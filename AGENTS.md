@@ -5,7 +5,7 @@
 - **Strictly linear history**: always rebase onto the latest remote before pushing (`git pull --rebase origin main`). Never generate merge commits.
 - **Never force-push**: do not force-push to `main` (or any shared branch). Amend only your own commits that have not been pushed yet.
 - **Respect branch protection**: never attempt to change, weaken, or remove branch protection rules — whether via UI, `gh api`, or any other means. If a rule blocks you, work within it.
-- **Directory boundaries**: frontend work is strictly confined to `/frontend`; backend work to `/backend`.
+- **Directory boundaries**: frontend work is strictly confined to `/frontend`; backend work to `/backend`. `/shared` is jointly owned: either side may edit it, commit those changes alone, and push immediately (shared contracts).
 - **Verify before push**: make sure local code runs before pushing.
 - **Conventional commits**: use lightweight messages scoped to the layer, e.g. `feat(fe): ...`, `fix(be): ...`.
 - **Shared contracts**: immediately commit updates to `.env.example` or shared API contracts whenever shared interfaces change.
