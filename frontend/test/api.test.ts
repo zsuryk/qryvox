@@ -1,6 +1,6 @@
-import { IngestedDocument, PDFJS_VERSION } from "@qryvox/shared";
+import { ChangeDispositionRequest, IngestedDocument, PDFJS_VERSION, StepResult } from "@qryvox/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { API_URL, ingestDocument, openCase } from "../lib/api";
+import { API_URL, changeDisposition, ingestDocument, openCase, runStep } from "../lib/api";
 
 // What intake hands the wire. Parsed against the real schema, so this test fails if a field the event
 // needs is ever dropped between the browser and the log.
@@ -58,5 +58,64 @@ describe("ingesting a document", () => {
   it("rejects a response that is not the append the contract describes", async () => {
     stubFetch({ seq: "two" });
     await expect(ingestDocument("case", crypto.randomUUID(), document)).rejects.toThrow();
+  });
+});
+
+describe("running a step", () => {
+  const request = { step_run_id: crypto.randomUUID(), step: "extract", input_run_id: null } as const;
+  const result = StepResult.parse({
+    step_run_id: request.step_run_id,
+    step: "extract",
+    seq: 7,
+    prompt_version: "extract@1",
+    model: "fake-model",
+    output: { statements: [] },
+  });
+
+  it("posts the run id the browser named, so a retry lands on the same run", async () => {
+    const caseId = crypto.randomUUID();
+    const fetch = stubFetch(result, 200);
+
+    expect(await runStep(caseId, request)).toEqual(result);
+
+    const [url, init] = fetch.mock.calls[0]!;
+    expect(url).toBe(`${API_URL}/cases/${caseId}/steps`);
+    expect(init).toMatchObject({ method: "POST", body: JSON.stringify(request) });
+  });
+
+  it("raises a failed run with what the server said and the seq it logged", async () => {
+    stubFetch({ error: "model endpoint unreachable", step_run_id: request.step_run_id, seq: 8 }, 502);
+
+    await expect(runStep(crypto.randomUUID(), request)).rejects.toMatchObject({
+      name: "StepFailureError",
+      message: "model endpoint unreachable",
+      failure: { step_run_id: request.step_run_id, seq: 8 },
+    });
+  });
+
+  it("raises what the server said, path and all, when the failure is not the contract's shape", async () => {
+    const caseId = crypto.randomUUID();
+    // stubFetch stringifies its body, so the wire text is a JSON string rather than the failure contract.
+    stubFetch("gateway timeout", 504);
+
+    await expect(runStep(caseId, request)).rejects.toThrow(`POST /cases/${caseId}/steps: 504 "gateway timeout"`);
+  });
+});
+
+describe("changing a disposition", () => {
+  it("posts the analyst's decision under the browser's event id, and nothing else", async () => {
+    const caseId = crypto.randomUUID();
+    const decision = ChangeDispositionRequest.parse({
+      event_id: crypto.randomUUID(),
+      finding_id: "finding-1",
+      disposition: "dismissed",
+    });
+    const fetch = stubFetch({ seq: 31 });
+
+    expect(await changeDisposition(caseId, decision)).toEqual({ seq: 31 });
+
+    const [url, init] = fetch.mock.calls[0]!;
+    expect(url).toBe(`${API_URL}/cases/${caseId}/dispositions`);
+    expect(init).toMatchObject({ method: "POST", body: JSON.stringify(decision) });
   });
 });

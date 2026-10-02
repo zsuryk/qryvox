@@ -1,9 +1,13 @@
 import {
   AppendResponse,
+  ChangeDispositionRequest,
   EventPage,
   type IngestedDocument,
   OpenCaseResponse,
+  type RunStepRequest,
   type SlimEvent,
+  StepFailure,
+  StepResult,
   VerifyResponse,
 } from "@qryvox/shared";
 
@@ -11,13 +15,27 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787
 
 export class NotFound extends Error {}
 
-// One shape for both verbs, so a message off the wire reads the same whichever call it came from.
-async function request(method: "GET" | "POST", path: string, body?: unknown): Promise<unknown> {
-  const res = await fetch(`${API_URL}${path}`, {
+// A step that ran and failed: the server appended step.failed and says why — 422 when the model's output
+// did not parse, 502 when the model was unreachable. The body is parsed rather than flattened into text,
+// because the sequence number it carries is what the log shows the analyst as the step's record.
+export class StepFailureError extends Error {
+  override name = "StepFailureError";
+  constructor(readonly failure: ReturnType<typeof StepFailure.parse>) {
+    super(failure.error);
+  }
+}
+
+async function send(method: "GET" | "POST", path: string, body?: unknown): Promise<Response> {
+  return fetch(`${API_URL}${path}`, {
     method,
     cache: "no-store",
     ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   });
+}
+
+// One shape for both verbs, so a message off the wire reads the same whichever call it came from.
+async function request(method: "GET" | "POST", path: string, body?: unknown): Promise<unknown> {
+  const res = await send(method, path, body);
   if (res.status === 404) throw new NotFound(`${method} ${path}: 404`);
   if (!res.ok) throw new Error(`${method} ${path}: ${res.status} ${await res.text()}`);
   return res.json();
@@ -50,4 +68,29 @@ export async function openCase(eventId: string): Promise<OpenCaseResponse> {
 // The PDF itself never goes over the wire — only what the browser read out of it in lib/intake.ts.
 export async function ingestDocument(caseId: string, eventId: string, document: IngestedDocument): Promise<AppendResponse> {
   return AppendResponse.parse(await post(`/cases/${caseId}/documents`, { event_id: eventId, document }));
+}
+
+// One analysis step, as one awaited call (spec decision 19): no background job, no streaming, no server
+// orchestration. step_run_id is the browser's to name (spec decision 25), so a retry after a failure
+// reuses the same id and the server hands back the run it already completed without calling the model.
+export async function runStep(caseId: string, req: RunStepRequest): Promise<StepResult> {
+  const path = `/cases/${caseId}/steps`;
+  const res = await send("POST", path, req);
+  if (res.ok) return StepResult.parse(await res.json());
+  const text = await res.text();
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = undefined;
+  }
+  const failure = StepFailure.safeParse(body);
+  if (failure.success) throw new StepFailureError(failure.data);
+  throw new Error(`POST ${path}: ${res.status} ${text}`);
+}
+
+// The analyst's explicit decision on one finding, by button or keyboard. Nothing is decided anywhere else,
+// and a retry with the same event_id appends nothing (spec decision 34, ADR-0002).
+export async function changeDisposition(caseId: string, req: ChangeDispositionRequest): Promise<AppendResponse> {
+  return AppendResponse.parse(await post(`/cases/${caseId}/dispositions`, req));
 }
