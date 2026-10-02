@@ -1,8 +1,8 @@
 import { createHmac } from "node:crypto";
 import { and, count, eq, gte, min } from "drizzle-orm";
 import type { Context, MiddlewareHandler } from "hono";
-import type { Db } from "./db/client";
-import { events } from "./db/schema";
+import type { Db } from "./db/client.js";
+import { events } from "./db/schema.js";
 
 // Spend protection for a public judge URL (ADR-0001): an origin allow-list, a hashed client IP, and a rate
 // limit counted from the events table. The model provider's hard spend limit is the real backstop

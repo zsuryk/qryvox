@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { type Citation, Finding, Severity } from "@qryvox/shared";
 import { z } from "zod";
-import { ContradictionsOutput, type Issue } from "./contradictions";
-import { type Claim, DecomposeOutput } from "./decompose";
-import { loadCompletedOutput } from "./inputs";
-import type { StepDefinition } from "./step";
+import { ContradictionsOutput, type Issue } from "./contradictions.js";
+import { type Claim, DecomposeOutput } from "./decompose.js";
+import { loadCompletedOutput } from "./inputs.js";
+import type { StepDefinition } from "./step.js";
 
 // findings@1 — the model rates and words each issue; the server attaches the citations. Every quote on
 // the board therefore comes from a grounded claim, never from model prose.

@@ -1,5 +1,5 @@
-import type { SlimEvent } from "./events";
-import { emptyCaseState, type CaseState, type StepRun } from "./state";
+import type { SlimEvent } from "./events.js";
+import { emptyCaseState, type CaseState, type StepRun } from "./state.js";
 
 export class FoldError extends Error {
   override name = "FoldError";

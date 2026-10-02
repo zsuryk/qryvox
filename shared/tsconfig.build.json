@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "declarationMap": false,
+    // tsc never rewrites specifiers, so relative imports must carry the .js extension the output
+    // actually needs at runtime, not just for type resolution.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "verbatimModuleSyntax": false,
+    // llm.ts reads the fetch Response, so the emit needs the same DOM types the test build has.
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src"]
+}

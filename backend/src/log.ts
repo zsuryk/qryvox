@@ -1,8 +1,8 @@
 import type { Event, VerifyResponse } from "@qryvox/shared";
 import { and, asc, desc, eq, gt } from "drizzle-orm";
-import type { Db } from "./db/client";
-import { events, type EventRow } from "./db/schema";
-import { hashEvent } from "./hash";
+import type { Db } from "./db/client.js";
+import { events, type EventRow } from "./db/schema.js";
+import { hashEvent } from "./hash.js";
 
 export type EventDraft = {
   eventId: string;

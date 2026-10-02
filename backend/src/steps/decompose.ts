@@ -1,8 +1,8 @@
 import { FindingCategory, type IngestedDocument } from "@qryvox/shared";
 import { z } from "zod";
-import { ExtractOutput } from "./extract";
-import { loadCompletedOutput, loadDocuments, onPage } from "./inputs";
-import type { StepDefinition } from "./step";
+import { ExtractOutput } from "./extract.js";
+import { loadCompletedOutput, loadDocuments, onPage } from "./inputs.js";
+import type { StepDefinition } from "./step.js";
 
 // decompose@1 — splits extracted statements into atomic claims, each with a category, a topic shared
 // across documents, and a short assertion. Quotes stay verbatim so every claim keeps its citation.

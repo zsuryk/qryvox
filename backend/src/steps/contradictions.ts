@@ -1,8 +1,8 @@
 import { FindingCategory, FindingKind, type IngestedDocument } from "@qryvox/shared";
 import { z } from "zod";
-import { type Claim, DecomposeOutput } from "./decompose";
-import { loadCompletedOutput, loadDocuments } from "./inputs";
-import type { StepDefinition } from "./step";
+import { type Claim, DecomposeOutput } from "./decompose.js";
+import { loadCompletedOutput, loadDocuments } from "./inputs.js";
+import type { StepDefinition } from "./step.js";
 
 // contradictions@1 — compares claims across the pack and names the issues: contradictions between
 // documents, marketing claims the PPM does not support, and promises missing their risk disclosure.

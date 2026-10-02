@@ -14,13 +14,13 @@ import {
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { assertAppendOnly } from "./db/append-only";
-import type { Database } from "./db/client";
-import { clientIp, type Guards, hashIp, originAllowList, RateLimited } from "./guards";
-import type { Llm } from "./llm";
-import { appendOnce, caseExists, EventIdConflict, getEvent, listEvents, toWire, verifyChain } from "./log";
-import { LlmNotConfigured, runStep } from "./steps/run";
-import { StepPrecondition } from "./steps/step";
+import { assertAppendOnly } from "./db/append-only.js";
+import type { Database } from "./db/client.js";
+import { clientIp, type Guards, hashIp, originAllowList, RateLimited } from "./guards.js";
+import type { Llm } from "./llm.js";
+import { appendOnce, caseExists, EventIdConflict, getEvent, listEvents, toWire, verifyChain } from "./log.js";
+import { LlmNotConfigured, runStep } from "./steps/run.js";
+import { StepPrecondition } from "./steps/step.js";
 
 export type AppOptions = Database & {
   // null when no model is configured: everything but running a new step still works.

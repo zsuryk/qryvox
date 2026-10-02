@@ -1,8 +1,8 @@
 import { IngestedDocument, type StepName } from "@qryvox/shared";
 import type { z } from "zod";
-import type { Db } from "../db/client";
-import { findCompletedRun, listEventsOfType } from "../log";
-import { StepPrecondition } from "./step";
+import type { Db } from "../db/client.js";
+import { findCompletedRun, listEventsOfType } from "../log.js";
+import { StepPrecondition } from "./step.js";
 
 export async function loadDocuments(db: Db, caseId: string): Promise<IngestedDocument[]> {
   const rows = await listEventsOfType(db, caseId, "document.ingested");

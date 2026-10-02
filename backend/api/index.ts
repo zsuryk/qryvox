@@ -3,10 +3,10 @@
 // cold start never issues DDL and concurrent cold starts cannot race each other (ADR-0001).
 // assertAppendOnly needs no entry-level call: app.ts runs it before the first request touches the log.
 import { handle } from "hono/vercel";
-import { createApp } from "./app";
-import { openDatabase } from "./db/client";
-import { env } from "./env";
-import { createLlm } from "./llm";
+import { createApp } from "../src/app.js";
+import { openDatabase } from "../src/db/client.js";
+import { env } from "../src/env.js";
+import { createLlm } from "../src/llm.js";
 
 const database = openDatabase(env.databaseUrl, env.databaseAuthToken);
 

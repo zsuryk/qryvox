@@ -188,9 +188,6 @@ catalogs:
     drizzle-orm:
       specifier: ^0.45.3
       version: 0.45.3
-    esbuild:
-      specifier: ^0.28.2
-      version: 0.28.2
     eslint:
       specifier: ^10.11.0
       version: 10.11.0
@@ -275,9 +272,6 @@ importers:
       drizzle-kit:
         specifier: 'catalog:'
         version: 0.31.11
-      esbuild:
-        specifier: 'catalog:'
-        version: 0.28.2
       tsx:
         specifier: 'catalog:'
         version: 4.23.15

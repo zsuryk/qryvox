@@ -1,7 +1,7 @@
 import type { IngestedDocument } from "@qryvox/shared";
 import { z } from "zod";
-import { documentsAsText, loadDocuments, onPage } from "./inputs";
-import { StepPrecondition, type StepDefinition } from "./step";
+import { documentsAsText, loadDocuments, onPage } from "./inputs.js";
+import { StepPrecondition, type StepDefinition } from "./step.js";
 
 // extract@1 — lists every statement each document makes, verbatim, with its page.
 

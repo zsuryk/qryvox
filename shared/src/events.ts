@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Finding } from "./finding";
+import { Finding } from "./finding.js";
 
 // Envelope fields carried by every event, named as in ADR-0002.
 // seq is per case: 1, 2, 3… with no gaps, assigned inside the append transaction.

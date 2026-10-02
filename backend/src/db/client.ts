@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { createClient, type Client } from "@libsql/client";
 import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
-import * as schema from "./schema";
+import * as schema from "./schema.js";
 
 export type Db = LibSQLDatabase<typeof schema>;
 export type Database = { client: Client; db: Db };

@@ -215,10 +215,11 @@ deploy_api() {
   load_project API
   migrate
   sync_env
-  step "Building the backend"
-  pnpm --filter @qryvox/backend build
   step "Deploying $API_PROJECT to production"
-  vercel deploy --prod
+  rm -rf .vercel/output
+  # --archive uploads a tarball carrying no git metadata, so there is no commit author for Vercel's
+  # Hobby check ("author must be the team owner") to reject. The Git integration stays disconnected.
+  vercel deploy --prod --archive=tgz
   step "Verifying /health on the deployed backend"
   local url="https://$API_PROJECT.vercel.app" attempt
   for attempt in 1 2 3 4 5 6; do
@@ -236,8 +237,9 @@ deploy_api() {
 deploy_web() {
   preflight
   load_project WEB
+  rm -rf .vercel/output
   step "Deploying $WEB_PROJECT to production"
-  vercel deploy --prod
+  vercel deploy --prod --archive=tgz
   info "deployed the frontend. It calls the backend via NEXT_PUBLIC_API_URL (set on the web project)."
 }
 

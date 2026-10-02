@@ -1,15 +1,15 @@
 import { randomUUID } from "node:crypto";
 import { ANALYST_ACTOR, PROMPT_VERSIONS, type RunStepRequest, type StepFailure, type StepResult } from "@qryvox/shared";
-import type { Db } from "../db/client";
-import type { EventRow } from "../db/schema";
-import { checkRateLimit, type RateLimits } from "../guards";
-import { extractJson, LlmError, type Llm } from "../llm";
-import { append, EventIdConflict, type EventDraft, findCompletedRun, isUniqueViolation, listEventsOfType, type Tx } from "../log";
-import { contradictions } from "./contradictions";
-import { decompose } from "./decompose";
-import { extract } from "./extract";
-import { findings } from "./findings";
-import type { AnyStep } from "./step";
+import type { Db } from "../db/client.js";
+import type { EventRow } from "../db/schema.js";
+import { checkRateLimit, type RateLimits } from "../guards.js";
+import { extractJson, LlmError, type Llm } from "../llm.js";
+import { append, EventIdConflict, type EventDraft, findCompletedRun, isUniqueViolation, listEventsOfType, type Tx } from "../log.js";
+import { contradictions } from "./contradictions.js";
+import { decompose } from "./decompose.js";
+import { extract } from "./extract.js";
+import { findings } from "./findings.js";
+import type { AnyStep } from "./step.js";
 
 const STEPS: Record<RunStepRequest["step"], AnyStep> = { extract, decompose, contradictions, findings };
 

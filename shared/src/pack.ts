@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { DocumentKind, Sha256 } from "./events";
-import { Citation, FindingCategory, FindingKind } from "./finding";
+import { DocumentKind, Sha256 } from "./events.js";
+import { Citation, FindingCategory, FindingKind } from "./finding.js";
 
 // One document of the fabricated pack, served as a static asset at /pack/<filename>.
 export const PackDocument = z.object({

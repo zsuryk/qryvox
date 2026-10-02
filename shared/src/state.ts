@@ -1,5 +1,5 @@
-import type { DocumentKind, StepName } from "./events";
-import type { Finding } from "./finding";
+import type { DocumentKind, StepName } from "./events.js";
+import type { Finding } from "./finding.js";
 
 export type CaseDocument = {
   documentId: string;

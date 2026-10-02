@@ -1,7 +1,7 @@
 import type { Finding, StepName } from "@qryvox/shared";
 import type { z } from "zod";
-import type { Db } from "../db/client";
-import type { ChatMessage } from "../llm";
+import type { Db } from "../db/client.js";
+import type { ChatMessage } from "../llm.js";
 
 // A step cannot run yet: no documents, or its input run is missing. Nothing is appended, no tokens spent.
 export class StepPrecondition extends Error {

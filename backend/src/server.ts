@@ -1,9 +1,9 @@
 import { serve } from "@hono/node-server";
-import { createApp } from "./app";
-import { assertAppendOnly } from "./db/append-only";
-import { openDatabase, runMigrations } from "./db/client";
-import { env } from "./env";
-import { createLlm } from "./llm";
+import { createApp } from "./app.js";
+import { assertAppendOnly } from "./db/append-only.js";
+import { openDatabase, runMigrations } from "./db/client.js";
+import { env } from "./env.js";
+import { createLlm } from "./llm.js";
 
 const database = openDatabase(env.databaseUrl, env.databaseAuthToken);
 await runMigrations(database.db);

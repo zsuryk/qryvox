@@ -1,4 +1,4 @@
-export { ANALYST_ACTOR } from "./actor";
+export { ANALYST_ACTOR } from "./actor.js";
 export {
   AppendResponse,
   ErrorResponse,
@@ -12,7 +12,7 @@ export {
   StepFailure,
   StepResult,
   VerifyResponse,
-} from "./api";
+} from "./api.js";
 export {
   CaseOpened,
   DocumentIngested,
@@ -30,8 +30,8 @@ export {
   StepFailed,
   StepName,
   StepStarted,
-} from "./events";
-export { fold, FoldError } from "./fold";
+} from "./events.js";
+export { fold, FoldError } from "./fold.js";
 export {
   activeFindings,
   type CaseDocument,
@@ -40,8 +40,8 @@ export {
   type CaseState,
   type StepRun,
   type StepRunStatus,
-} from "./state";
-export { Citation, Finding, FindingCategory, FindingKind, Severity } from "./finding";
+} from "./state.js";
+export { Citation, Finding, FindingCategory, FindingKind, Severity } from "./finding.js";
 export {
   GroundTruth,
   GroundTruthEntry,
@@ -49,4 +49,4 @@ export {
   PackDocument,
   PackManifest,
   PlantedKind,
-} from "./pack";
+} from "./pack.js";
