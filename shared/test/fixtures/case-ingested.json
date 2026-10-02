@@ -1,0 +1,49 @@
+[
+  {
+    "seq": 1,
+    "event_id": "e71633f5-f57c-4be7-96e6-4cb88a822464",
+    "case_id": "e71633f5-f57c-4be7-96e6-4cb88a822464",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T03:05:50.498Z",
+    "step_run_id": null,
+    "type": "case.opened",
+    "v": 1,
+    "payload": {}
+  },
+  {
+    "seq": 2,
+    "event_id": "faf0c498-142b-4c22-8585-2d725134bd4c",
+    "case_id": "e71633f5-f57c-4be7-96e6-4cb88a822464",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T03:05:50.512Z",
+    "step_run_id": null,
+    "type": "document.ingested",
+    "v": 1,
+    "payload": {
+      "document_id": "factsheet",
+      "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "filename": "factsheet.pdf",
+      "kind": "factsheet",
+      "page_count": 1,
+      "pdfjs_version": "5.0.0"
+    }
+  },
+  {
+    "seq": 3,
+    "event_id": "24f49102-b8ce-450f-9410-db1e606e0e96",
+    "case_id": "e71633f5-f57c-4be7-96e6-4cb88a822464",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T03:05:50.522Z",
+    "step_run_id": null,
+    "type": "document.ingested",
+    "v": 1,
+    "payload": {
+      "document_id": "ppm",
+      "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+      "filename": "ppm-excerpt.pdf",
+      "kind": "ppm",
+      "page_count": 2,
+      "pdfjs_version": "5.0.0"
+    }
+  }
+]
