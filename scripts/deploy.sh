@@ -223,11 +223,14 @@ preview_api() {
   step "Deploying a PREVIEW of $API_PROJECT (production is not touched)"
   vercel deploy --yes --scope "$SCOPE" --cwd "$STAGE"
   step "Verifying /health on the preview"
-  local url="$1" attempt
+  # Previews sit behind Vercel Authentication, so the health check goes through the CLI's own
+  # authenticated client rather than a bare curl.
+  local url="${1:-$(latest_deployment_url)}" attempt
   for attempt in 1 2 3 4 5 6; do
-    if curl -fsS --max-time 20 "$url/health" | grep -q '"status":"ok"'; then
+    if vercel curl /health "$url" --scope "$SCOPE" 2>/dev/null | grep -q '"status":"ok"'; then
       info "healthy: $url/health"
-      info "author check passed without a commit, so production deploys will pass too"
+      info "the commit-author check passed with no git metadata in the upload,"
+      info "so a production deploy of the same commit will pass too"
       return 0
     fi
     info "attempt $attempt/6 not ready yet, waiting..."
@@ -260,6 +263,13 @@ stage_gitless() {
 }
 
 cleanup_stage() { [ -n "${STAGE:-}" ] && rm -rf "$(dirname "$STAGE")"; }
+
+# The URL of the most recent deployment, for the preview health check.
+latest_deployment_url() {
+  vercel project inspect "$API_PROJECT" --scope "$SCOPE" 2>/dev/null \
+    | awk '/Latest Production URL|latest deployment/ { print $NF }' \
+    | grep -E '^https://' | head -1
+}
 trap cleanup_stage EXIT
 
 deploy_api() {
