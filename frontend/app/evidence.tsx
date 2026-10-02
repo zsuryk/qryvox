@@ -28,8 +28,12 @@ import { browserPdfAssets, openPdf, type OpenDocument, type RenderedPage } from 
 //
 // Props are the document and the citation and nothing else: no store, no context, and no fetch of
 // anything but that document's own bytes. The bytes are re-fetched by hash on every mount and every
-// citation change — every render, reload and replay — and nothing about the document is read out of the
-// event log, because the slim document.ingested event carries no page text to read (ADR-0002).
+// citation change — so every reload and every replay of the case reads them again — and nothing about the
+// document is read out of the event log, because the slim document.ingested event carries no page text to
+// read (ADR-0002). What is deliberately not claimed: one fetch per React render. The effect keys on the
+// citation's own values, so a re-render that changes nothing about which passage of which page is being
+// read does not re-download the document — which is the criterion's intent (nothing is cached *in the
+// event log*, and no rendering is ever served from a stored copy of the bytes) rather than its letter.
 
 const MUTED = "#5b6270";
 const LINE = "#d5d9e0";
@@ -115,13 +119,15 @@ export function EvidencePane({ document: source, citation }: EvidencePaneProps) 
 
   // Opening a citation opens its document: fetch the bytes, check them against the hash the log
   // recorded, and only then let pdf.js have them. Nothing here is memoised and nothing is kept — a pane
-  // that has shown a document before fetches it again, which is what "re-fetched by hash on every
-  // render, reload and replay" is in code rather than in prose (ADR-0001).
+  // that has shown a document before fetches it again, which is what "re-fetched by hash on every render,
+  // reload and replay" asks for in code rather than in prose (ADR-0001). What is held is only the
+  // hash-checked bytes for the citation currently open, so that a re-render mid-read does not start a
+  // second download of the same document.
   //
   // The effect depends on the citation's own values rather than on the objects they arrive in, so a
-  // caller handing over a fresh document and citation every render fetches once per render and not once
-  // per object — key and the values it is built from are named together so that stays true if the key
-  // ever stops being what it looks like.
+  // caller handing over a fresh document and citation every render does not fetch once per object —
+  // key and the values it is built from are named together so that stays true if the key ever stops being
+  // what it looks like.
   useEffect(() => {
     const next: EvidenceDocument = { documentId, filename, sha256, pageCount };
     const forKey = key;
@@ -274,7 +280,10 @@ export function EvidencePane({ document: source, citation }: EvidencePaneProps) 
       </figure>
 
       <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-        {view.showsPage ? (
+        {/* Gated on canJump, not on showsPage: the fallback is the quote panel *plus a page jump*
+            (ADR-0001), so a document that has been read but whose page has not painted yet still owes
+            the analyst the way to move within it. canJump outlives a page being drawn for that reason. */}
+        {view.canJump ? (
           <>
             <Jump
               label="‹ Previous page"
@@ -283,6 +292,7 @@ export function EvidencePane({ document: source, citation }: EvidencePaneProps) 
             />
             <span style={{ color: MUTED, fontSize: "0.8rem" }}>
               Page {view.page} of {view.pageCount}
+              {!view.showsPage && " · not drawn yet"}
             </span>
             <Jump
               label="Next page ›"
@@ -298,7 +308,8 @@ export function EvidencePane({ document: source, citation }: EvidencePaneProps) 
           </>
         ) : (
           <p style={{ color: MUTED, fontSize: "0.8rem", margin: 0 }}>
-            No page on screen yet, so there is nothing to jump between.
+            Nothing to jump between: the citation names page {view.citedPage} and the document holds{" "}
+            {view.pageCount === 1 ? "one page" : `${view.pageCount} pages`}, but it has not been read.
           </p>
         )}
       </div>

@@ -191,10 +191,10 @@ function apply(state: EvidenceState, event: EvidenceEvent): EvidenceState {
     case "citation.opened":
       return opened();
     case "page.jumped":
-      // The document is still open and still verified; what is being read is another page of it, and the
-      // runs held are the runs of the page left behind. Saying so keeps the pane from marking the old
-      // page's runs as though they were the page now on screen.
-      return { ...state, status: "verified", page: event.page, runs: [] };
+      // Only within a document the pane actually holds: the bytes were fetched and their hash checked
+      // against the case log. A jump from a document that never arrived would move a pane that has
+      // nothing to show and invite it to draw from bytes it does not have.
+      return holdsDocument(state) ? { ...state, status: "verified", page: event.page, runs: [] } : state;
     case "document.fetched":
       return state.status === "reading" ? { ...state, status: "verified", sha256: event.sha256 } : state;
     case "document.hash-mismatch":
@@ -247,6 +247,13 @@ export async function fetchVerifiedDocument(document: EvidenceDocument): Promise
       };
 }
 
+// Whether the pane holds a document to move within: fetched, and its hash the one the case log recorded.
+// page-unavailable counts, because there the bytes are present and only the page that failed is not — which
+// is exactly the state the quote-panel fallback has to carry a page jump through (ADR-0001).
+function holdsDocument(state: EvidenceState): boolean {
+  return state.sha256 !== null && state.status !== "fetch-failed" && state.status !== "hash-mismatch";
+}
+
 // What the pane shows, said once here rather than discovered in a demo. The fallback is specified: for
 // every state there is a path, a word for it, and a sentence saying why that one.
 export type EvidenceView = {
@@ -264,7 +271,8 @@ export type EvidenceView = {
   quote: string;
   // The runs the passage covers, when the primary path is available; null on every fallback.
   match: QuoteMatch | null;
-  // Whether the page itself is on screen, and whether there is anything to move it within.
+  // Whether the page itself is on screen, and whether there is a document to move within — the second
+  // outlives the first, so the fallback keeps its page jump (ADR-0001, spec decision 33).
   showsPage: boolean;
   canJump: boolean;
   onCitedPage: boolean;
@@ -285,8 +293,9 @@ export function evidenceView(
   const match = state.status === "page-read" && onCitedPage ? findQuote(state.runs, citation.quote) : null;
   const showsPage = state.status === "page-read";
   // Whether there is a document to move within, which outlives a page being drawn — the jump stays put
-  // while the next page is read rather than blinking out of the pane and back.
-  const canJump = (state.status === "verified" || state.status === "page-read") && document.pageCount > 1;
+  // while the next page is read rather than blinking out of the pane and back, and stays available on the
+  // quote panel when the page never arrives, because that is the fallback ADR-0001 specifies.
+  const canJump = holdsDocument(state) && document.pageCount > 1;
   const shown = {
     page,
     citedPage: citation.page,

@@ -146,7 +146,13 @@ export default function Pipeline({ log, running, busy, failure, onAction }: Pipe
               {error !== null && (
                 <span style={{ color: "#a02c2c", flexBasis: "100%", fontSize: "0.85rem" }}>
                   {error}
-                  {lost === null && step.runId !== null && " — the retry runs it again under the same run id, so it stays one run in the log."}
+                  {/* Two different promises, and the panel must not blur them: retrying a step that failed
+                      calls the model again — there is no stored result to return — while continuing past a
+                      step the log already holds a completed result for spends nothing, because the server
+                      returns that result before it reaches the model (ADR-0002). Both reuse the run id,
+                      which is what keeps a retry inside one run rather than forking a second. */}
+                  {lost === null && step.runId !== null && " — retrying calls the model again, under the same run id."}
+                  {lost !== null && " — the log already holds this run's result, so continuing costs nothing."}
                 </span>
               )}
             </li>

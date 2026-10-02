@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { FindingCategory, Severity, SlimEvent } from "@qryvox/shared";
 import { boardView, categoryLabel, CATEGORIES, names, type BoardCard, type BoardCitation, type BoardView } from "../lib/board";
 import { errorMessage } from "../lib/errors";
@@ -117,7 +117,9 @@ export function Board({ events, selected, onSelect }: BoardProps) {
       </div>
 
       {/* The split: findings on the left, the document they cite on the right, wrapping to one column on
-          a narrow screen rather than squeezing a page of PDF into nothing. */}
+          a narrow screen rather than squeezing a page of PDF into nothing. The second column appears when
+          a citation is opened and not before: the default view is the board with its filters, not a
+          placeholder asking to be filled (spec decision 31). */}
       <div style={{ alignItems: "flex-start", display: "flex", flexWrap: "wrap", gap: 20 }}>
         <div style={{ flex: "1 1 420px", minWidth: 0 }}>
           {view.cards.length === 0 ? (
@@ -152,12 +154,14 @@ export function Board({ events, selected, onSelect }: BoardProps) {
           )}
         </div>
 
-        <EvidenceColumn
-          selection={selection}
-          // The pane is given the document the log recorded, not the one the citation names: the hash it
-          // checks the bytes against belongs to the document, and a citation carries no hash at all.
-          source={selection ? evidenceDocument(events, selection.citation.documentId) : null}
-        />
+        {selection !== null && (
+          <EvidenceColumn
+            selection={selection}
+            // The pane is given the document the log recorded, not the one the citation names: the hash it
+            // checks the bytes against belongs to the document, and a citation carries no hash at all.
+            source={evidenceDocument(events, selection.citation.documentId)}
+          />
+        )}
       </div>
     </section>
   );
@@ -165,45 +169,40 @@ export function Board({ events, selected, onSelect }: BoardProps) {
 
 export default Board;
 
-// The second column: the pane, or what it says before a citation is opened. The split is there from the
-// start, so an analyst can see what a citation leads to before opening one.
+// The evidence column's own box. One place, because the pane and the one thing that can stand in for it
+// are the same column and were drifting apart as two copies of the same style.
+function Aside({ children }: { children: ReactNode }) {
+  return (
+    <aside
+      aria-label="Evidence"
+      style={{ background: "#ffffff", border: `1px solid ${LINE}`, borderRadius: 6, flex: "0 1 380px", padding: "12px 14px" }}
+    >
+      {children}
+    </aside>
+  );
+}
+
+// The second column: the pane, or what it says when the log names no document for the citation. Both are
+// states the pane cannot draw for itself — the pane is handed a document, and there is none to hand it.
 function EvidenceColumn({
   selection,
   source,
 }: {
-  selection: EvidenceSelection | null;
+  selection: EvidenceSelection;
   source: EvidenceDocument | null;
 }) {
-  if (selection === null) {
-    return (
-      <aside
-        aria-label="Evidence"
-        style={{ background: "#ffffff", border: `1px solid ${LINE}`, borderRadius: 6, flex: "0 1 380px", padding: "12px 14px" }}
-      >
-        <p style={{ fontWeight: 600, margin: 0 }}>No citation open</p>
-        <p style={{ color: MUTED, fontSize: "0.85rem", margin: "4px 0 0" }}>
-          Open a citation on any card and the document it names opens here, on the page it cites, with the
-          passage marked.
-        </p>
-      </aside>
-    );
-  }
-
   // The log names every document a citation can cite, so this is a log gap rather than a state the pane
   // draws — and the board already treats a log gap as an error of its own. Nothing is rendered from a
   // document that cannot be named, and certainly not from one that cannot be hashed.
   if (source === null) {
     return (
-      <aside
-        aria-label="Evidence"
-        style={{ background: "#ffffff", border: `1px solid ${LINE}`, borderRadius: 6, flex: "0 1 380px", padding: "12px 14px" }}
-      >
+      <Aside>
         <p style={{ fontWeight: 600, margin: 0 }}>This case&apos;s log names no such document</p>
         <p style={{ color: MUTED, fontSize: "0.85rem", margin: "4px 0 0" }}>
           No document was ingested with the id <code>{selection.citation.documentId}</code>, so there is
           nothing to open or to check the bytes against. The passage is quoted in full on its card.
         </p>
-      </aside>
+      </Aside>
     );
   }
 

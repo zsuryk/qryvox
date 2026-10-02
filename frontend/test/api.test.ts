@@ -118,4 +118,22 @@ describe("changing a disposition", () => {
     expect(url).toBe(`${API_URL}/cases/${caseId}/dispositions`);
     expect(init).toMatchObject({ method: "POST", body: JSON.stringify(decision) });
   });
+
+  it("carries the server's reason on a refusal, because a status code is not a reason", async () => {
+    // The backend answers 409 when a later findings run superseded the finding. The analyst has to be told
+    // that in words, and a bare 404 would leave them pressing a button that will never work.
+    stubFetch({ error: "finding f-1 was superseded by a later findings run and is off the board" }, 409);
+
+    await expect(
+      changeDisposition("case", ChangeDispositionRequest.parse({ event_id: crypto.randomUUID(), finding_id: "f-1", disposition: "approved" })),
+    ).rejects.toThrow("was superseded by a later findings run and is off the board");
+  });
+
+  it("carries the server's reason on a 404 too", async () => {
+    stubFetch({ error: "finding f-1 not found in case case" }, 404);
+
+    await expect(
+      changeDisposition("case", ChangeDispositionRequest.parse({ event_id: crypto.randomUUID(), finding_id: "f-1", disposition: "approved" })),
+    ).rejects.toThrow("not found in case case");
+  });
 });

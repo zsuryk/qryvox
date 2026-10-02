@@ -273,6 +273,36 @@ describe("the pane", () => {
     expect(view.quote).toBe(feeCitation.quote);
   });
 
+  it("keeps the page jump on the fallback, which is the quote panel *and* a page jump (ADR-0001)", () => {
+    // The document was fetched and its hash checked; only the page failed. The bytes are there, so there
+    // is something to move within — a pane that dropped the jump here would be half the named fallback.
+    const unreadable = pane([opened, fetched(), { type: "page.unavailable", detail: "that page would not paint" }]);
+    expect(unreadable).toMatchObject({ showsPage: false, canJump: true, path: "quote-panel" });
+
+    // And it moves: jumping from the fallback lands on a page the pane is now reading, not the one that
+    // failed — which is what "quote panel plus a page jump" has to mean for the jump to be worth having.
+    const recovered = pane([opened, fetched(), { type: "page.unavailable", detail: "no" }, { type: "page.jumped", page: 2 }]);
+    expect(recovered).toMatchObject({ page: 2, citedPage: 1, showsPage: false, canJump: true, sha256: factsheet.sha256 });
+  });
+
+  it("offers no page jump when there is no verified document to move within", () => {
+    // Nothing fetched and nothing verified: the quote panel is all there is, and pretending otherwise
+    // would offer a control that cannot do what it says.
+    for (const failed of [
+      { type: "document.fetch-failed", detail: "404" },
+      { type: "document.hash-mismatch", expected: factsheet.sha256, found: deck.sha256 },
+    ] as const) {
+      expect(pane([opened, failed])).toMatchObject({ canJump: false, path: "quote-panel" });
+    }
+  });
+
+  it("ignores a page jump when the document never arrived, rather than drawing from bytes it lacks", () => {
+    const view = pane([opened, { type: "document.fetch-failed", detail: "404" }, { type: "page.jumped", page: 2 }]);
+
+    expect(view).toMatchObject({ mode: "document-missing", sha256: null });
+    expect(paneState([opened, { type: "document.fetch-failed", detail: "404" }, { type: "page.jumped", page: 2 }]).page).toBeNull();
+  });
+
   it("says which page the passage is on once the analyst has moved away from it", () => {
     const view = pane([opened, fetched(), pageRead(2), { type: "page.jumped", page: 1 }, pageRead(1)]);
 
@@ -369,6 +399,23 @@ describe("the document a citation is opened against", () => {
 // every control the analyst reaches for is in the markup, which is the part that has to be real rather
 // than described. Rendered with react-dom/server, which ships with react-dom: no DOM-testing dependency
 // is added for two assertions.
+//
+// Rendered markup is a string, so every assertion on it is a pattern. These three helpers keep the
+// patterns off what an implementation may reasonably rewrite — attribute order, a colour, a separator —
+// and on what it may not: what the control is, what it says, and what it points at. A test that pinned
+// `style="background:#fde68a…"` would fail on a repaint with every behaviour unchanged, which is by the
+// repo's own testing decision 1 the wrong test.
+function chipFor(markup: string, filename: string): string {
+  const chips = markup.match(/<button[^>]*>[^<]*<\/button>/g) ?? [];
+  const chip = chips.find((tag) => tag.includes(filename));
+  if (chip === undefined) throw new Error(`no citation chip naming ${filename} in:\n${markup}`);
+  return chip;
+}
+
+const attr = (tag: string, name: string): string | null => tag.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] ?? null;
+
+const marks = (markup: string): string[] => markup.match(/<mark[^>]*>[\s\S]*?<\/mark>/g) ?? [];
+
 describe("the board with its citation chips", () => {
   const cards = boardView(events, [...CATEGORIES]).cards;
   const card = cards[0]!;
@@ -388,18 +435,27 @@ describe("the board with its citation chips", () => {
   });
 
   it("makes each citation a button that names the document and the page, and says which one is open", () => {
-    const closed = html(null);
-    expect(closed).toMatch(/<button type="button" aria-expanded="false"[^>]*>larkspur-factsheet\.pdf · page 1<\/button>/);
-    expect(closed).toContain("No citation open");
+    const closed = chipFor(html(null), "larkspur-factsheet.pdf");
+    expect(attr(closed, "type")).toBe("button");
+    expect(attr(closed, "aria-expanded")).toBe("false");
+    expect(closed).toContain("page 1");
 
     const openedNow = html(open(0));
-    expect(openedNow).toMatch(/<button type="button" aria-expanded="true"[^>]*>larkspur-factsheet\.pdf · page 1<\/button>/);
+    const chip = chipFor(openedNow, "larkspur-factsheet.pdf");
+    expect(attr(chip, "aria-expanded")).toBe("true");
     expect(openedNow).toContain("open in the pane");
     // The pane beside the board, on the cited page, with the passage quoted verbatim and marked as a
     // quote rather than left blank while the document is fetched.
     expect(openedNow).toContain('aria-label="Evidence from larkspur-factsheet.pdf"');
     expect(openedNow).toContain("Reading the document");
-    expect(openedNow).toContain(`<mark style="background:#fde68a;color:inherit;padding:0 2px">${card.citation!.quote}</mark>`);
+    expect(marks(openedNow).some((mark) => mark.includes(card.citation!.quote))).toBe(true);
+  });
+
+  it("shows no evidence column until a citation is opened, so the board is the default view", () => {
+    // Spec decision 31: the default view is the board with its filters, not an empty column asking to be
+    // filled. The column appears when there is a citation to put in it.
+    expect(html(null)).not.toContain("Evidence from");
+    expect(html(open(0))).toContain("Evidence from larkspur-factsheet.pdf");
   });
 
   it("moves the pane to another citation's document and page, and works on a log alone", () => {
@@ -410,7 +466,6 @@ describe("the board with its citation chips", () => {
     // events on its own is how /board mounts it, and how this suite folds the case log.
     const alone = html();
     expect(alone).toContain("Claim board");
-    expect(alone).toContain("No citation open");
     expect(alone).toContain(card.citation!.quote);
   });
 });

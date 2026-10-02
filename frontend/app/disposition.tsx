@@ -62,13 +62,24 @@ export default function DispositionConsole({ caseId, events, refetch, selected =
     setSaid(null);
     try {
       await changeDisposition(caseId, { event_id: eventId, finding_id: row.card.findingId, disposition });
+      setPending(null);
       await refetch();
       setSaid({ text: `${DISPOSITION_LABEL[disposition]} — ${row.card.claim}`, recorded: true });
     } catch (cause) {
       // Said as a failure rather than left silent: a decision that did not reach the log is not a decision.
+      // The event id is deliberately kept, so pressing again reuses it — the endpoint is idempotent by
+      // event_id (ADR-0002), so a decision whose response was lost in transit is recovered by retrying
+      // rather than logged twice. Clearing it here would make every retry a second event.
+      //
+      // The log is re-read on the way out because a refusal usually means the log has moved on: the
+      // backend answers 409 when a later findings run superseded the finding, and the analyst is owed the
+      // board as it now stands rather than the one that asked them to decide on a finding already gone.
       setSaid({ text: `Not recorded: ${errorMessage(cause)}`, recorded: false });
-    } finally {
-      setPending(null);
+      try {
+        await refetch();
+      } catch {
+        // A log that will not re-read costs the console its refresh, not the analyst their reason.
+      }
     }
   }
 

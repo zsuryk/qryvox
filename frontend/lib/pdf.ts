@@ -91,6 +91,14 @@ export async function extractPageRuns(bytes: Uint8Array, assets: PdfAssets): Pro
 type LoadingTask = PDFDocumentLoadingTask;
 type OpenDocumentProxy = Awaited<LoadingTask["promise"]>;
 
+// From here down is the rendering half — canvas, text layer, measured columns — and it touches the DOM,
+// where the extraction above deliberately does not. It lives in this file anyway, which is a departure from
+// the shape the rest of lib/ keeps, and the reason is the one at the top: this is the single place the
+// pinned build is imported and the single place its version is checked. Splitting the render half out would
+// mean a second module loading pdf.js, and the pack's quotes are matched against text read by *one* build —
+// so the risk of two importers drifting apart is worse than the tidiness of separating them. What protects
+// the DOM half is the production build and the browser, since Node has no document to draw into.
+
 // How far a page may be scaled to fit the column it is drawn in. Read off the pane: a portrait
 // factsheet and a landscape deck both have to be readable there, and neither may be scaled to a smudge
 // by a pane that is briefly hidden while it measures.

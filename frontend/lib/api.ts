@@ -34,11 +34,15 @@ async function send(method: "GET" | "POST", path: string, body?: unknown): Promi
 }
 
 // One shape for both verbs, so a message off the wire reads the same whichever call it came from.
+// The body is read once and carried into every failure, the 404 included: a server that says *why* —
+// "finding X was superseded by a later findings run" — is the only reason the analyst gets for a control
+// that refused them, and a bare status code is not a reason.
 async function request(method: "GET" | "POST", path: string, body?: unknown): Promise<unknown> {
   const res = await send(method, path, body);
-  if (res.status === 404) throw new NotFound(`${method} ${path}: 404`);
-  if (!res.ok) throw new Error(`${method} ${path}: ${res.status} ${await res.text()}`);
-  return res.json();
+  if (res.ok) return res.json();
+  const text = await res.text();
+  if (res.status === 404) throw new NotFound(`${method} ${path}: 404 ${text}`);
+  throw new Error(`${method} ${path}: ${res.status} ${text}`);
 }
 
 const get = (path: string) => request("GET", path);
