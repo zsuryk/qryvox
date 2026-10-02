@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "pnpm install --filter @qryvox/backend...",
   "buildCommand": "pnpm build",
   "builds": [
     {
