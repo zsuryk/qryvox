@@ -1,5 +1,5 @@
 import { GroundTruth, PackManifest } from "@qryvox/shared";
-import type { DocumentBytes } from "./intake";
+import type { DocumentBytes, IntakeFile } from "./intake";
 
 // The fabricated pack is served from public/: PDFs and manifest under /pack, the answer key under /eval.
 // Regenerate with `pnpm --filter @qryvox/shared pack:generate`.
@@ -19,6 +19,19 @@ export async function fetchPackFile(filename: string): Promise<DocumentBytes> {
   const res = await fetch(packUrl(filename));
   if (!res.ok) throw new Error(`GET ${packUrl(filename)}: ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
+}
+
+// The pack as intake takes it: one source per document, read by filename, with the ids and kinds the
+// manifest names. Loading the pack this way and dropping it onto the zone then differ only in where
+// the bytes come from, which is what keeps the button on the same road as a hand drop.
+export async function packSources(): Promise<IntakeFile[]> {
+  const { documents } = await fetchPackManifest();
+  return documents.map((document) => ({
+    filename: document.filename,
+    documentId: document.document_id,
+    kind: document.kind,
+    read: () => fetchPackFile(document.filename),
+  }));
 }
 
 // For the eval tiles only. Never send it to the backend: it is not a pipeline input.

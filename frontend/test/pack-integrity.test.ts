@@ -1,28 +1,18 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { GroundTruth, PackManifest, PDFJS_VERSION } from "@qryvox/shared";
+import { PDFJS_VERSION } from "@qryvox/shared";
 import { describe, expect, it } from "vitest";
 import { assertPdfjsVersion, extractPageTexts } from "../lib/pdf";
+import { groundTruth, manifest, nodeAssets, packDir, pdfjsDir, readBytes, readJson } from "./helpers";
 
 // The highest-value test in stage 1: if a planted quote is not in the text pdf.js reads off its cited
 // page, citation highlighting cannot work and every downstream surface is at risk. A failure names the
 // document and the page, so the fix is one line in shared/pack/source.ts and a `pack:generate`.
 
-const readBytes = (dir: URL, name: string) => readFileSync(fileURLToPath(new URL(name, dir)));
-const readJson = (dir: URL, name: string): unknown => JSON.parse(readBytes(dir, name).toString("utf8"));
-const packDir = new URL("../public/pack/", import.meta.url);
-const evalDir = new URL("../public/eval/", import.meta.url);
-const pdfjsDir = new URL("../node_modules/pdfjs-dist/", import.meta.url);
-const installedVersion = (readJson(pdfjsDir, "package.json") as { version: string }).version;
-
 // Parsing the manifest is the pin that runs in the browser today, because fetchPackManifest parses with
 // this schema and pdfjs_version is a literal in it.
-const manifest = PackManifest.parse(readJson(packDir, "manifest.json"));
-const groundTruth = GroundTruth.parse(readJson(evalDir, "ground-truth.json"));
+const installedVersion = (readJson(pdfjsDir, "package.json") as { version: string }).version;
 
 // Node wants a directory path where the browser will want a URL, and pdf.js finds its own worker there.
-// This test is the Node caller; the drop-zone intake will be the browser one.
-const nodeAssets = { standardFontDataUrl: fileURLToPath(new URL("standard_fonts/", pdfjsDir)) };
+// This test is the Node caller; the drop-zone intake is the browser one.
 
 const pageTexts = new Map<string, string[]>();
 for (const document of manifest.documents) {

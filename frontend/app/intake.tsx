@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import type { Sha256 } from "@qryvox/shared";
 import { ingestDocument, openCase } from "../lib/api";
-import { type DocumentTile, intake, type IntakeFile } from "../lib/intake";
+import { errorMessage, type DocumentTile, intake, type IntakeFile } from "../lib/intake";
 import { browserPdfAssets } from "../lib/pdf";
-import { fetchPackFile, fetchPackManifest } from "../lib/pack";
+import { packSources } from "../lib/pack";
 
 // The one place a document enters the system. Nothing here asks for a file dialog and nothing waits to
 // be told to go: a drop, or the fabricated pack behind the button, are the whole of intake. Both land
@@ -25,7 +26,7 @@ const STATUS: Record<DocumentTile["status"], { label: string; colour: string }> 
 
 export default function Intake() {
   const [tiles, setTiles] = useState<readonly DocumentTile[]>([]);
-  const [ingested, setIngested] = useState<readonly string[]>([]);
+  const [ingested, setIngested] = useState<readonly Sha256[]>([]);
   const [caseId, setCaseId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -33,7 +34,8 @@ export default function Intake() {
   // rather than trusting a single leave.
   const [depth, setDepth] = useState(0);
   // The browser names the event that opens the case (ADR-0002). Held across retries so a second
-  // attempt lands on the case the first one opened rather than opening another.
+  // attempt lands on the case the first one opened rather than opening another. Never cleared: this
+  // screen is one case, and a second drop joins it rather than quietly starting a fresh one.
   const opening = useRef<string | null>(null);
 
   async function run(files: readonly IntakeFile[]) {
@@ -51,7 +53,14 @@ export default function Intake() {
           ingest: (id, eventId, document) => ingestDocument(id, eventId, document),
         },
         ingested,
-        onTile: (tile) => setTiles((current) => [...current.filter((other) => other.key !== tile.key), tile]),
+        // A tile is identified by its filename, so a second drop of the same pack updates the tiles
+        // already on screen where they stand rather than stacking a second copy of the pack.
+        onTile: (tile) =>
+          setTiles((current) =>
+            current.some((other) => other.key === tile.key)
+              ? current.map((other) => (other.key === tile.key ? tile : other))
+              : [...current, tile],
+          ),
       });
       setIngested((current) => [...current, ...accepted.map((document) => document.sha256)]);
     } finally {
@@ -59,7 +68,7 @@ export default function Intake() {
     }
   }
 
-  const report = (cause: unknown) => setNotice(cause instanceof Error ? cause.message : String(cause));
+  const report = (cause: unknown) => setNotice(errorMessage(cause));
 
   // A dropped File names only itself. Its bytes are read here, in the browser; the server is told what
   // was in them and is never handed the file.
@@ -68,15 +77,7 @@ export default function Intake() {
 
   // The fabricated pack, through the same road: same read, same parse, same append.
   const fromPack = async () => {
-    const manifest = await fetchPackManifest();
-    await run(
-      manifest.documents.map((document) => ({
-        filename: document.filename,
-        documentId: document.document_id,
-        kind: document.kind,
-        read: () => fetchPackFile(document.filename),
-      })),
-    );
+    await run(await packSources());
   };
 
   return (

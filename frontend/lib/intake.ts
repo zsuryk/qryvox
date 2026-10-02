@@ -1,4 +1,4 @@
-import { type DocumentKind, IngestedDocument, PDFJS_VERSION } from "@qryvox/shared";
+import { type DocumentKind, IngestedDocument, type Sha256, PDFJS_VERSION } from "@qryvox/shared";
 import { extractPageTexts, type PdfAssets } from "./pdf";
 
 // Intake: the pack arrives as files, the browser reads them, and each one becomes a document.ingested
@@ -23,8 +23,8 @@ export type IntakeFile = {
 
 export type TileStatus = "extracting" | "sending" | "ingested" | "skipped" | "failed";
 
-// One document's progress, reported as a whole snapshot so a tile never shows a half-applied step.
-// `key` is the filename: a second drop of the same pack updates the tiles already on screen.
+// One document's progress. `key` is the filename: a second drop of the same pack updates the tiles
+// already on screen.
 export type DocumentTile = {
   key: string;
   filename: string;
@@ -38,7 +38,8 @@ export class RejectedDocument extends Error {
   override name = "RejectedDocument";
 }
 
-const reason = (cause: unknown) => (cause instanceof Error ? cause.message : String(cause));
+// What a tile shows when something goes wrong: whatever the browser, pdf.js or the server last said.
+export const errorMessage = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
 
 export async function sha256Hex(bytes: DocumentBytes): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
@@ -50,7 +51,7 @@ export async function sha256Hex(bytes: DocumentBytes): Promise<string> {
 // the same case always produce the same event_id, so the server's appendOnce hands back the event it
 // already wrote instead of appending a second, and re-dropping a pack appends nothing at all. The
 // case is in the name so that the same pack dropped into a different case is a different event.
-export async function documentEventId(caseId: string, sha256: string): Promise<string> {
+export async function documentEventId(caseId: string, sha256: Sha256): Promise<string> {
   const name = new TextEncoder().encode(`${caseId}/${sha256}`);
   const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", name)).slice(0, 16);
   // RFC 9562 version 8, the one version reserved for ids an application derives itself, so nothing
@@ -113,7 +114,7 @@ export type IntakeOptions = {
   api: IntakeApi;
   // The hashes this case already holds, from the caller's reading of the log. A document whose hash is
   // in here is skipped before a request is made, so re-dropping a pack appends no event.
-  ingested: readonly string[];
+  ingested: readonly Sha256[];
   onTile: (tile: DocumentTile) => void;
 };
 
@@ -128,7 +129,9 @@ export async function intake(files: readonly IntakeFile[], options: IntakeOption
 
   const accepted = await Promise.all(
     files.map(async (file): Promise<IngestedDocument | null> => {
-      const tile: DocumentTile = {
+      // One tile, patched as it goes and reported whole each time: a step is never shown half-applied,
+      // and a step that supersedes an earlier one (kind once known, then sent) keeps what it learned.
+      let tile: DocumentTile = {
         key: file.filename,
         filename: file.filename,
         kind: file.kind ?? null,
@@ -136,14 +139,17 @@ export async function intake(files: readonly IntakeFile[], options: IntakeOption
         detail: "reading the PDF in your browser",
         seq: null,
       };
-      const report = (patch: Partial<DocumentTile>) => options.onTile({ ...tile, ...patch });
+      const report = (patch: Partial<DocumentTile>) => {
+        tile = { ...tile, ...patch };
+        options.onTile(tile);
+      };
       options.onTile(tile);
 
       let document: IngestedDocument;
       try {
         document = await parseDocument(file, await file.read(), options.assets);
       } catch (cause) {
-        report({ status: "failed", detail: reason(cause) });
+        report({ status: "failed", detail: errorMessage(cause) });
         return null;
       }
 
@@ -164,7 +170,7 @@ export async function intake(files: readonly IntakeFile[], options: IntakeOption
         report({ status: "ingested", seq, detail: `event ${seq} · ${read}` });
         return document;
       } catch (cause) {
-        report({ status: "failed", detail: reason(cause) });
+        report({ status: "failed", detail: errorMessage(cause) });
         return null;
       }
     }),

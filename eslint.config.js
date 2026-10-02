@@ -4,9 +4,9 @@ import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-  // **/public/** holds served assets, not code we wrote: the pack, the eval key, and the pdf.js build
-  // that frontend/scripts/pdfjs-assets.ts copies in before dev and build.
-  { ignores: ["**/node_modules/", "**/.next/", "**/dist/", "**/.vercel/", "**/next-env.d.ts", "**/public/**"] },
+  // frontend/public/pdfjs/ holds served assets, not code we wrote: the pinned pdf.js build that
+  // frontend/scripts/pdfjs-assets.ts copies in before dev and build.
+  { ignores: ["**/node_modules/", "**/.next/", "**/dist/", "**/.vercel/", "**/next-env.d.ts", "frontend/public/pdfjs/"] },
   js.configs.recommended,
   tseslint.configs.recommended,
   {

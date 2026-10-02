@@ -12,12 +12,12 @@ import { cp, mkdir, readFile, rm } from "node:fs/promises";
 const pdfjsDir = new URL("../node_modules/pdfjs-dist/", import.meta.url);
 const outDir = new URL("../public/pdfjs/", import.meta.url);
 
-// The worker, flattened out of legacy/build/ because its URL is named in lib/pdf.ts; the non-embedded
-// standard fonts the pack's pdf-lib pages need; and the cmaps for CID-keyed PDFs.
+// The worker, flattened out of legacy/build/ because its URL is named in lib/pdf.ts, and the fonts the
+// pack's pdf-lib pages do not embed. Not the cmaps: getDocument is never given a cMapUrl, so a CID-keyed
+// PDF has no way to ask for one, and 1.6 MB of files nothing can request is not worth carrying.
 const assets: readonly (readonly [from: string, to: string])[] = [
   ["legacy/build/pdf.worker.mjs", "pdf.worker.mjs"],
   ["standard_fonts", "standard_fonts"],
-  ["cmaps", "cmaps"],
 ];
 
 const installed = JSON.parse(await readFile(new URL("package.json", pdfjsDir), "utf8")) as { version: string };

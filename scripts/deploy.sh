@@ -272,6 +272,7 @@ stage_gitless() {
     --exclude '.deploy' \
     --exclude '.env.deploy' \
     --exclude 'shared/dist' \
+    --exclude 'frontend/public/pdfjs' \
     "$ROOT/" "$STAGE/"
   [ -d "$STAGE/.git" ] && fail "staging directory still contains .git; the deploy would be blocked"
   STAGED_AT="$(git -C "$ROOT" rev-parse --short HEAD)"

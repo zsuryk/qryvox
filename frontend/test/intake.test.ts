@@ -1,7 +1,4 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { PackManifest, PDFJS_VERSION } from "@qryvox/shared";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   describeFile,
   type DocumentBytes,
@@ -14,37 +11,32 @@ import {
   RejectedDocument,
   sha256Hex,
 } from "../lib/intake";
-import type { PdfAssets } from "../lib/pdf";
+import { packSources } from "../lib/pack";
+import { manifest, nodeAssets, packDir, readBytes } from "./helpers";
 
 // The drop zone, driven headlessly: the same pack files the browser fetches, through the same
 // functions, with pdf.js reading them the way the browser will. What a tile shows and what reaches
 // the log are both decided in lib/intake.ts, so this is where they are asserted.
 
-const readBytes = (dir: URL, name: string) => readFileSync(fileURLToPath(new URL(name, dir)));
-const readJson = (dir: URL, name: string): unknown => JSON.parse(readBytes(dir, name).toString("utf8"));
-const packDir = new URL("../public/pack/", import.meta.url);
-const pdfjsDir = new URL("../node_modules/pdfjs-dist/", import.meta.url);
-const manifest = PackManifest.parse(readJson(packDir, "manifest.json"));
-const packFile = (documentId: string) => manifest.documents.find((d) => d.document_id === documentId)!;
+// The pack the browser has under /pack, served off the committed files. The intake button goes through
+// exactly this fetch, so the test exercises the same route the button takes.
+const servePack = () =>
+  vi.stubGlobal("fetch", async (url: string | URL | Request) => {
+    const path = new URL(String(url), "http://localhost").pathname;
+    const name = path === "/pack/manifest.json" ? "manifest.json" : path.slice("/pack/".length);
+    return new Response(readBytes(packDir, name), { status: 200 });
+  });
 
-// Node wants a directory path where the browser wants the copy under /pdfjs; same build either way.
-const nodeAssets: PdfAssets = { standardFontDataUrl: fileURLToPath(new URL("standard_fonts/", pdfjsDir)) };
-
-// The fabricated pack as the drop zone hands it over: bytes fetched by filename, ids and kinds from
-// the manifest, so it goes through the same path as a hand-dropped pack.
-const packFiles = (): IntakeFile[] =>
-  manifest.documents.map((document) => ({
-    filename: document.filename,
-    documentId: document.document_id,
-    kind: document.kind,
-    read: async () => Uint8Array.from(readBytes(packDir, document.filename)),
-  }));
+beforeEach(servePack);
+afterEach(() => vi.unstubAllGlobals());
 
 // One dropped File: no ids, no kinds, just a name and its bytes.
 const dropped = (filename: string, body?: DocumentBytes): IntakeFile => ({
   filename,
   read: async () => body ?? Uint8Array.from(readBytes(packDir, filename)),
 });
+
+const packFile = (documentId: string) => manifest.documents.find((d) => d.document_id === documentId)!;
 
 type Call = { caseId: string; eventId: string; filename: string; sha256: string; pages: string[] };
 
@@ -73,8 +65,10 @@ function tiles() {
 
 describe("reading a document in the browser", () => {
   it("records the id, hash, filename, kind, page count, text and pdf.js version the manifest says it will", async () => {
+    const files = await packSources();
+
     for (const expected of manifest.documents) {
-      const file = packFiles().find((f) => f.filename === expected.filename)!;
+      const file = files.find((f) => f.filename === expected.filename)!;
       const document = await parseDocument(file, await file.read(), nodeAssets);
 
       expect(document.document_id).toBe(expected.document_id);
@@ -84,7 +78,7 @@ describe("reading a document in the browser", () => {
       expect(document.page_count).toBe(expected.page_count);
       expect(document.pages).toHaveLength(expected.page_count);
       expect(document.pages.every((page) => page.trim() !== ""), `${expected.document_id} has an empty page`).toBe(true);
-      expect(document.pdfjs_version).toBe(PDFJS_VERSION);
+      expect(document.pdfjs_version).toBe(manifest.pdfjs_version);
     }
   });
 
@@ -94,7 +88,7 @@ describe("reading a document in the browser", () => {
   });
 
   it("reports a PDF it cannot read rather than ingesting it empty", async () => {
-    const broken = dropped("larkspur-factsheet.pdf", new TextEncoder().encode("not a pdf"));
+    const broken = dropped("larkspur-factsheet.pdf", new TextEncoder().encode("not a pdf") as DocumentBytes);
     await expect(parseDocument(broken, await broken.read(), nodeAssets)).rejects.toThrow();
   });
 });
@@ -115,18 +109,18 @@ describe("naming a document the contract will accept", () => {
 
 describe("the event id the browser names", () => {
   const caseId = "9f2c1a40-1111-4222-8333-444444444444";
+  const sha = packFile("ppm").sha256;
 
   it("is the same id every time for the same bytes in the same case, so a retry deduplicates", async () => {
-    const sha = "a".repeat(64);
     const again = await documentEventId(caseId, sha);
 
     expect(await documentEventId(caseId, sha)).toBe(again);
-    expect(await documentEventId(caseId, "b".repeat(64))).not.toBe(again);
+    expect(await documentEventId(caseId, packFile("deck").sha256)).not.toBe(again);
     expect(await documentEventId("00000000-0000-4000-8000-000000000000", sha)).not.toBe(again);
   });
 
   it("is a uuid the append contract will take", async () => {
-    const eventId = await documentEventId(caseId, "c".repeat(64));
+    const eventId = await documentEventId(caseId, packFile("factsheet").sha256);
     expect(eventId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(eventId[14]).toBe("8");
   });
@@ -135,7 +129,7 @@ describe("the event id the browser names", () => {
 describe("intake", () => {
   it("opens one case and ingests every document in the pack through the same path as a drop", async () => {
     const { api, calls, opened } = recorder();
-    const accepted = await intake(packFiles(), { assets: nodeAssets, api, ingested: [], onTile: () => {} });
+    const accepted = await intake(await packSources(), { assets: nodeAssets, api, ingested: [], onTile: () => {} });
 
     expect(accepted.map((d) => d.document_id).sort()).toEqual(manifest.documents.map((d) => d.document_id).sort());
     expect(new Set(calls.map((c) => c.filename))).toEqual(new Set(manifest.documents.map((d) => d.filename)));
@@ -159,7 +153,7 @@ describe("intake", () => {
   it("settles a tile per document, with its filename, kind and the event it took", async () => {
     const { api } = recorder();
     const { settled, onTile } = tiles();
-    await intake(packFiles(), { assets: nodeAssets, api, ingested: [], onTile });
+    await intake(await packSources(), { assets: nodeAssets, api, ingested: [], onTile });
 
     expect(settled().map((tile) => tile.filename).sort()).toEqual(manifest.documents.map((d) => d.filename).sort());
     expect(settled().map((tile) => tile.kind).sort()).toEqual(manifest.documents.map((d) => d.kind).sort());
@@ -176,10 +170,21 @@ describe("intake", () => {
     expect(seen[0]?.seq).toBeNull();
   });
 
+  it("carries the kind it worked out from the filename onto the settled tile", async () => {
+    // A dropped File starts out naming nothing but itself, so the kind is only known after the parse.
+    const { api } = recorder();
+    const { settled, onTile } = tiles();
+    await intake([dropped("Larkspur-Fee-Table.pdf")], { assets: nodeAssets, api, ingested: [], onTile });
+
+    expect(settled()[0]).toMatchObject({ kind: "fee_table", status: "ingested" });
+    expect(settled()[0]?.detail).toContain(packFile("fee-table").sha256.slice(0, 12));
+  });
+
   it("appends nothing when the same pack is dropped again", async () => {
     const { api, calls } = recorder();
-    const first = await intake(packFiles(), { assets: nodeAssets, api, ingested: [], onTile: () => {} });
-    const second = await intake(packFiles(), { assets: nodeAssets, api, ingested: first.map((d) => d.sha256), onTile: () => {} });
+    const files = await packSources();
+    const first = await intake(files, { assets: nodeAssets, api, ingested: [], onTile: () => {} });
+    const second = await intake(files, { assets: nodeAssets, api, ingested: first.map((d) => d.sha256), onTile: () => {} });
 
     expect(calls).toHaveLength(manifest.documents.length);
     expect(second).toEqual([]);
@@ -199,7 +204,10 @@ describe("intake", () => {
     const { api, calls } = recorder();
     const { settled, onTile } = tiles();
 
-    const accepted = await intake([...packFiles(), dropped("holiday-photos.pdf", new Uint8Array())], { assets: nodeAssets, api, ingested: [], onTile });
+    const accepted = await intake(
+      [...(await packSources()), dropped("holiday-photos.pdf", new Uint8Array())],
+      { assets: nodeAssets, api, ingested: [], onTile },
+    );
 
     expect(accepted).toHaveLength(manifest.documents.length);
     expect(calls).toHaveLength(manifest.documents.length);
@@ -211,7 +219,7 @@ describe("intake", () => {
     const refused = recorder();
     const { settled, onTile } = tiles();
 
-    await intake(packFiles(), {
+    await intake(await packSources(), {
       assets: nodeAssets,
       api: {
         ...refused.api,
