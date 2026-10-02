@@ -139,10 +139,11 @@ check_secrets() {
 
 # Requires load_project to have run first: without a project in scope these vars would land on
 # whichever project the CLI infers.
+# Takes variable names as arguments, not an array name: macOS ships bash 3.2, which has no
+# namerefs, and a failure here would look like a deploy bug rather than a shell-version one.
 sync_env_vars() {
-  local -n names="$1"
   local name value
-  for name in "${names[@]}"; do
+  for name in "$@"; do
     value="${!name:-}"
     if [ -z "$value" ]; then
       case "$name" in
@@ -161,7 +162,7 @@ sync_env_vars() {
 sync_env() {
   step "Syncing production environment variables"
   load_secrets
-  sync_env_vars API_VARS
+  sync_env_vars "${API_VARS[@]}"
 }
 
 # The dashboard's "new project" flow demands either a Git connection or a file upload, and
@@ -320,7 +321,7 @@ deploy_web() {
   fi
   stage_gitless
   step "Syncing the frontend's public environment variables"
-  sync_env_vars WEB_VARS
+  sync_env_vars "${WEB_VARS[@]}"
   step "Deploying $WEB_PROJECT to production"
   vercel deploy --prod --yes --scope "$SCOPE" --cwd "$STAGE" \
     || fail "the web project also needs Root Directory = frontend in the Vercel dashboard"
