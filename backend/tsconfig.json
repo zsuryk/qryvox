@@ -1,7 +1,10 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+    // The fetch Response in llm.ts needs the DOM lib; without it the deploy log reports bogus errors
+    // because Vercel type-checks with this tsconfig (ADR-0001).
+    "lib": ["ES2023", "DOM"]
   },
-  "include": ["src", "test", "scripts", "drizzle.config.ts"]
+  "include": ["src", "api", "test", "scripts", "drizzle.config.ts"]
 }

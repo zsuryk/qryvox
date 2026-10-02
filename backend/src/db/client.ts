@@ -1,11 +1,14 @@
 import { fileURLToPath } from "node:url";
-import { createClient, type Client } from "@libsql/client";
+import { createClient } from "@libsql/client";
 import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
 import { migrate } from "drizzle-orm/libsql/migrator";
 import * as schema from "./schema.js";
 
 export type Db = LibSQLDatabase<typeof schema>;
-export type Database = { client: Client; db: Db };
+// Derived rather than imported: @libsql/client re-exports Client from @libsql/core/api, which some
+// resolution modes report as "declared locally but not exported" during the Vercel build (ADR-0001).
+export type SqliteClient = ReturnType<typeof createClient>;
+export type Database = { client: SqliteClient; db: Db };
 
 // file: locally, libsql:// + auth token on Vercel — same schema and queries (ADR-0001).
 export function openDatabase(url: string, authToken?: string): Database {
