@@ -18,7 +18,7 @@ import { assertAppendOnly } from "./db/append-only";
 import type { Database } from "./db/client";
 import type { Llm } from "./llm";
 import { appendOnce, caseExists, EventIdConflict, getEvent, listEvents, toWire, verifyChain } from "./log";
-import { LlmNotConfigured, runStep, StepNotImplemented } from "./steps/run";
+import { LlmNotConfigured, runStep } from "./steps/run";
 import { StepPrecondition } from "./steps/step";
 
 export type AppOptions = Database & {
@@ -48,7 +48,6 @@ export function createApp({ client, db, allowedOrigin, llm }: AppOptions) {
 
   app.onError((err, c) => {
     if (err instanceof EventIdConflict || err instanceof StepPrecondition) return c.json({ error: err.message }, 409);
-    if (err instanceof StepNotImplemented) return c.json({ error: err.message }, 501);
     if (err instanceof LlmNotConfigured) return c.json({ error: err.message }, 503);
     console.error(err);
     return c.json({ error: err.message }, 500);

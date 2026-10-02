@@ -25,13 +25,20 @@ function exclusive<T>(db: Db, fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
 // Every append is one write transaction (ADR-0002): read the case's latest seq and hash, chain the
 // new events onto it, insert, commit. Callers do any slow work (model calls) before calling this.
-export async function append(db: Db, caseId: string, drafts: readonly EventDraft[]): Promise<EventRow[]> {
-  return exclusive(db, () => db.transaction((tx) => chainAndInsert(tx, caseId, drafts)));
+// Drafts may be built inside the transaction when they depend on what the log holds at commit time.
+export async function append(
+  db: Db,
+  caseId: string,
+  drafts: readonly EventDraft[] | ((tx: Tx) => Promise<readonly EventDraft[]>),
+): Promise<EventRow[]> {
+  return exclusive(db, () =>
+    db.transaction(async (tx) => chainAndInsert(tx, caseId, typeof drafts === "function" ? await drafts(tx) : drafts)),
+  );
 }
-
-type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 async function chainAndInsert(tx: Tx, caseId: string, drafts: readonly EventDraft[]): Promise<EventRow[]> {
   const [last] = await tx
@@ -172,7 +179,7 @@ export function toWire(row: EventRow) {
   };
 }
 
-export async function listEventsOfType(db: Db, caseId: string, type: Event["type"]): Promise<EventRow[]> {
+export async function listEventsOfType(db: Db | Tx, caseId: string, type: Event["type"]): Promise<EventRow[]> {
   return db
     .select()
     .from(events)

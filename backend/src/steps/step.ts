@@ -1,4 +1,4 @@
-import type { StepName } from "@qryvox/shared";
+import type { Finding, StepName } from "@qryvox/shared";
 import type { z } from "zod";
 import type { Db } from "../db/client";
 import type { ChatMessage } from "../llm";
@@ -8,18 +8,21 @@ export class StepPrecondition extends Error {
   override name = "StepPrecondition";
 }
 
-export type StepDefinition<Input, Output extends Record<string, unknown>> = {
+// Output is what the run stores and returns; Reply is what the model must answer, when the two differ.
+export type StepDefinition<Input, Output extends Record<string, unknown>, Reply = Output> = {
   name: StepName;
   // Reads what the step consumes from the log. Steps are stateless: the log is their only input.
   loadInput(db: Db, caseId: string, inputRunId: string | null): Promise<Input>;
   // The versioned prompt. Never sent to the interface; only PROMPT_VERSIONS[name] is recorded.
   messages(input: Input): ChatMessage[];
-  output: z.ZodType<Output>;
-  // Checks the parsed output against the input (e.g. quotes really appear on the cited page).
+  output: z.ZodType<Reply>;
+  // Checks the parsed reply against the input (e.g. quotes really appear on the cited page).
   // Returns the output to store, or an error that fails the run.
-  ground(output: Output, input: Input): { output: Output } | { error: string };
+  ground(reply: Reply, input: Input): { output: Output } | { error: string };
+  // The findings this run puts on the board, appended with its step.completed in one transaction.
+  toFindings?(output: Output): Finding[];
 };
 
 // Erases the type parameters so steps can share one registry.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyStep = StepDefinition<any, Record<string, unknown>>;
+export type AnyStep = StepDefinition<any, Record<string, unknown>, any>;

@@ -5,28 +5,44 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { EventPage, type IngestedDocument } from "@qryvox/shared";
+import { EventPage, type IngestedDocument, type StepName, StepResult } from "@qryvox/shared";
 import { createApp } from "../src/app";
 import { openDatabase, runMigrations } from "../src/db/client";
 import { LlmError, type Llm } from "../src/llm";
+import { CONTRADICTIONS_SYSTEM_PROMPT } from "../src/steps/contradictions";
+import { DECOMPOSE_SYSTEM_PROMPT } from "../src/steps/decompose";
+import { FINDINGS_SYSTEM_PROMPT } from "../src/steps/findings";
 
 const out = fileURLToPath(new URL("../../shared/test/fixtures/case-recorded.json", import.meta.url));
 
 const database = openDatabase(pathToFileURL(join(mkdtempSync(join(tmpdir(), "qryvox-fixture-")), "fixture.db")).href);
 await runMigrations(database.db);
-// A scripted model: the first extract call fails as if the endpoint were down, the retry succeeds.
+// A scripted model for the factsheet and PPM below: the first call fails as if the endpoint were down,
+// then each step gets a canned reply that finds the one planted fee contradiction.
+const factsheetFee = { document_id: "factsheet", page: 1, quote: "Management fee: 0.85% per annum." };
+const ppmFee = { document_id: "ppm", page: 2, quote: "The management fee is 1.10% per annum." };
+const replies: [string | null, unknown][] = [
+  [DECOMPOSE_SYSTEM_PROMPT, {
+    claims: [
+      { id: "c1", ...factsheetFee, category: "fees", topic: "management fee", assertion: "management fee 0.85% per annum" },
+      { id: "c2", ...ppmFee, category: "fees", topic: "management fee", assertion: "management fee 1.10% per annum" },
+    ],
+  }],
+  [CONTRADICTIONS_SYSTEM_PROMPT, {
+    issues: [{ kind: "contradiction", category: "fees", claim_id: "c1", counterpart_claim_id: "c2", explanation: "0.85% vs 1.10%." }],
+  }],
+  [FINDINGS_SYSTEM_PROMPT, {
+    findings: [{ issue: 1, severity: "high", claim: "The factsheet states a 0.85% management fee; the PPM states 1.10%." }],
+  }],
+  [null, { statements: [factsheetFee, ppmFee] }],
+];
 let calls = 0;
 const llm: Llm = {
   model: "recorded-fake-model",
-  async complete() {
+  async complete(messages) {
     calls += 1;
     if (calls === 1) throw new LlmError("model endpoint unreachable: recorded outage");
-    const content = JSON.stringify({
-      statements: [
-        { document_id: "factsheet", page: 1, quote: "Management fee: 0.85% per annum." },
-        { document_id: "ppm", page: 2, quote: "The management fee is 1.10% per annum." },
-      ],
-    });
+    const content = JSON.stringify(replies.find(([prompt]) => prompt === null || prompt === messages[0]?.content)![1]);
     return { content, raw: { choices: [{ message: { content } }] } };
   },
 };
@@ -67,9 +83,23 @@ const { case_id } = (await call("POST", "/cases", { event_id: randomUUID() })) a
 for (const document of documents) {
   await call("POST", `/cases/${case_id}/documents`, { event_id: randomUUID(), document });
 }
-const extract = { step_run_id: randomUUID(), step: "extract", input_run_id: null };
-await call("POST", `/cases/${case_id}/steps`, extract, [502]);
-await call("POST", `/cases/${case_id}/steps`, extract);
+async function step(step: StepName, inputRunId: string | null, stepRunId = randomUUID(), ok?: number[]) {
+  const body = { step_run_id: stepRunId, step, input_run_id: inputRunId };
+  return call("POST", `/cases/${case_id}/steps`, body, ok);
+}
+
+// extract fails once and is retried under the same run id; then the pipeline runs through, and findings
+// is run a second time so the first run's finding is superseded.
+const extractRun = randomUUID();
+await step("extract", null, extractRun, [502]);
+await step("extract", null, extractRun);
+let input: string = extractRun;
+let contradictionsRun = "";
+for (const name of ["decompose", "contradictions", "findings"] as const) {
+  input = StepResult.parse(await step(name, input)).step_run_id;
+  if (name === "contradictions") contradictionsRun = input;
+}
+await step("findings", contradictionsRun);
 
 const { events } = EventPage.parse(await call("GET", `/cases/${case_id}/events`));
 

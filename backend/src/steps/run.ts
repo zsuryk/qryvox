@@ -3,16 +3,14 @@ import { ANALYST_ACTOR, PROMPT_VERSIONS, type RunStepRequest, type StepFailure, 
 import type { Db } from "../db/client";
 import type { EventRow } from "../db/schema";
 import { extractJson, LlmError, type Llm } from "../llm";
-import { append, EventIdConflict, findCompletedRun, isUniqueViolation } from "../log";
+import { append, EventIdConflict, type EventDraft, findCompletedRun, isUniqueViolation, listEventsOfType, type Tx } from "../log";
+import { contradictions } from "./contradictions";
+import { decompose } from "./decompose";
 import { extract } from "./extract";
+import { findings } from "./findings";
 import type { AnyStep } from "./step";
 
-// Steps land one ticket at a time; a step missing here answers 501.
-const STEPS: Partial<Record<RunStepRequest["step"], AnyStep>> = { extract };
-
-export class StepNotImplemented extends Error {
-  override name = "StepNotImplemented";
-}
+const STEPS: Record<RunStepRequest["step"], AnyStep> = { extract, decompose, contradictions, findings };
 
 export class LlmNotConfigured extends Error {
   override name = "LlmNotConfigured";
@@ -23,7 +21,8 @@ export type StepOutcome = { status: 200; body: StepResult } | { status: 422 | 50
 // One analysis step as a single stateless call, safe to retry (ADR-0002):
 //   1. a run that already completed returns its stored result — before any model call, so a retry is free;
 //   2. otherwise step.started is appended, then the model is called with no transaction open;
-//   3. step.completed (and, for the findings step, its findings) is appended in one write transaction;
+//   3. step.completed, and for the findings step its findings plus a finding.superseded for every finding
+//      a previous run left on the board, is appended in one write transaction;
 //   4. if a concurrent duplicate completed first, the partial unique index rejects ours, the transaction
 //      rolls back whole, and the winner's stored result is returned instead.
 export async function runStep(db: Db, llm: Llm | null, caseId: string, req: RunStepRequest): Promise<StepOutcome> {
@@ -31,7 +30,6 @@ export async function runStep(db: Db, llm: Llm | null, caseId: string, req: RunS
   if (done) return completedOutcome(done, req);
 
   const step = STEPS[req.step];
-  if (!step) throw new StepNotImplemented(`step ${req.step} is not implemented yet`);
   if (!llm) throw new LlmNotConfigured("no model is configured: set LLM_BASE_URL and LLM_MODEL");
 
   const input = await step.loadInput(db, caseId, req.input_run_id);
@@ -65,14 +63,18 @@ export async function runStep(db: Db, llm: Llm | null, caseId: string, req: RunS
   const grounded = step.ground(parsed.data, input);
   if ("error" in grounded) return fail(422, grounded.error, completion.raw);
 
+  const created = step.toFindings?.(grounded.output) ?? [];
   try {
-    const [row] = await append(db, caseId, [
+    const [row] = await append(db, caseId, async (tx) => [
       {
         ...draft,
         eventId: randomUUID(),
         type: "step.completed",
         payload: { ...run, output: grounded.output, raw_response: completion.raw },
       },
+      // Read inside the transaction, so two findings runs completing together cannot both stay on the board.
+      ...(step.toFindings ? await supersededBy(tx, caseId, draft) : []),
+      ...created.map((finding): EventDraft => ({ ...draft, eventId: randomUUID(), type: "finding.created", payload: finding })),
     ]);
     return completedOutcome(row!, req);
   } catch (err) {
@@ -81,6 +83,15 @@ export async function runStep(db: Db, llm: Llm | null, caseId: string, req: RunS
     if (!winner) throw err;
     return completedOutcome(winner, req);
   }
+}
+
+// One finding.superseded for each finding still on the board: the new run replaces it.
+async function supersededBy(tx: Tx, caseId: string, draft: Omit<EventDraft, "eventId" | "type" | "payload">): Promise<EventDraft[]> {
+  const ids = (rows: { payload: Record<string, unknown> }[]) => rows.map((r) => String(r.payload.finding_id));
+  const superseded = new Set(ids(await listEventsOfType(tx, caseId, "finding.superseded")));
+  return ids(await listEventsOfType(tx, caseId, "finding.created"))
+    .filter((id) => !superseded.has(id))
+    .map((finding_id) => ({ ...draft, eventId: randomUUID(), type: "finding.superseded", payload: { finding_id } }));
 }
 
 function completedOutcome(row: EventRow, req: RunStepRequest): StepOutcome {

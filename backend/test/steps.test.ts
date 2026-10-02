@@ -192,18 +192,6 @@ describe("a step that cannot run", () => {
     expect((await runExtract(t, caseId)).status).toBe(503);
   });
 
-  it("is 501 for a step that has not landed yet", async () => {
-    const t = await setup({ llm: new FakeLlm(() => EXTRACT_REPLY) });
-    const caseId = await caseWithDocument(t);
-    const res = await t.request("POST", `/cases/${caseId}/steps`, {
-      step_run_id: randomUUID(),
-      step: "findings",
-      input_run_id: randomUUID(),
-    });
-
-    expect(res.status).toBe(501);
-  });
-
   it("is 404 for an unknown case", async () => {
     const t = await setup({ llm: new FakeLlm(() => EXTRACT_REPLY) });
     expect((await runExtract(t, randomUUID())).status).toBe(404);
