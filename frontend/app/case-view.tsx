@@ -6,16 +6,20 @@ import { fetchEvents, runStep } from "../lib/api";
 import { errorMessage } from "../lib/errors";
 import { type AttemptFailure, type PipelineAction, type PipelineDeps, runAction } from "../lib/pipeline";
 import Board from "./board";
+import DispositionConsole from "./disposition";
 import Pipeline from "./pipeline";
 
-// The case surface, as the client owns it: the run at the top, the board the run fills beneath it, and
-// the log both are folded from. The server component fetches the events and hands them over; from here on
-// the browser is what runs the pipeline (spec decision 19), so it is what holds the log as most recently
-// read — the page's own copy of it is a fetch behind the moment a step settles (ADR-0002).
+// The case surface, as the client owns it: the run at the top, the board the run fills beneath it, the
+// analyst's decision on what the board holds, and the log all three are folded from. The server component
+// fetches the events and hands them over; from here on the browser is what runs the pipeline (spec
+// decision 19), so it is what holds the log as most recently read — the page's own copy of it is a fetch
+// behind the moment a step settles (ADR-0002).
 //
-// The citation pane and the disposition console drop in beside <Board> below, both as client components
-// of their own: this file is deliberately nothing more than the log, the run wiring and the board, so
-// that neither has to know how the other is built.
+// The citation pane needs no wiring here: <Board> opens it beside the card whose citation was chosen, so it
+// arrives and leaves with the board's own selection. The disposition console does need a mount, because it
+// is a section in its own right rather than a property of a card. Both are client components of their own,
+// and this file stays nothing more than the log, the run wiring and the two surfaces — so that neither has
+// to know how the other is built.
 
 export type CaseViewProps = {
   events: readonly SlimEvent[];
@@ -79,6 +83,7 @@ export default function CaseView({ events, caseId, refetch }: CaseViewProps) {
     <>
       <Pipeline log={log} running={running} busy={busy} failure={failure} onAction={(action) => void drive(action)} />
       <Board events={log} />
+      <DispositionConsole caseId={caseId} events={log} refetch={refetch} />
     </>
   );
 }
