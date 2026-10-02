@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { activeFindings, emptyCaseState, fold, FoldError, SlimEvent } from "../src";
-import recorded from "./fixtures/case-recorded.json";
+import recorded from "../fixtures/case-recorded.json";
 
-// Recorded from the API by `pnpm --filter @qryvox/backend record:fixture`.
+// Recorded from the API by `pnpm --filter @qryvox/backend record:fixture`: the whole fabricated pack
+// ingested, extract failing once and retried under the same run id, then the pipeline run through and run
+// again, so the log carries one superseded finding and an active board spanning all four categories.
 const events = SlimEvent.array().parse(recorded);
 const caseId = events[0]!.case_id;
+// The seq the first findings run put its finding on the board, before the re-run supersedes it.
+const afterFirstFindings = events.filter((e) => e.type === "finding.created")[0]!.seq;
 
 describe("fold", () => {
   it("folds zero events into an empty case state", () => {
@@ -16,10 +20,12 @@ describe("fold", () => {
 
     expect(state.caseId).toBe(caseId);
     expect(state.openedAt).toBe(events[0]!.at);
-    expect(state.lastSeq).toBe(18);
+    expect(state.lastSeq).toBe(27);
     expect(state.documents.map((d) => [d.documentId, d.kind, d.pageCount, d.ingestedAtSeq])).toEqual([
-      ["factsheet", "factsheet", 1, 2],
-      ["ppm", "ppm", 2, 3],
+      ["factsheet", "factsheet", 2, 2],
+      ["ppm", "ppm", 3, 3],
+      ["deck", "deck", 3, 4],
+      ["fee-table", "fee_table", 1, 5],
     ]);
   });
 
@@ -38,34 +44,34 @@ describe("fold", () => {
     const runId = events.find((e) => e.type === "step.started")!.step_run_id;
     const runAt = (seq: number) => fold(events.filter((e) => e.seq <= seq)).stepRuns;
 
-    expect(runAt(4)).toEqual([expect.objectContaining({ stepRunId: runId, step: "extract", status: "running" })]);
-    expect(runAt(5)).toEqual([
-      expect.objectContaining({ status: "failed", error: "model endpoint unreachable: recorded outage", settledAtSeq: 5 }),
-    ]);
-    expect(runAt(6)).toEqual([expect.objectContaining({ status: "running", startedAtSeq: 6, error: null })]);
+    expect(runAt(6)).toEqual([expect.objectContaining({ stepRunId: runId, step: "extract", status: "running" })]);
     expect(runAt(7)).toEqual([
+      expect.objectContaining({ status: "failed", error: "model endpoint unreachable: recorded outage", settledAtSeq: 7 }),
+    ]);
+    expect(runAt(8)).toEqual([expect.objectContaining({ status: "running", startedAtSeq: 8, error: null })]);
+    expect(runAt(9)).toEqual([
       expect.objectContaining({
         stepRunId: runId,
         status: "completed",
         model: "recorded-fake-model",
         promptVersion: "extract@1",
         inputRunId: null,
-        settledAtSeq: 7,
+        settledAtSeq: 9,
       }),
     ]);
   });
 
   it("puts a findings run's findings on the board with their citations", () => {
-    const state = fold(events.filter((e) => e.seq <= 14));
+    const state = fold(events.filter((e) => e.seq <= afterFirstFindings));
 
     expect(activeFindings(state)).toEqual([
       expect.objectContaining({
         category: "fees",
         kind: "contradiction",
         severity: "high",
-        citation: { document_id: "factsheet", page: 1, quote: "Management fee: 0.85% per annum." },
-        counterpart: { document_id: "ppm", page: 2, quote: "The management fee is 1.10% per annum." },
-        createdAtSeq: 14,
+        citation: { document_id: "factsheet", page: 1, quote: "Annual management fee: 0.85% per annum" },
+        counterpart: { document_id: "fee-table", page: 1, quote: "Annual management fee: 1.25% of net asset value" },
+        createdAtSeq: afterFirstFindings,
         supersededAtSeq: null,
       }),
     ]);
@@ -73,17 +79,29 @@ describe("fold", () => {
 
   it("a re-run supersedes earlier findings: off the board, still in the log", () => {
     const state = fold(events);
-    const [first, second] = state.findings;
+    const [first, ...rest] = state.findings;
 
-    expect(state.findings).toHaveLength(2);
-    expect(first).toMatchObject({ createdAtSeq: 14, supersededAtSeq: 17 });
-    expect(activeFindings(state)).toEqual([second]);
-    expect(second!.stepRunId).not.toBe(first!.stepRunId);
+    expect(state.findings).toHaveLength(7);
+    expect(first).toMatchObject({ createdAtSeq: afterFirstFindings, supersededAtSeq: 21 });
+    expect(activeFindings(state)).toEqual(rest);
+    expect(new Set(rest.map((f) => f.stepRunId)).size).toBe(1);
+    expect(rest[0]!.stepRunId).not.toBe(first!.stepRunId);
+  });
+
+  it("the recorded board covers all four categories", () => {
+    expect(activeFindings(fold(events)).map((f) => f.category).sort()).toEqual([
+      "fees",
+      "fees",
+      "risk",
+      "strategy",
+      "strategy",
+      "terms",
+    ]);
   });
 
   it("replay before the re-run shows the board as it was", () => {
-    expect(activeFindings(fold(events.filter((e) => e.seq <= 16)))).toEqual([
-      expect.objectContaining({ createdAtSeq: 14, supersededAtSeq: null }),
+    expect(activeFindings(fold(events.filter((e) => e.seq <= 20)))).toEqual([
+      expect.objectContaining({ createdAtSeq: afterFirstFindings, supersededAtSeq: null }),
     ]);
   });
 

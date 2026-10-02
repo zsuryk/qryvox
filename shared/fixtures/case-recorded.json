@@ -1,0 +1,850 @@
+[
+  {
+    "seq": 1,
+    "event_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.533Z",
+    "step_run_id": null,
+    "type": "case.opened",
+    "v": 1,
+    "payload": {}
+  },
+  {
+    "seq": 2,
+    "event_id": "8f39bcd3-9fa7-4eb8-a0b1-59814af282e9",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.535Z",
+    "step_run_id": null,
+    "type": "document.ingested",
+    "v": 1,
+    "payload": {
+      "document_id": "factsheet",
+      "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "filename": "larkspur-factsheet.pdf",
+      "kind": "factsheet",
+      "page_count": 2,
+      "pdfjs_version": "5.0.0"
+    }
+  },
+  {
+    "seq": 3,
+    "event_id": "48743958-b793-4fd4-8966-1e049b4173e3",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.536Z",
+    "step_run_id": null,
+    "type": "document.ingested",
+    "v": 1,
+    "payload": {
+      "document_id": "ppm",
+      "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+      "filename": "larkspur-ppm-excerpt.pdf",
+      "kind": "ppm",
+      "page_count": 3,
+      "pdfjs_version": "5.0.0"
+    }
+  },
+  {
+    "seq": 4,
+    "event_id": "beaef41e-b0f0-4d19-8bee-8d2b0ba3b319",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.537Z",
+    "step_run_id": null,
+    "type": "document.ingested",
+    "v": 1,
+    "payload": {
+      "document_id": "deck",
+      "sha256": "3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d",
+      "filename": "larkspur-marketing-deck.pdf",
+      "kind": "deck",
+      "page_count": 3,
+      "pdfjs_version": "5.0.0"
+    }
+  },
+  {
+    "seq": 5,
+    "event_id": "29767939-d03e-46f0-addc-dfd0ba8f4c39",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.538Z",
+    "step_run_id": null,
+    "type": "document.ingested",
+    "v": 1,
+    "payload": {
+      "document_id": "fee-table",
+      "sha256": "4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c",
+      "filename": "larkspur-fee-table.pdf",
+      "kind": "fee_table",
+      "page_count": 1,
+      "pdfjs_version": "5.0.0"
+    }
+  },
+  {
+    "seq": 6,
+    "event_id": "b6389b5c-3028-4b6c-a49e-fe8df5d3bb7a",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.539Z",
+    "step_run_id": "87b42d57-8d6c-4d34-b8cc-497a24396b28",
+    "type": "step.started",
+    "v": 1,
+    "payload": {
+      "step": "extract",
+      "model": "recorded-fake-model",
+      "prompt_version": "extract@1",
+      "input_run_id": null
+    }
+  },
+  {
+    "seq": 7,
+    "event_id": "f5debbf1-b559-4b5d-8a57-9a37510dcf6d",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.540Z",
+    "step_run_id": "87b42d57-8d6c-4d34-b8cc-497a24396b28",
+    "type": "step.failed",
+    "v": 1,
+    "payload": {
+      "step": "extract",
+      "model": "recorded-fake-model",
+      "prompt_version": "extract@1",
+      "input_run_id": null,
+      "error": "model endpoint unreachable: recorded outage"
+    }
+  },
+  {
+    "seq": 8,
+    "event_id": "1fe6476c-4724-4583-be9c-66163e73cb88",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.541Z",
+    "step_run_id": "87b42d57-8d6c-4d34-b8cc-497a24396b28",
+    "type": "step.started",
+    "v": 1,
+    "payload": {
+      "step": "extract",
+      "model": "recorded-fake-model",
+      "prompt_version": "extract@1",
+      "input_run_id": null
+    }
+  },
+  {
+    "seq": 9,
+    "event_id": "16453906-0a32-470b-a2a2-560a57cc6375",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.542Z",
+    "step_run_id": "87b42d57-8d6c-4d34-b8cc-497a24396b28",
+    "type": "step.completed",
+    "v": 1,
+    "payload": {
+      "step": "extract",
+      "model": "recorded-fake-model",
+      "prompt_version": "extract@1",
+      "input_run_id": null,
+      "output": {
+        "statements": [
+          {
+            "document_id": "factsheet",
+            "page": 1,
+            "quote": "Annual management fee: 0.85% per annum"
+          },
+          {
+            "document_id": "fee-table",
+            "page": 1,
+            "quote": "Annual management fee: 1.25% of net asset value"
+          },
+          {
+            "document_id": "deck",
+            "page": 2,
+            "quote": "No entry or exit charges."
+          },
+          {
+            "document_id": "fee-table",
+            "page": 1,
+            "quote": "Redemption charge: 2.00% on units redeemed within 24 months of purchase"
+          },
+          {
+            "document_id": "factsheet",
+            "page": 1,
+            "quote": "The Fund invests only in investment-grade bonds."
+          },
+          {
+            "document_id": "ppm",
+            "page": 1,
+            "quote": "3.3 The Fund may invest up to 40% of its net assets in sub-investment-grade bonds."
+          },
+          {
+            "document_id": "deck",
+            "page": 1,
+            "quote": "Every holding is screened to exclude fossil fuel companies."
+          },
+          {
+            "document_id": "deck",
+            "page": 2,
+            "quote": "Target income of 6% a year, paid every month."
+          },
+          {
+            "document_id": "ppm",
+            "page": 2,
+            "quote": "5.2 Distributions are not guaranteed and may be paid out of capital."
+          },
+          {
+            "document_id": "factsheet",
+            "page": 1,
+            "quote": "Dealing: daily, on any business day"
+          },
+          {
+            "document_id": "ppm",
+            "page": 3,
+            "quote": "7.3 Redemptions are processed monthly, on the last business day of each month."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "seq": 10,
+    "event_id": "e0fa16ee-24e6-4d55-99ff-de7a0ad5da76",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.543Z",
+    "step_run_id": "1fc82f1c-8430-4b1e-b558-712a0fd8783c",
+    "type": "step.started",
+    "v": 1,
+    "payload": {
+      "step": "decompose",
+      "model": "recorded-fake-model",
+      "prompt_version": "decompose@1",
+      "input_run_id": "87b42d57-8d6c-4d34-b8cc-497a24396b28"
+    }
+  },
+  {
+    "seq": 11,
+    "event_id": "dc60824c-9bdb-4ff5-9c46-615a3c443039",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.544Z",
+    "step_run_id": "1fc82f1c-8430-4b1e-b558-712a0fd8783c",
+    "type": "step.completed",
+    "v": 1,
+    "payload": {
+      "step": "decompose",
+      "model": "recorded-fake-model",
+      "prompt_version": "decompose@1",
+      "input_run_id": "87b42d57-8d6c-4d34-b8cc-497a24396b28",
+      "output": {
+        "claims": [
+          {
+            "id": "c1",
+            "document_id": "factsheet",
+            "page": 1,
+            "quote": "Annual management fee: 0.85% per annum",
+            "category": "fees",
+            "topic": "management fee",
+            "assertion": "management fee 0.85% per annum"
+          },
+          {
+            "id": "c2",
+            "document_id": "fee-table",
+            "page": 1,
+            "quote": "Annual management fee: 1.25% of net asset value",
+            "category": "fees",
+            "topic": "management fee",
+            "assertion": "management fee 1.25% of net asset value"
+          },
+          {
+            "id": "c3",
+            "document_id": "deck",
+            "page": 2,
+            "quote": "No entry or exit charges.",
+            "category": "fees",
+            "topic": "exit charge",
+            "assertion": "no entry or exit charges"
+          },
+          {
+            "id": "c4",
+            "document_id": "fee-table",
+            "page": 1,
+            "quote": "Redemption charge: 2.00% on units redeemed within 24 months of purchase",
+            "category": "fees",
+            "topic": "exit charge",
+            "assertion": "redemption charge 2.00% within 24 months"
+          },
+          {
+            "id": "c5",
+            "document_id": "factsheet",
+            "page": 1,
+            "quote": "The Fund invests only in investment-grade bonds.",
+            "category": "strategy",
+            "topic": "credit quality",
+            "assertion": "invests only in investment-grade bonds"
+          },
+          {
+            "id": "c6",
+            "document_id": "ppm",
+            "page": 1,
+            "quote": "3.3 The Fund may invest up to 40% of its net assets in sub-investment-grade bonds.",
+            "category": "strategy",
+            "topic": "credit quality",
+            "assertion": "may hold up to 40% sub-investment-grade"
+          },
+          {
+            "id": "c7",
+            "document_id": "deck",
+            "page": 1,
+            "quote": "Every holding is screened to exclude fossil fuel companies.",
+            "category": "strategy",
+            "topic": "esg screening",
+            "assertion": "screens out fossil fuel companies"
+          },
+          {
+            "id": "c8",
+            "document_id": "deck",
+            "page": 2,
+            "quote": "Target income of 6% a year, paid every month.",
+            "category": "risk",
+            "topic": "income",
+            "assertion": "targets 6% income paid monthly"
+          },
+          {
+            "id": "c9",
+            "document_id": "ppm",
+            "page": 2,
+            "quote": "5.2 Distributions are not guaranteed and may be paid out of capital.",
+            "category": "risk",
+            "topic": "income",
+            "assertion": "distributions not guaranteed, may come from capital"
+          },
+          {
+            "id": "c10",
+            "document_id": "factsheet",
+            "page": 1,
+            "quote": "Dealing: daily, on any business day",
+            "category": "terms",
+            "topic": "dealing frequency",
+            "assertion": "dealing daily on any business day"
+          },
+          {
+            "id": "c11",
+            "document_id": "ppm",
+            "page": 3,
+            "quote": "7.3 Redemptions are processed monthly, on the last business day of each month.",
+            "category": "terms",
+            "topic": "dealing frequency",
+            "assertion": "redemptions processed monthly"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "seq": 12,
+    "event_id": "d17cab06-cd0a-4932-9bbd-7e23b7867c7d",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.545Z",
+    "step_run_id": "3719e30d-bb8c-4858-a09f-e2aae68ee0aa",
+    "type": "step.started",
+    "v": 1,
+    "payload": {
+      "step": "contradictions",
+      "model": "recorded-fake-model",
+      "prompt_version": "contradictions@1",
+      "input_run_id": "1fc82f1c-8430-4b1e-b558-712a0fd8783c"
+    }
+  },
+  {
+    "seq": 13,
+    "event_id": "257bd85d-1d13-4ce8-adcc-246005d0b764",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.546Z",
+    "step_run_id": "3719e30d-bb8c-4858-a09f-e2aae68ee0aa",
+    "type": "step.completed",
+    "v": 1,
+    "payload": {
+      "step": "contradictions",
+      "model": "recorded-fake-model",
+      "prompt_version": "contradictions@1",
+      "input_run_id": "1fc82f1c-8430-4b1e-b558-712a0fd8783c",
+      "output": {
+        "issues": [
+          {
+            "kind": "contradiction",
+            "category": "fees",
+            "claim_id": "c1",
+            "counterpart_claim_id": "c2",
+            "explanation": "The factsheet states 0.85% per annum; the fee table states 1.25% of net asset value."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "seq": 14,
+    "event_id": "26277c3f-8aa0-402c-b628-a489c6b23dee",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.547Z",
+    "step_run_id": "53487a70-637f-41a9-b84a-80c69b95f671",
+    "type": "step.started",
+    "v": 1,
+    "payload": {
+      "step": "findings",
+      "model": "recorded-fake-model",
+      "prompt_version": "findings@1",
+      "input_run_id": "3719e30d-bb8c-4858-a09f-e2aae68ee0aa"
+    }
+  },
+  {
+    "seq": 15,
+    "event_id": "1a49c791-93a2-434a-a393-997fd5eada20",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.548Z",
+    "step_run_id": "53487a70-637f-41a9-b84a-80c69b95f671",
+    "type": "step.completed",
+    "v": 1,
+    "payload": {
+      "step": "findings",
+      "model": "recorded-fake-model",
+      "prompt_version": "findings@1",
+      "input_run_id": "3719e30d-bb8c-4858-a09f-e2aae68ee0aa",
+      "output": {
+        "findings": [
+          {
+            "finding_id": "571bed69-adcf-4213-b95c-bb5f42c956c9",
+            "category": "fees",
+            "kind": "contradiction",
+            "severity": "high",
+            "claim": "The factsheet states a 0.85% management fee per annum; the fee table states 1.25% of net asset value.",
+            "citation": {
+              "document_id": "factsheet",
+              "page": 1,
+              "quote": "Annual management fee: 0.85% per annum"
+            },
+            "counterpart": {
+              "document_id": "fee-table",
+              "page": 1,
+              "quote": "Annual management fee: 1.25% of net asset value"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "seq": 16,
+    "event_id": "15c9fc5c-7aed-4b63-a805-065c5f0f36f8",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.548Z",
+    "step_run_id": "53487a70-637f-41a9-b84a-80c69b95f671",
+    "type": "finding.created",
+    "v": 1,
+    "payload": {
+      "finding_id": "571bed69-adcf-4213-b95c-bb5f42c956c9",
+      "category": "fees",
+      "kind": "contradiction",
+      "severity": "high",
+      "claim": "The factsheet states a 0.85% management fee per annum; the fee table states 1.25% of net asset value.",
+      "citation": {
+        "document_id": "factsheet",
+        "page": 1,
+        "quote": "Annual management fee: 0.85% per annum"
+      },
+      "counterpart": {
+        "document_id": "fee-table",
+        "page": 1,
+        "quote": "Annual management fee: 1.25% of net asset value"
+      }
+    }
+  },
+  {
+    "seq": 17,
+    "event_id": "e918175c-3b2d-4fa4-9499-b8f949ea521d",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.550Z",
+    "step_run_id": "3a592e5b-b10c-4db3-8ea0-a29e2189c557",
+    "type": "step.started",
+    "v": 1,
+    "payload": {
+      "step": "contradictions",
+      "model": "recorded-fake-model",
+      "prompt_version": "contradictions@1",
+      "input_run_id": "1fc82f1c-8430-4b1e-b558-712a0fd8783c"
+    }
+  },
+  {
+    "seq": 18,
+    "event_id": "75a30148-3540-4d4f-bf79-5c4c4f7fb1c1",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.550Z",
+    "step_run_id": "3a592e5b-b10c-4db3-8ea0-a29e2189c557",
+    "type": "step.completed",
+    "v": 1,
+    "payload": {
+      "step": "contradictions",
+      "model": "recorded-fake-model",
+      "prompt_version": "contradictions@1",
+      "input_run_id": "1fc82f1c-8430-4b1e-b558-712a0fd8783c",
+      "output": {
+        "issues": [
+          {
+            "kind": "contradiction",
+            "category": "fees",
+            "claim_id": "c1",
+            "counterpart_claim_id": "c2",
+            "explanation": "The factsheet states 0.85% per annum; the fee table states 1.25% of net asset value."
+          },
+          {
+            "kind": "contradiction",
+            "category": "fees",
+            "claim_id": "c3",
+            "counterpart_claim_id": "c4",
+            "explanation": "The deck states no entry or exit charges; the fee table charges 2.00% within 24 months."
+          },
+          {
+            "kind": "contradiction",
+            "category": "strategy",
+            "claim_id": "c5",
+            "counterpart_claim_id": "c6",
+            "explanation": "The factsheet states investment-grade only; the PPM allows up to 40% sub-investment-grade."
+          },
+          {
+            "kind": "unsupported_claim",
+            "category": "strategy",
+            "claim_id": "c7",
+            "counterpart_claim_id": null,
+            "explanation": "The deck states a fossil fuel exclusion screen; the PPM investment policy describes none."
+          },
+          {
+            "kind": "disclosure_gap",
+            "category": "risk",
+            "claim_id": "c8",
+            "counterpart_claim_id": "c9",
+            "explanation": "The deck promises monthly income with no risk warning; the PPM says distributions are not guaranteed."
+          },
+          {
+            "kind": "contradiction",
+            "category": "terms",
+            "claim_id": "c10",
+            "counterpart_claim_id": "c11",
+            "explanation": "The factsheet offers daily dealing; the PPM processes redemptions monthly."
+          }
+        ]
+      }
+    }
+  },
+  {
+    "seq": 19,
+    "event_id": "9f4c860c-b92a-4551-b956-e8921e663279",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.551Z",
+    "step_run_id": "a97fa914-fa44-4918-a8ca-2e13ec8db1a1",
+    "type": "step.started",
+    "v": 1,
+    "payload": {
+      "step": "findings",
+      "model": "recorded-fake-model",
+      "prompt_version": "findings@1",
+      "input_run_id": "3a592e5b-b10c-4db3-8ea0-a29e2189c557"
+    }
+  },
+  {
+    "seq": 20,
+    "event_id": "566b5e34-9b28-4db7-8303-bd5754d381db",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.552Z",
+    "step_run_id": "a97fa914-fa44-4918-a8ca-2e13ec8db1a1",
+    "type": "step.completed",
+    "v": 1,
+    "payload": {
+      "step": "findings",
+      "model": "recorded-fake-model",
+      "prompt_version": "findings@1",
+      "input_run_id": "3a592e5b-b10c-4db3-8ea0-a29e2189c557",
+      "output": {
+        "findings": [
+          {
+            "finding_id": "34146bc8-1ce4-4da1-bb58-a98d6478418f",
+            "category": "fees",
+            "kind": "contradiction",
+            "severity": "high",
+            "claim": "The factsheet states a 0.85% management fee per annum; the fee table states 1.25% of net asset value.",
+            "citation": {
+              "document_id": "factsheet",
+              "page": 1,
+              "quote": "Annual management fee: 0.85% per annum"
+            },
+            "counterpart": {
+              "document_id": "fee-table",
+              "page": 1,
+              "quote": "Annual management fee: 1.25% of net asset value"
+            }
+          },
+          {
+            "finding_id": "71e677fa-820e-41f0-94c3-cc47fa8c6598",
+            "category": "fees",
+            "kind": "contradiction",
+            "severity": "high",
+            "claim": "The deck states no entry or exit charges; the fee table charges 2.00% on units redeemed within 24 months.",
+            "citation": {
+              "document_id": "deck",
+              "page": 2,
+              "quote": "No entry or exit charges."
+            },
+            "counterpart": {
+              "document_id": "fee-table",
+              "page": 1,
+              "quote": "Redemption charge: 2.00% on units redeemed within 24 months of purchase"
+            }
+          },
+          {
+            "finding_id": "fe2e1ad5-1f26-4941-8987-557a13d0fa85",
+            "category": "strategy",
+            "kind": "contradiction",
+            "severity": "high",
+            "claim": "The factsheet states the Fund invests only in investment-grade bonds; the PPM allows up to 40% sub-investment-grade.",
+            "citation": {
+              "document_id": "factsheet",
+              "page": 1,
+              "quote": "The Fund invests only in investment-grade bonds."
+            },
+            "counterpart": {
+              "document_id": "ppm",
+              "page": 1,
+              "quote": "3.3 The Fund may invest up to 40% of its net assets in sub-investment-grade bonds."
+            }
+          },
+          {
+            "finding_id": "a9f67565-d0a5-490f-8c2e-e1de23f05e56",
+            "category": "strategy",
+            "kind": "unsupported_claim",
+            "severity": "medium",
+            "claim": "The deck states every holding is screened to exclude fossil fuel companies; the PPM investment policy describes no such screen.",
+            "citation": {
+              "document_id": "deck",
+              "page": 1,
+              "quote": "Every holding is screened to exclude fossil fuel companies."
+            },
+            "counterpart": null
+          },
+          {
+            "finding_id": "df3539d5-954f-49a5-ace1-6ca237a6c0c7",
+            "category": "risk",
+            "kind": "disclosure_gap",
+            "severity": "high",
+            "claim": "The deck promises a target income of 6% a year with no risk warning; the PPM states distributions are not guaranteed.",
+            "citation": {
+              "document_id": "deck",
+              "page": 2,
+              "quote": "Target income of 6% a year, paid every month."
+            },
+            "counterpart": {
+              "document_id": "ppm",
+              "page": 2,
+              "quote": "5.2 Distributions are not guaranteed and may be paid out of capital."
+            }
+          },
+          {
+            "finding_id": "f5722de4-63d6-4860-9339-8e2c485f024b",
+            "category": "terms",
+            "kind": "contradiction",
+            "severity": "medium",
+            "claim": "The factsheet states dealing is daily on any business day; the PPM processes redemptions monthly.",
+            "citation": {
+              "document_id": "factsheet",
+              "page": 1,
+              "quote": "Dealing: daily, on any business day"
+            },
+            "counterpart": {
+              "document_id": "ppm",
+              "page": 3,
+              "quote": "7.3 Redemptions are processed monthly, on the last business day of each month."
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "seq": 21,
+    "event_id": "8e73af99-18e1-4056-9e79-487e152130e8",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.552Z",
+    "step_run_id": "a97fa914-fa44-4918-a8ca-2e13ec8db1a1",
+    "type": "finding.superseded",
+    "v": 1,
+    "payload": {
+      "finding_id": "571bed69-adcf-4213-b95c-bb5f42c956c9"
+    }
+  },
+  {
+    "seq": 22,
+    "event_id": "6dbbd16e-8e49-470d-9419-4f2cf94e1c6a",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.552Z",
+    "step_run_id": "a97fa914-fa44-4918-a8ca-2e13ec8db1a1",
+    "type": "finding.created",
+    "v": 1,
+    "payload": {
+      "finding_id": "34146bc8-1ce4-4da1-bb58-a98d6478418f",
+      "category": "fees",
+      "kind": "contradiction",
+      "severity": "high",
+      "claim": "The factsheet states a 0.85% management fee per annum; the fee table states 1.25% of net asset value.",
+      "citation": {
+        "document_id": "factsheet",
+        "page": 1,
+        "quote": "Annual management fee: 0.85% per annum"
+      },
+      "counterpart": {
+        "document_id": "fee-table",
+        "page": 1,
+        "quote": "Annual management fee: 1.25% of net asset value"
+      }
+    }
+  },
+  {
+    "seq": 23,
+    "event_id": "24694f86-edfd-4102-9b9d-dd099e39745a",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.552Z",
+    "step_run_id": "a97fa914-fa44-4918-a8ca-2e13ec8db1a1",
+    "type": "finding.created",
+    "v": 1,
+    "payload": {
+      "finding_id": "71e677fa-820e-41f0-94c3-cc47fa8c6598",
+      "category": "fees",
+      "kind": "contradiction",
+      "severity": "high",
+      "claim": "The deck states no entry or exit charges; the fee table charges 2.00% on units redeemed within 24 months.",
+      "citation": {
+        "document_id": "deck",
+        "page": 2,
+        "quote": "No entry or exit charges."
+      },
+      "counterpart": {
+        "document_id": "fee-table",
+        "page": 1,
+        "quote": "Redemption charge: 2.00% on units redeemed within 24 months of purchase"
+      }
+    }
+  },
+  {
+    "seq": 24,
+    "event_id": "eaa6e0b6-a715-46ba-919b-31dcf700539d",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.552Z",
+    "step_run_id": "a97fa914-fa44-4918-a8ca-2e13ec8db1a1",
+    "type": "finding.created",
+    "v": 1,
+    "payload": {
+      "finding_id": "fe2e1ad5-1f26-4941-8987-557a13d0fa85",
+      "category": "strategy",
+      "kind": "contradiction",
+      "severity": "high",
+      "claim": "The factsheet states the Fund invests only in investment-grade bonds; the PPM allows up to 40% sub-investment-grade.",
+      "citation": {
+        "document_id": "factsheet",
+        "page": 1,
+        "quote": "The Fund invests only in investment-grade bonds."
+      },
+      "counterpart": {
+        "document_id": "ppm",
+        "page": 1,
+        "quote": "3.3 The Fund may invest up to 40% of its net assets in sub-investment-grade bonds."
+      }
+    }
+  },
+  {
+    "seq": 25,
+    "event_id": "761e4ed4-d964-4c41-95ef-a7f86fe5c94d",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.552Z",
+    "step_run_id": "a97fa914-fa44-4918-a8ca-2e13ec8db1a1",
+    "type": "finding.created",
+    "v": 1,
+    "payload": {
+      "finding_id": "a9f67565-d0a5-490f-8c2e-e1de23f05e56",
+      "category": "strategy",
+      "kind": "unsupported_claim",
+      "severity": "medium",
+      "claim": "The deck states every holding is screened to exclude fossil fuel companies; the PPM investment policy describes no such screen.",
+      "citation": {
+        "document_id": "deck",
+        "page": 1,
+        "quote": "Every holding is screened to exclude fossil fuel companies."
+      },
+      "counterpart": null
+    }
+  },
+  {
+    "seq": 26,
+    "event_id": "732d5b11-3d8d-4f2c-bf8e-7e759303fd03",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.552Z",
+    "step_run_id": "a97fa914-fa44-4918-a8ca-2e13ec8db1a1",
+    "type": "finding.created",
+    "v": 1,
+    "payload": {
+      "finding_id": "df3539d5-954f-49a5-ace1-6ca237a6c0c7",
+      "category": "risk",
+      "kind": "disclosure_gap",
+      "severity": "high",
+      "claim": "The deck promises a target income of 6% a year with no risk warning; the PPM states distributions are not guaranteed.",
+      "citation": {
+        "document_id": "deck",
+        "page": 2,
+        "quote": "Target income of 6% a year, paid every month."
+      },
+      "counterpart": {
+        "document_id": "ppm",
+        "page": 2,
+        "quote": "5.2 Distributions are not guaranteed and may be paid out of capital."
+      }
+    }
+  },
+  {
+    "seq": 27,
+    "event_id": "8b48c898-84e3-4716-824a-7a4211b33f0a",
+    "case_id": "3b69e359-a370-46ef-8c35-7e2908b78540",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T12:31:22.552Z",
+    "step_run_id": "a97fa914-fa44-4918-a8ca-2e13ec8db1a1",
+    "type": "finding.created",
+    "v": 1,
+    "payload": {
+      "finding_id": "f5722de4-63d6-4860-9339-8e2c485f024b",
+      "category": "terms",
+      "kind": "contradiction",
+      "severity": "medium",
+      "claim": "The factsheet states dealing is daily on any business day; the PPM processes redemptions monthly.",
+      "citation": {
+        "document_id": "factsheet",
+        "page": 1,
+        "quote": "Dealing: daily, on any business day"
+      },
+      "counterpart": {
+        "document_id": "ppm",
+        "page": 3,
+        "quote": "7.3 Redemptions are processed monthly, on the last business day of each month."
+      }
+    }
+  }
+]
