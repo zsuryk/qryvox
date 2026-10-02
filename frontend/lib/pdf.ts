@@ -24,6 +24,14 @@ assertPdfjsVersion(PDFJS_VERSION);
 // emitted, or getDocument rejects before it reads a page. Only the caller knows which it is.
 export type PdfAssets = { standardFontDataUrl: string; workerSrc?: string };
 
+// What the browser hands to extractPageTexts: the static copies scripts/pdfjs-assets.ts makes of the
+// pinned build, which run before dev and before build. Both the trailing slash and the flat worker
+// name are load-bearing — pdf.js resolves a font file against the first, and the second is the copy.
+export const browserPdfAssets: PdfAssets = {
+  standardFontDataUrl: "/pdfjs/standard_fonts/",
+  workerSrc: "/pdfjs/pdf.worker.mjs",
+};
+
 // The text of each page, in page order — index n holds the text of page n + 1.
 export async function extractPageTexts(bytes: Uint8Array, assets: PdfAssets): Promise<string[]> {
   if (assets.workerSrc) pdfjs.GlobalWorkerOptions.workerSrc = assets.workerSrc;

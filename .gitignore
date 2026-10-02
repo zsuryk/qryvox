@@ -7,6 +7,9 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 
+# Copied out of the pinned pdfjs-dist by frontend/scripts/pdfjs-assets.ts, before dev and build.
+frontend/public/pdfjs/
+
 # Local SQLite databases
 *.db
 *.db-journal
