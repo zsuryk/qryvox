@@ -1,8 +1,13 @@
 import { serve } from "@hono/node-server";
-import { app } from "./app";
+import { createApp } from "./app";
+import { assertAppendOnly } from "./db/append-only";
+import { openDatabase, runMigrations } from "./db/client";
+import { env } from "./env";
 
-const port = Number(process.env.PORT ?? 8787);
+const database = openDatabase(env.databaseUrl, env.databaseAuthToken);
+await runMigrations(database.db);
+await assertAppendOnly(database.client);
 
-serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`backend listening on http://localhost:${info.port}`);
+serve({ fetch: createApp({ ...database, allowedOrigin: env.allowedOrigin }).fetch, port: env.port }, (info) => {
+  console.log(`backend listening on http://localhost:${info.port} (${env.databaseUrl})`);
 });
