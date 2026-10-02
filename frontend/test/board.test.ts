@@ -1,0 +1,133 @@
+import { describe, expect, it } from "vitest";
+import { fold, type FindingCategory, SlimEvent } from "@qryvox/shared";
+import recorded from "@qryvox/shared/case-recorded.json";
+import { boardView, CATEGORIES } from "../lib/board";
+
+// The recorded case, folded by the board exactly as the browser folds it: no model call, no state store.
+const events = SlimEvent.array().parse(recorded);
+const all = [...CATEGORIES];
+const selected = (...categories: FindingCategory[]) => categories;
+
+// The seq the first findings run put its finding on the board; the re-run supersedes it and puts six up.
+const supersededSeq = events.find((e) => e.type === "finding.created")!.seq;
+
+describe("the board", () => {
+  it("shows every active finding as a card, with its category, claim, rationale and quote", () => {
+    const { cards, active, visible, counts } = boardView(events, all);
+
+    expect(active).toBe(6);
+    expect(visible).toBe(6);
+    expect(counts).toEqual({ fees: 2, strategy: 2, risk: 1, terms: 1 });
+    expect(cards).toHaveLength(6);
+    expect(cards[0]).toEqual({
+      findingId: expect.any(String),
+      category: "fees",
+      categoryLabel: "Fees",
+      kind: "contradiction",
+      kindLabel: "Contradiction",
+      severity: "high",
+      severityLabel: "High",
+      claim: "The factsheet states a 0.85% management fee per annum; the fee table states 1.25% of net asset value.",
+      rationale: "Two documents state the same fact differently.",
+      citation: {
+        documentId: "factsheet",
+        documentName: "larkspur-factsheet.pdf",
+        page: 1,
+        quote: "Annual management fee: 0.85% per annum",
+      },
+      counterpart: {
+        documentId: "fee-table",
+        documentName: "larkspur-fee-table.pdf",
+        page: 1,
+        quote: "Annual management fee: 1.25% of net asset value",
+      },
+      runId: expect.any(String),
+      seq: 22,
+    });
+    expect(cards.every((card) => card.rationale.length > 0 && card.citation !== null)).toBe(true);
+  });
+
+  it("leaves a superseded finding off the board while it stays in the log", () => {
+    const superseded = fold(events.filter((e) => e.seq <= supersededSeq)).findings[0]!;
+    const { cards } = boardView(events, all);
+
+    expect(fold(events).findings.map((f) => f.finding_id)).toContain(superseded.finding_id);
+    expect(cards.map((card) => card.findingId)).not.toContain(superseded.finding_id);
+  });
+
+  it("orders cards by severity, then by category", () => {
+    expect(boardView(events, all).cards.map((card) => [card.severity, card.category])).toEqual([
+      ["high", "fees"],
+      ["high", "fees"],
+      ["high", "strategy"],
+      ["high", "risk"],
+      ["medium", "strategy"],
+      ["medium", "terms"],
+    ]);
+  });
+
+  it("narrows the board and the count to the categories selected", () => {
+    const fees = boardView(events, selected("fees"));
+    const feesAndTerms = boardView(events, selected("fees", "terms"));
+
+    expect(fees.cards.map((card) => card.category)).toEqual(["fees", "fees"]);
+    expect(fees.visible).toBe(2);
+    expect(fees.active).toBe(6);
+    // The count follows the filter, and the per-category counts still say what is held back.
+    expect(feesAndTerms.visible).toBe(3);
+    expect(feesAndTerms.cards.map((card) => card.category)).toEqual(["fees", "fees", "terms"]);
+  });
+
+  it("says plainly that a filter with no findings is empty", () => {
+    // The board as the first findings run left it: one fee finding, so nothing in strategy.
+    const firstRun = events.filter((e) => e.seq <= supersededSeq);
+
+    expect(boardView(firstRun, selected("strategy")).notice).toEqual({
+      headline: "No strategy findings.",
+      detail: "The board holds 1 finding in other categories.",
+    });
+  });
+
+  it("says plainly that a case with no findings yet is empty", () => {
+    const beforeFindings = events.filter((e) => e.seq < supersededSeq);
+
+    expect(boardView(beforeFindings, all)).toMatchObject({
+      cards: [],
+      active: 0,
+      visible: 0,
+      notice: {
+        headline: "No findings on this case yet.",
+        detail: "Nothing has been recorded to the board, so there is nothing to filter.",
+      },
+    });
+  });
+
+  it("says plainly that a board with every category turned off is empty", () => {
+    expect(boardView(events, []).notice).toEqual({
+      headline: "No categories selected.",
+      detail: "The board holds 6 findings in other categories. Turn a category on to see them.",
+    });
+  });
+
+  it("names the run that put the board up, and what it superseded", () => {
+    const { scope } = boardView(events, all);
+    const secondRun = events.filter((e) => e.type === "finding.created").at(-1)!.step_run_id;
+
+    expect(scope).toEqual({
+      runIds: [secondRun],
+      step: "findings",
+      model: "recorded-fake-model",
+      promptVersion: "findings@1",
+      firstSeq: 22,
+      lastSeq: 27,
+      superseded: 1,
+    });
+  });
+
+  it("folds the log it is given rather than holding findings of its own", () => {
+    const board = events.filter((e) => e.seq <= supersededSeq);
+
+    expect(boardView(board, all).active).toBe(1);
+    expect(boardView(events, all).active).toBe(6);
+  });
+});
