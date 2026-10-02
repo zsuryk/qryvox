@@ -1,0 +1,35 @@
+{
+  "pack_id": "larkspur-v1",
+  "product": "Larkspur Global Income Fund",
+  "issuer": "Calderhaven Asset Management Ltd",
+  "documents": [
+    {
+      "document_id": "factsheet",
+      "kind": "factsheet",
+      "filename": "larkspur-factsheet.pdf",
+      "sha256": "69e3a677473795b884efe833ac02b04128da1cbb59688c08e1a2a5f05aa2c933",
+      "page_count": 2
+    },
+    {
+      "document_id": "ppm",
+      "kind": "ppm",
+      "filename": "larkspur-ppm-excerpt.pdf",
+      "sha256": "ee72e47a20d377f3fa6232d5d7010cf4445781697d2e95f8e4c2280044354fe9",
+      "page_count": 3
+    },
+    {
+      "document_id": "deck",
+      "kind": "deck",
+      "filename": "larkspur-marketing-deck.pdf",
+      "sha256": "0492b3e35ed6f5037688419800cdc7a2b7564a6732613226d2651ebef7559133",
+      "page_count": 3
+    },
+    {
+      "document_id": "fee-table",
+      "kind": "fee_table",
+      "filename": "larkspur-fee-table.pdf",
+      "sha256": "7e5a28f6c65d71acf1273cd96e14de6d27ade3a4aeb4b0bb70fa4543ba6a2dfe",
+      "page_count": 1
+    }
+  ]
+}
