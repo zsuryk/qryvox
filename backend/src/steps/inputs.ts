@@ -31,18 +31,39 @@ export function normalize(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
+// The document a citation names. A model is handed the ids in a header and asked to copy them, and models
+// copy what they see: a header reading "factsheet (factsheet, larkspur-factsheet.pdf)" invites the whole
+// token back as the id, which then matches no document and grounds nothing at all. So a cited id is
+// matched exactly first, and only then by the longest known id it begins with — the repair is narrow on
+// purpose. A citation still has to quote its page verbatim to be believed, so a sloppy id costs a claim
+// nothing but the id, never the grounding it would otherwise have had.
+export function resolveDocument(
+  documents: readonly IngestedDocument[],
+  cited: string,
+): IngestedDocument | undefined {
+  const exact = documents.find((d) => d.document_id === cited);
+  if (exact) return exact;
+  const trimmed = cited.trim();
+  return documents
+    .filter((d) => trimmed === d.document_id || trimmed.startsWith(`${d.document_id} `) || trimmed.startsWith(`${d.document_id}(`))
+    .sort((a, b) => b.document_id.length - a.document_id.length)[0];
+}
+
 // True when the quote appears on that page of that document.
 export function onPage(documents: readonly IngestedDocument[], documentId: string, page: number, quote: string): boolean {
-  const text = documents.find((d) => d.document_id === documentId)?.pages[page - 1];
+  const text = resolveDocument(documents, documentId)?.pages[page - 1];
   return text !== undefined && normalize(text).includes(normalize(quote));
 }
 
-// The document text as the model sees it: every page labelled, so it can cite document and page.
+// The document text as the model sees it: every page labelled, so it can cite document and page. The id is
+// alone on its line and nothing else is quoted on it, so there is no way to copy a longer token back as
+// the id — the filename and kind sit on the next line, where they cannot be mistaken for part of it.
 export function documentsAsText(documents: readonly IngestedDocument[]): string {
   return documents
     .map((d) =>
       [
-        `=== document_id: ${d.document_id} (${d.kind}, ${d.filename}) ===`,
+        `=== document_id: ${d.document_id} ===`,
+        `--- ${d.kind}, ${d.filename} ---`,
         ...d.pages.map((page, i) => `--- page ${i + 1} ---\n${page}`),
       ].join("\n"),
     )

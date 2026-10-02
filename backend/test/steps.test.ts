@@ -133,6 +133,47 @@ describe("a failing step", () => {
     expect(StepFailure.parse(await res.json()).error).toMatch(/appear verbatim/);
   });
 
+  it("grounds a verbatim quote whose document_id came back with the kind stuck to it", async () => {
+    // A real model, handed "document_id: factsheet (factsheet)", copies the whole token back as the id.
+    // Every citation then names a document the case does not have, and a run of perfectly verbatim quotes
+    // fails for want of one. The id is repaired; the quote is still checked against the page it cites,
+    // which is the part that has to hold for a citation to be worth anything.
+    const verbose = JSON.stringify({
+      statements: [
+        { document_id: "factsheet (factsheet)", page: 1, quote: "Management fee: 0.85% per annum." },
+        { document_id: "factsheet(factsheet)", page: 1, quote: "Management fee: 0.85% per annum." },
+        // …and the repair does not stretch to a document the case never ingested, or to a quote that is
+        // not really on the page. Both still ground to nothing.
+        { document_id: "no such document", page: 1, quote: "Management fee: 0.85% per annum." },
+        { document_id: "factsheet", page: 2, quote: "Management fee: 0.85% per annum." },
+      ],
+    });
+    const t = await setup({ llm: new FakeLlm(() => verbose) });
+    const caseId = await caseWithDocument(t);
+
+    const result = StepResult.parse(await (await runExtract(t, caseId)).json());
+
+    expect(result.output).toEqual({
+      statements: [
+        { document_id: "factsheet (factsheet)", page: 1, quote: "Management fee: 0.85% per annum." },
+        { document_id: "factsheet(factsheet)", page: 1, quote: "Management fee: 0.85% per annum." },
+      ],
+    });
+  });
+
+  it("tells the model a document id on its own, so there is no longer token to copy back", async () => {
+    const llm = new FakeLlm(() => EXTRACT_REPLY);
+    const t = await setup({ llm });
+    const caseId = await caseWithDocument(t);
+
+    await runExtract(t, caseId);
+
+    const sent = llm.calls.at(-1)!.at(-1)!.content;
+    expect(sent).toContain("=== document_id: factsheet ===");
+    // The kind and filename moved off the id's line, where they cannot be read as part of it.
+    expect(sent).not.toContain("document_id: factsheet (");
+  });
+
   it("drops quotes that are not on their cited page and keeps the grounded ones", async () => {
     const mixed = JSON.stringify({
       statements: [

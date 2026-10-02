@@ -53,7 +53,10 @@ export const decompose: StepDefinition<DecomposeInput, DecomposeOutput> = {
   messages({ statements, documents }) {
     const kinds = new Map(documents.map((d) => [d.document_id, d.kind]));
     const text = statements
-      .map((s) => `- document_id: ${s.document_id} (${kinds.get(s.document_id)}), page ${s.page}: ${s.quote}`)
+      // The id alone, with the kind after the quote rather than beside the id: this line is the model's
+      // only picture of what a document_id looks like, and anything in parentheses next to the id is a
+      // token it will hand straight back as one (see resolveDocument in inputs.ts for the repair).
+      .map((s) => `- document_id: ${s.document_id}, page ${s.page}: ${s.quote} [${kinds.get(s.document_id)}]`)
       .join("\n");
     return [
       { role: "system", content: DECOMPOSE_SYSTEM_PROMPT },
