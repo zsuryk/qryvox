@@ -13,6 +13,7 @@
   "dependencies": {
     "@qryvox/shared": "workspace:*",
     "next": "catalog:",
+    "pdfjs-dist": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

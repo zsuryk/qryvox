@@ -21,6 +21,10 @@ catalog:
   hono: ^4.13.12
   next: ^16.3.8
   pdf-lib: ^1.17.1
+  # Exact, not a range: citation highlighting matches quotes against pdf.js's extracted text, so a
+  # text-layer change would move every highlight out from under a citation. Bump it, re-pin
+  # PDFJS_VERSION in shared/src/pack.ts with it, and re-run the pack integrity test.
+  pdfjs-dist: 6.3.289
   react: ^19.3.0
   react-dom: ^19.3.0
   tsx: ^4.23.15
