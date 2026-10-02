@@ -45,6 +45,12 @@ API_VARS=(
   LLM_TIMEOUT_MS
 )
 
+# The frontend bundle inlines NEXT_PUBLIC_* at build time, so these live on the web project, not
+# the API project. The value is the deployed backend's own URL.
+WEB_VARS=(
+  NEXT_PUBLIC_API_URL
+)
+
 info() { printf '  %s\n' "$*"; }
 fail() { printf '\033[31merror: %s\033[0m\n' "$*" >&2; exit 1; }
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
@@ -131,17 +137,16 @@ check_secrets() {
   info "secrets present; database $DATABASE_URL"
 }
 
-# Requires load_project API to have run first: without a project in scope these vars would land
-# on whichever project the CLI infers.
-sync_env() {
-  step "Syncing production environment variables"
-  load_secrets
+# Requires load_project to have run first: without a project in scope these vars would land on
+# whichever project the CLI infers.
+sync_env_vars() {
+  local -n names="$1"
   local name value
-  for name in "${API_VARS[@]}"; do
+  for name in "${names[@]}"; do
     value="${!name:-}"
     if [ -z "$value" ]; then
       case "$name" in
-        DATABASE_URL | IP_HASH_SECRET)
+        DATABASE_URL | IP_HASH_SECRET | NEXT_PUBLIC_API_URL)
           fail "$name is empty in $SECRETS_FILE and is required in production" ;;
       esac
       info "skip  $name (optional, unset)"
@@ -151,6 +156,12 @@ sync_env() {
     printf '%s' "$value" | vercel env add "$name" production >/dev/null
     info "set   $name"
   done
+}
+
+sync_env() {
+  step "Syncing production environment variables"
+  load_secrets
+  sync_env_vars API_VARS
 }
 
 # The dashboard's "new project" flow demands either a Git connection or a file upload, and
@@ -300,11 +311,31 @@ deploy_api() {
 deploy_web() {
   preflight
   load_project WEB
+  load_secrets
+  # The backend's own deployed URL, unless .env.deploy pins it. The frontend bundle inlines it, so
+  # it has to be on the web project before the build, not after.
+  if [ -z "${NEXT_PUBLIC_API_URL:-}" ]; then
+    NEXT_PUBLIC_API_URL="https://$API_PROJECT.vercel.app"
+    export NEXT_PUBLIC_API_URL
+  fi
   stage_gitless
+  step "Syncing the frontend's public environment variables"
+  sync_env_vars WEB_VARS
   step "Deploying $WEB_PROJECT to production"
   vercel deploy --prod --yes --scope "$SCOPE" --cwd "$STAGE" \
     || fail "the web project also needs Root Directory = frontend in the Vercel dashboard"
-  info "deployed the frontend. It calls the backend via NEXT_PUBLIC_API_URL (set on the web project)."
+  step "Verifying the deployed frontend"
+  local url="https://$WEB_PROJECT.vercel.app" attempt
+  for attempt in 1 2 3 4 5 6; do
+    if curl -fsS --max-time 25 "$url" | grep -qi "qryvox"; then
+      info "served: $url"
+      info "the page rendered, so the Next build and its shared-workspace import both resolved"
+      return 0
+    fi
+    info "attempt $attempt/6 not ready yet, waiting..."
+    sleep 5
+  done
+  fail "$url never served the app. Check: vercel logs $WEB_PROJECT"
 }
 
 case "${1:-all}" in
