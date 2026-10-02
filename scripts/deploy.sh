@@ -226,8 +226,12 @@ preview_api() {
   # Previews sit behind Vercel Authentication, so the health check goes through the CLI's own
   # authenticated client rather than a bare curl.
   local url="${1:-$(latest_deployment_url)}" attempt
+  # Vercel streams progress to stderr while the body lands on stdout, so read the body separately
+  # from the noisy build output rather than grepping a merged stream.
+  local body
   for attempt in 1 2 3 4 5 6; do
-    if vercel curl /health "$url" --scope "$SCOPE" 2>/dev/null | grep -q '"status":"ok"'; then
+    body="$(vercel curl /health "$url" --scope "$SCOPE" 2>/dev/null)"
+    if printf '%s' "$body" | grep -q '"status":"ok"'; then
       info "healthy: $url/health"
       info "the commit-author check passed with no git metadata in the upload,"
       info "so a production deploy of the same commit will pass too"
@@ -266,9 +270,8 @@ cleanup_stage() { [ -n "${STAGE:-}" ] && rm -rf "$(dirname "$STAGE")"; }
 
 # The URL of the most recent deployment, for the preview health check.
 latest_deployment_url() {
-  vercel project inspect "$API_PROJECT" --scope "$SCOPE" 2>/dev/null \
-    | awk '/Latest Production URL|latest deployment/ { print $NF }' \
-    | grep -E '^https://' | head -1
+  vercel ls "$API_PROJECT" --scope "$SCOPE" 2>/dev/null \
+    | grep -oE 'https://[a-z0-9-]+\.vercel\.app' | head -1
 }
 trap cleanup_stage EXIT
 
