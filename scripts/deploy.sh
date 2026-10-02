@@ -86,7 +86,7 @@ preflight() {
   [ -z "$(git status --porcelain)" ] || fail "uncommitted changes. Commit or stash first; deploys come from a clean checkout of main."
   [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || fail "not on main. Deploys come from a clean checkout of main (ADR-0001)."
   git fetch --quiet origin
-  [ -z "$(git rev-list --count HEAD..origin/main)" ] || fail "main is behind origin/main. Run: git pull --rebase origin main"
+  [ "$(git rev-list --count HEAD..origin/main)" -eq 0 ] || fail "main is behind origin/main. Run: git pull --rebase origin main"
   resolve_scope
   info "vercel $(vercel --version), scope '$SCOPE'"
   info "on main at $(git rev-parse --short HEAD), clean and up to date with origin"
