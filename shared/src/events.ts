@@ -44,8 +44,74 @@ export const DocumentIngested = z.object({
   payload: IngestedDocument,
 });
 
+// The four analysis steps, driven by the browser in this order (ADR-0001).
+export const StepName = z.enum(["extract", "decompose", "contradictions", "findings"]);
+export type StepName = z.infer<typeof StepName>;
+
+// Which prompt produced a step's output. The prompt text lives in the backend and never reaches the
+// interface; only its version is part of the contract, recorded on every step event.
+export const PROMPT_VERSIONS = {
+  extract: "extract@1",
+  decompose: "decompose@1",
+  contradictions: "contradictions@1",
+  findings: "findings@1",
+} as const satisfies Record<StepName, string>;
+
+const stepRun = {
+  step: StepName,
+  model: z.string().min(1),
+  prompt_version: z.string().min(1),
+  // The completed run whose output this run consumed; null for extract, which reads the documents.
+  input_run_id: z.string().min(1).nullable(),
+};
+
+// Step events always carry the run's step_run_id in the envelope.
+const stepEnvelope = { ...envelope, step_run_id: z.string().min(1) };
+
+export const StepStarted = z.object({
+  ...stepEnvelope,
+  type: z.literal("step.started"),
+  v: z.literal(1),
+  payload: z.object(stepRun),
+});
+
+const stepCompletedPayload = z.object({
+  ...stepRun,
+  // The parsed, schema-checked output; its shape depends on the step.
+  output: z.record(z.string(), z.unknown()),
+  // The model's raw response body, kept for audit. Heavy.
+  raw_response: z.unknown(),
+});
+
+export const StepCompleted = z.object({
+  ...stepEnvelope,
+  type: z.literal("step.completed"),
+  v: z.literal(1),
+  payload: stepCompletedPayload,
+});
+
+const stepFailedPayload = z.object({
+  ...stepRun,
+  error: z.string(),
+  // What the model returned when its output failed to parse; null when no response arrived. Heavy.
+  raw_response: z.unknown(),
+});
+
+export const StepFailed = z.object({
+  ...stepEnvelope,
+  type: z.literal("step.failed"),
+  v: z.literal(1),
+  payload: stepFailedPayload,
+});
+
 // Full events: what the hash covers and what the per-event payload endpoint returns.
-export const Event = z.discriminatedUnion("type", [CaseOpened, DocumentIngested]);
+export const Event = z.discriminatedUnion("type", [
+  CaseOpened,
+  DocumentIngested,
+  StepStarted,
+  StepCompleted,
+  StepFailed,
+]);
 export type Event = z.infer<typeof Event>;
 
 // Slim events: what the event list endpoint returns and what the browser folds.
@@ -53,6 +119,9 @@ export type Event = z.infer<typeof Event>;
 export const SlimEvent = z.discriminatedUnion("type", [
   CaseOpened,
   DocumentIngested.extend({ payload: IngestedDocument.omit({ pages: true }) }),
+  StepStarted,
+  StepCompleted.extend({ payload: stepCompletedPayload.omit({ raw_response: true }) }),
+  StepFailed.extend({ payload: stepFailedPayload.omit({ raw_response: true }) }),
 ]);
 export type SlimEvent = z.infer<typeof SlimEvent>;
 

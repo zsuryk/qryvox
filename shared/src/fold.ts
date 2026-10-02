@@ -1,5 +1,5 @@
 import type { SlimEvent } from "./events";
-import { emptyCaseState, type CaseState } from "./state";
+import { emptyCaseState, type CaseState, type StepRun } from "./state";
 
 export class FoldError extends Error {
   override name = "FoldError";
@@ -42,6 +42,42 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
             ingestedAtSeq: event.seq,
           },
         ],
+      };
+    }
+    case "step.started": {
+      // A retry reuses its run id: it restarts that run instead of adding another, and a run that
+      // already completed stays completed (a concurrent duplicate may log its start late).
+      const existing = state.stepRuns.find((r) => r.stepRunId === event.step_run_id);
+      if (existing?.status === "completed") return next;
+      const p = event.payload;
+      const run: StepRun = {
+        stepRunId: event.step_run_id,
+        step: p.step,
+        status: "running",
+        model: p.model,
+        promptVersion: p.prompt_version,
+        inputRunId: p.input_run_id,
+        startedAtSeq: event.seq,
+        settledAtSeq: null,
+        error: null,
+      };
+      return { ...next, stepRuns: existing ? state.stepRuns.map((r) => (r === existing ? run : r)) : [...state.stepRuns, run] };
+    }
+    case "step.completed":
+    case "step.failed": {
+      const completed = event.type === "step.completed";
+      return {
+        ...next,
+        stepRuns: state.stepRuns.map((r) =>
+          r.stepRunId !== event.step_run_id || r.status === "completed"
+            ? r
+            : {
+                ...r,
+                status: completed ? "completed" : "failed",
+                settledAtSeq: event.seq,
+                error: completed ? null : event.payload.error,
+              },
+        ),
       };
     }
   }

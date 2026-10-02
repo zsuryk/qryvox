@@ -1,0 +1,128 @@
+[
+  {
+    "seq": 1,
+    "event_id": "4e09df81-4734-4eff-9c5e-3c788017fc5c",
+    "case_id": "4e09df81-4734-4eff-9c5e-3c788017fc5c",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T03:33:29.705Z",
+    "step_run_id": null,
+    "type": "case.opened",
+    "v": 1,
+    "payload": {}
+  },
+  {
+    "seq": 2,
+    "event_id": "3d55ced5-4a8f-46c8-96e5-af8c9d22f7a9",
+    "case_id": "4e09df81-4734-4eff-9c5e-3c788017fc5c",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T03:33:29.719Z",
+    "step_run_id": null,
+    "type": "document.ingested",
+    "v": 1,
+    "payload": {
+      "document_id": "factsheet",
+      "sha256": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+      "filename": "factsheet.pdf",
+      "kind": "factsheet",
+      "page_count": 1,
+      "pdfjs_version": "5.0.0"
+    }
+  },
+  {
+    "seq": 3,
+    "event_id": "da55ad29-2af9-462a-8f93-d3bc32d5bfa1",
+    "case_id": "4e09df81-4734-4eff-9c5e-3c788017fc5c",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T03:33:29.729Z",
+    "step_run_id": null,
+    "type": "document.ingested",
+    "v": 1,
+    "payload": {
+      "document_id": "ppm",
+      "sha256": "2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e",
+      "filename": "ppm-excerpt.pdf",
+      "kind": "ppm",
+      "page_count": 2,
+      "pdfjs_version": "5.0.0"
+    }
+  },
+  {
+    "seq": 4,
+    "event_id": "7517b701-b32a-4d9e-a707-849a37d7f240",
+    "case_id": "4e09df81-4734-4eff-9c5e-3c788017fc5c",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T03:33:29.741Z",
+    "step_run_id": "d684f194-8ed2-49e2-8a7c-ee144cc89977",
+    "type": "step.started",
+    "v": 1,
+    "payload": {
+      "step": "extract",
+      "model": "recorded-fake-model",
+      "prompt_version": "extract@1",
+      "input_run_id": null
+    }
+  },
+  {
+    "seq": 5,
+    "event_id": "8fa342ea-39a6-4f76-bde2-c9ec74c68520",
+    "case_id": "4e09df81-4734-4eff-9c5e-3c788017fc5c",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T03:33:29.759Z",
+    "step_run_id": "d684f194-8ed2-49e2-8a7c-ee144cc89977",
+    "type": "step.failed",
+    "v": 1,
+    "payload": {
+      "step": "extract",
+      "model": "recorded-fake-model",
+      "prompt_version": "extract@1",
+      "input_run_id": null,
+      "error": "model endpoint unreachable: recorded outage"
+    }
+  },
+  {
+    "seq": 6,
+    "event_id": "709bd2d5-fb02-4761-9d1c-00c4a77d402d",
+    "case_id": "4e09df81-4734-4eff-9c5e-3c788017fc5c",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T03:33:29.769Z",
+    "step_run_id": "d684f194-8ed2-49e2-8a7c-ee144cc89977",
+    "type": "step.started",
+    "v": 1,
+    "payload": {
+      "step": "extract",
+      "model": "recorded-fake-model",
+      "prompt_version": "extract@1",
+      "input_run_id": null
+    }
+  },
+  {
+    "seq": 7,
+    "event_id": "4cf63112-f326-4b1c-98b7-1ea464feb037",
+    "case_id": "4e09df81-4734-4eff-9c5e-3c788017fc5c",
+    "actor": "demo-analyst",
+    "at": "2026-10-02T03:33:29.781Z",
+    "step_run_id": "d684f194-8ed2-49e2-8a7c-ee144cc89977",
+    "type": "step.completed",
+    "v": 1,
+    "payload": {
+      "step": "extract",
+      "model": "recorded-fake-model",
+      "prompt_version": "extract@1",
+      "input_run_id": null,
+      "output": {
+        "statements": [
+          {
+            "document_id": "factsheet",
+            "page": 1,
+            "quote": "Management fee: 0.85% per annum."
+          },
+          {
+            "document_id": "ppm",
+            "page": 2,
+            "quote": "The management fee is 1.10% per annum."
+          }
+        ]
+      }
+    }
+  }
+]

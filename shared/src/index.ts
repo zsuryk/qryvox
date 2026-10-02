@@ -8,6 +8,9 @@ export {
   IngestDocumentRequest,
   OpenCaseRequest,
   OpenCaseResponse,
+  RunStepRequest,
+  StepFailure,
+  StepResult,
   VerifyResponse,
 } from "./api";
 export {
@@ -18,11 +21,16 @@ export {
   EVENT_TYPES,
   type EventType,
   IngestedDocument,
+  PROMPT_VERSIONS,
   Sha256,
   SlimEvent,
+  StepCompleted,
+  StepFailed,
+  StepName,
+  StepStarted,
 } from "./events";
 export { fold, FoldError } from "./fold";
-export { type CaseDocument, emptyCaseState, type CaseState } from "./state";
+export { type CaseDocument, emptyCaseState, type CaseState, type StepRun, type StepRunStatus } from "./state";
 export {
   FindingCategory,
   GroundTruth,

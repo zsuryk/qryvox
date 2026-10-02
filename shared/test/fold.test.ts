@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { emptyCaseState, fold, FoldError, SlimEvent } from "../src";
-import recorded from "./fixtures/case-ingested.json";
+import recorded from "./fixtures/case-recorded.json";
 
 // Recorded from the API by `pnpm --filter @qryvox/backend record:fixture`.
 const events = SlimEvent.array().parse(recorded);
@@ -16,7 +16,7 @@ describe("fold", () => {
 
     expect(state.caseId).toBe(caseId);
     expect(state.openedAt).toBe(events[0]!.at);
-    expect(state.lastSeq).toBe(3);
+    expect(state.lastSeq).toBe(7);
     expect(state.documents.map((d) => [d.documentId, d.kind, d.pageCount, d.ingestedAtSeq])).toEqual([
       ["factsheet", "factsheet", 1, 2],
       ["ppm", "ppm", 2, 3],
@@ -32,6 +32,34 @@ describe("fold", () => {
 
     expect(atTwo.lastSeq).toBe(2);
     expect(atTwo.documents.map((d) => d.documentId)).toEqual(["factsheet"]);
+  });
+
+  it("tracks a step run that failed and then completed on retry under the same run id", () => {
+    const runId = events.find((e) => e.type === "step.started")!.step_run_id;
+    const runAt = (seq: number) => fold(events.filter((e) => e.seq <= seq)).stepRuns;
+
+    expect(runAt(4)).toEqual([expect.objectContaining({ stepRunId: runId, step: "extract", status: "running" })]);
+    expect(runAt(5)).toEqual([
+      expect.objectContaining({ status: "failed", error: "model endpoint unreachable: recorded outage", settledAtSeq: 5 }),
+    ]);
+    expect(runAt(6)).toEqual([expect.objectContaining({ status: "running", startedAtSeq: 6, error: null })]);
+    expect(runAt(7)).toEqual([
+      expect.objectContaining({
+        stepRunId: runId,
+        status: "completed",
+        model: "recorded-fake-model",
+        promptVersion: "extract@1",
+        inputRunId: null,
+        settledAtSeq: 7,
+      }),
+    ]);
+  });
+
+  it("a late start from a concurrent duplicate does not reopen a completed run", () => {
+    const started = events.find((e) => e.type === "step.started")!;
+    const late = { ...started, seq: 8, event_id: "0f6c1f8e-6a3b-4f53-9d0b-3c1f5b2e7a90" };
+
+    expect(fold([...events, late]).stepRuns).toEqual(fold(events).stepRuns);
   });
 
   it("fails hard on a missing seq rather than building a partial board", () => {
