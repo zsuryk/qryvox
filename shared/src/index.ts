@@ -18,6 +18,8 @@ export {
   DocumentIngested,
   DocumentKind,
   Event,
+  FindingCreated,
+  FindingSuperseded,
   EVENT_TYPES,
   type EventType,
   IngestedDocument,
@@ -30,9 +32,17 @@ export {
   StepStarted,
 } from "./events";
 export { fold, FoldError } from "./fold";
-export { type CaseDocument, emptyCaseState, type CaseState, type StepRun, type StepRunStatus } from "./state";
 export {
-  FindingCategory,
+  activeFindings,
+  type CaseDocument,
+  type CaseFinding,
+  emptyCaseState,
+  type CaseState,
+  type StepRun,
+  type StepRunStatus,
+} from "./state";
+export { Citation, Finding, FindingCategory, FindingKind, Severity } from "./finding";
+export {
   GroundTruth,
   GroundTruthEntry,
   PackCitation,

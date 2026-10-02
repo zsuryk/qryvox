@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyCaseState, fold, FoldError, SlimEvent } from "../src";
+import { activeFindings, emptyCaseState, fold, FoldError, SlimEvent } from "../src";
 import recorded from "./fixtures/case-recorded.json";
 
 // Recorded from the API by `pnpm --filter @qryvox/backend record:fixture`.
@@ -16,7 +16,7 @@ describe("fold", () => {
 
     expect(state.caseId).toBe(caseId);
     expect(state.openedAt).toBe(events[0]!.at);
-    expect(state.lastSeq).toBe(7);
+    expect(state.lastSeq).toBe(18);
     expect(state.documents.map((d) => [d.documentId, d.kind, d.pageCount, d.ingestedAtSeq])).toEqual([
       ["factsheet", "factsheet", 1, 2],
       ["ppm", "ppm", 2, 3],
@@ -55,9 +55,41 @@ describe("fold", () => {
     ]);
   });
 
+  it("puts a findings run's findings on the board with their citations", () => {
+    const state = fold(events.filter((e) => e.seq <= 14));
+
+    expect(activeFindings(state)).toEqual([
+      expect.objectContaining({
+        category: "fees",
+        kind: "contradiction",
+        severity: "high",
+        citation: { document_id: "factsheet", page: 1, quote: "Management fee: 0.85% per annum." },
+        counterpart: { document_id: "ppm", page: 2, quote: "The management fee is 1.10% per annum." },
+        createdAtSeq: 14,
+        supersededAtSeq: null,
+      }),
+    ]);
+  });
+
+  it("a re-run supersedes earlier findings: off the board, still in the log", () => {
+    const state = fold(events);
+    const [first, second] = state.findings;
+
+    expect(state.findings).toHaveLength(2);
+    expect(first).toMatchObject({ createdAtSeq: 14, supersededAtSeq: 17 });
+    expect(activeFindings(state)).toEqual([second]);
+    expect(second!.stepRunId).not.toBe(first!.stepRunId);
+  });
+
+  it("replay before the re-run shows the board as it was", () => {
+    expect(activeFindings(fold(events.filter((e) => e.seq <= 16)))).toEqual([
+      expect.objectContaining({ createdAtSeq: 14, supersededAtSeq: null }),
+    ]);
+  });
+
   it("a late start from a concurrent duplicate does not reopen a completed run", () => {
     const started = events.find((e) => e.type === "step.started")!;
-    const late = { ...started, seq: 8, event_id: "0f6c1f8e-6a3b-4f53-9d0b-3c1f5b2e7a90" };
+    const late = { ...started, seq: events.length + 1, event_id: "0f6c1f8e-6a3b-4f53-9d0b-3c1f5b2e7a90" };
 
     expect(fold([...events, late]).stepRuns).toEqual(fold(events).stepRuns);
   });

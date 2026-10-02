@@ -1,8 +1,6 @@
 import { z } from "zod";
 import { DocumentKind, Sha256 } from "./events";
-
-export const FindingCategory = z.enum(["fees", "strategy", "risk", "terms"]);
-export type FindingCategory = z.infer<typeof FindingCategory>;
+import { Citation, FindingCategory, FindingKind } from "./finding";
 
 // One document of the fabricated pack, served as a static asset at /pack/<filename>.
 export const PackDocument = z.object({
@@ -23,23 +21,11 @@ export const PackManifest = z.object({
 });
 export type PackManifest = z.infer<typeof PackManifest>;
 
-// A verbatim quote on one page of one document; page is 1-based.
-export const PackCitation = z.object({
-  document_id: z.string().min(1),
-  page: z.number().int().positive(),
-  quote: z.string().min(1),
-});
-export type PackCitation = z.infer<typeof PackCitation>;
-
-export const PlantedKind = z.enum([
-  // Two documents state the same fact differently.
-  "contradiction",
-  // A marketing claim the PPM does not back.
-  "unsupported_claim",
-  // A promise made without the risk disclosure that should accompany it.
-  "disclosure_gap",
-]);
-export type PlantedKind = z.infer<typeof PlantedKind>;
+// Ground truth uses the same citation and kind vocabulary as findings, so eval compares like with like.
+export const PackCitation = Citation;
+export type PackCitation = Citation;
+export const PlantedKind = FindingKind;
+export type PlantedKind = FindingKind;
 
 // One planted finding. The citation is where the finding originates; the counterpart is the passage
 // it conflicts with, or that it lacks, when there is one.

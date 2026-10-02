@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Finding } from "./finding";
 
 // Envelope fields carried by every event, named as in ADR-0002.
 // seq is per case: 1, 2, 3… with no gaps, assigned inside the append transaction.
@@ -104,6 +105,23 @@ export const StepFailed = z.object({
   payload: stepFailedPayload,
 });
 
+// Appended by a findings run, in the same transaction as its step.completed; step_run_id is that run.
+export const FindingCreated = z.object({
+  ...stepEnvelope,
+  type: z.literal("finding.created"),
+  v: z.literal(1),
+  payload: Finding,
+});
+
+// A later findings run replaces the board: each finding still active when it completes is superseded in
+// the same transaction. step_run_id is the superseding run. The finding and its dispositions stay in the log.
+export const FindingSuperseded = z.object({
+  ...stepEnvelope,
+  type: z.literal("finding.superseded"),
+  v: z.literal(1),
+  payload: z.object({ finding_id: z.string().min(1) }),
+});
+
 // Full events: what the hash covers and what the per-event payload endpoint returns.
 export const Event = z.discriminatedUnion("type", [
   CaseOpened,
@@ -111,6 +129,8 @@ export const Event = z.discriminatedUnion("type", [
   StepStarted,
   StepCompleted,
   StepFailed,
+  FindingCreated,
+  FindingSuperseded,
 ]);
 export type Event = z.infer<typeof Event>;
 
@@ -122,6 +142,8 @@ export const SlimEvent = z.discriminatedUnion("type", [
   StepStarted,
   StepCompleted.extend({ payload: stepCompletedPayload.omit({ raw_response: true }) }),
   StepFailed.extend({ payload: stepFailedPayload.omit({ raw_response: true }) }),
+  FindingCreated,
+  FindingSuperseded,
 ]);
 export type SlimEvent = z.infer<typeof SlimEvent>;
 

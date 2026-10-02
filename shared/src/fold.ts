@@ -63,6 +63,21 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
       };
       return { ...next, stepRuns: existing ? state.stepRuns.map((r) => (r === existing ? run : r)) : [...state.stepRuns, run] };
     }
+    case "finding.created":
+      return {
+        ...next,
+        findings: [
+          ...state.findings,
+          { ...event.payload, stepRunId: event.step_run_id, createdAtSeq: event.seq, supersededAtSeq: null },
+        ],
+      };
+    case "finding.superseded":
+      return {
+        ...next,
+        findings: state.findings.map((f) =>
+          f.finding_id === event.payload.finding_id && f.supersededAtSeq === null ? { ...f, supersededAtSeq: event.seq } : f,
+        ),
+      };
     case "step.completed":
     case "step.failed": {
       const completed = event.type === "step.completed";
