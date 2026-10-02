@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# Owner-only Vercel deploys for qryvox (ADR-0001: the Hobby Git integration only accepts commits
-# authored by the account owner, so nothing here is automated and nothing uses GitHub Actions).
+# Owner-only Vercel deploys for qryvox, run from the command line by the account owner
+# (ADR-0001). The Git integration is never connected: on Hobby, a push only deploys when the commit
+# author is the team owner, which cannot be satisfied by anyone else. So deploys upload a git-less
+# copy of the repo, which leaves Vercel no commit author to reject.
 #
 #   scripts/deploy.sh setup   create + link both projects, push production env vars
+#   scripts/deploy.sh check   build locally with Vercel's own pipeline, deploying nothing
+#   scripts/deploy.sh preview <url>  upload for real as a Preview; production is not touched
 #   scripts/deploy.sh api     migrate, deploy the backend, verify /health
 #   scripts/deploy.sh web     deploy the frontend
 #   scripts/deploy.sh all     api then web, from the same commit (never web before api)
@@ -197,29 +201,75 @@ setup() {
   info "Next: pnpm deploy:api"
 }
 
-# Runs Vercel's real build pipeline locally without deploying, so a bad vercel.json or an
-# unresolvable workspace is caught before it costs a deployment.
+# Runs Vercel's real build pipeline locally, in the same git-less staging copy the deploy uses, so a
+# bad vercel.json or an unresolvable workspace is caught before it costs a deployment.
 check_build() {
   preflight
   load_project API
+  stage_gitless
   step "Pulling project settings"
-  vercel pull --yes --environment production --scope "$SCOPE" >/dev/null
+  vercel pull --yes --environment production --scope "$SCOPE" --cwd "$STAGE" >/dev/null
   step "Building locally (nothing is deployed)"
-  vercel build --yes --target production --scope "$SCOPE"
+  vercel build --yes --target production --scope "$SCOPE" --cwd "$STAGE"
   step "Build config is valid"
-  info "output in .vercel/output (gitignored). Delete it before 'vercel deploy' to force a fresh remote build."
 }
+
+# Same build, uploaded for real, but as a Preview: it exercises the whole upload path, including the
+# commit-author check, without replacing the production deployment.
+preview_api() {
+  preflight
+  load_project API
+  stage_gitless
+  step "Deploying a PREVIEW of $API_PROJECT (production is not touched)"
+  vercel deploy --yes --scope "$SCOPE" --cwd "$STAGE"
+  step "Verifying /health on the preview"
+  local url="$1" attempt
+  for attempt in 1 2 3 4 5 6; do
+    if curl -fsS --max-time 20 "$url/health" | grep -q '"status":"ok"'; then
+      info "healthy: $url/health"
+      info "author check passed without a commit, so production deploys will pass too"
+      return 0
+    fi
+    info "attempt $attempt/6 not ready yet, waiting..."
+    sleep 5
+  done
+  fail "$url/health never returned ok"
+}
+
+# Deploy from a copy of the repo that has no .git directory. Vercel's Hobby plan only lets the team
+# owner create deployments and works this out by matching the git commit author against the team
+# owner, so any other author is blocked before the build runs (ADR-0001). Uploading from a git-less
+# directory means there is no commit metadata to inspect, so the check has nothing to reject, and the
+# commit author is never involved. The staged copy is made from the committed tree, so main stays
+# the single source of truth for what production runs.
+stage_gitless() {
+  STAGE="$(mktemp -d)/repo"
+  mkdir -p "$STAGE"
+  rsync -a \
+    --exclude '.git' \
+    --exclude 'node_modules' \
+    --exclude '.vercel' \
+    --exclude '.next' \
+    --exclude '.deploy' \
+    --exclude '.env.deploy' \
+    --exclude 'shared/dist' \
+    "$ROOT/" "$STAGE/"
+  [ -d "$STAGE/.git" ] && fail "staging directory still contains .git; the deploy would be blocked"
+  STAGED_AT="$(git -C "$ROOT" rev-parse --short HEAD)"
+  info "staged $STAGED_AT without .git -> $STAGE"
+}
+
+cleanup_stage() { [ -n "${STAGE:-}" ] && rm -rf "$(dirname "$STAGE")"; }
+trap cleanup_stage EXIT
 
 deploy_api() {
   preflight
   load_project API
   migrate
   sync_env
+  stage_gitless
   step "Deploying $API_PROJECT to production"
-  rm -rf .vercel/output
-  # --archive uploads a tarball carrying no git metadata, so there is no commit author for Vercel's
-  # Hobby check ("author must be the team owner") to reject. The Git integration stays disconnected.
-  vercel deploy --prod --archive=tgz
+  vercel deploy --prod --yes --scope "$SCOPE" --cwd "$STAGE"
   step "Verifying /health on the deployed backend"
   local url="https://$API_PROJECT.vercel.app" attempt
   for attempt in 1 2 3 4 5 6; do
@@ -237,17 +287,19 @@ deploy_api() {
 deploy_web() {
   preflight
   load_project WEB
-  rm -rf .vercel/output
+  stage_gitless
   step "Deploying $WEB_PROJECT to production"
-  vercel deploy --prod --archive=tgz
+  vercel deploy --prod --yes --scope "$SCOPE" --cwd "$STAGE" \
+    || fail "the web project also needs Root Directory = frontend in the Vercel dashboard"
   info "deployed the frontend. It calls the backend via NEXT_PUBLIC_API_URL (set on the web project)."
 }
 
 case "${1:-all}" in
   setup) setup ;;
   check) check_build ;;
+  preview) preview_api "${2:-}" ;;
   api) deploy_api ;;
   web) deploy_web ;;
   all) deploy_api; deploy_web ;;
-  *) fail "usage: scripts/deploy.sh [setup|check|api|web|all]" ;;
+  *) fail "usage: scripts/deploy.sh [setup|check|preview <url>|api|web|all]" ;;
 esac

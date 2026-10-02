@@ -12,8 +12,9 @@
     "lint": "eslint .",
     "deploy": "bash scripts/deploy.sh",
     "deploy:setup": "bash scripts/deploy.sh setup",
-    "deploy:api": "bash scripts/deploy.sh api",
     "deploy:check": "bash scripts/deploy.sh check",
+    "deploy:preview": "bash scripts/deploy.sh preview",
+    "deploy:api": "bash scripts/deploy.sh api",
     "deploy:web": "bash scripts/deploy.sh web"
   },
   "devDependencies": {
