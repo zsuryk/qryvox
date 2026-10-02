@@ -17,6 +17,7 @@ export const DocumentKind = z.enum(["factsheet", "ppm", "deck", "fee_table"]);
 export type DocumentKind = z.infer<typeof DocumentKind>;
 
 export const Sha256 = z.string().regex(/^[0-9a-f]{64}$/);
+export type Sha256 = z.infer<typeof Sha256>;
 
 // What the browser sends after parsing a PDF with pdf.js.
 export const IngestedDocument = z.object({
