@@ -1,11 +1,31 @@
 // Local defaults match .env.example; production values live only in the Vercel project (ADR-0001).
+const databaseUrl = process.env.DATABASE_URL ?? "file:./dev.db";
+
 export const env = {
-  databaseUrl: process.env.DATABASE_URL ?? "file:./dev.db",
+  databaseUrl,
   databaseAuthToken: process.env.DATABASE_AUTH_TOKEN || undefined,
-  allowedOrigin: process.env.ALLOWED_ORIGIN ?? "http://localhost:3000",
   port: Number(process.env.PORT ?? 8787),
   llm: llmConfig(),
+  guards: {
+    // Comma-separated; the frontend origin(s).
+    allowedOrigins: (process.env.ALLOWED_ORIGIN ?? "http://localhost:3000").split(",").map((o) => o.trim()),
+    ipHashSecret: ipHashSecret(),
+    limits: {
+      windowSeconds: Number(process.env.RATE_LIMIT_WINDOW_SECONDS ?? 3600),
+      stepsPerIp: Number(process.env.RATE_LIMIT_STEPS_PER_IP ?? 60),
+      stepsPerCase: Number(process.env.RATE_LIMIT_STEPS_PER_CASE ?? 24),
+    },
+  },
 };
+
+// Required against a hosted database: every instance must hash with the same key, or the per-IP limit
+// splits across instances. A local file database gets a fixed development key.
+function ipHashSecret(): string {
+  const secret = process.env.IP_HASH_SECRET;
+  if (secret) return secret;
+  if (databaseUrl.startsWith("file:")) return "local-development-only";
+  throw new Error("IP_HASH_SECRET must be set when DATABASE_URL is not a local file");
+}
 
 // Any OpenAI-compatible chat-completions endpoint: a hosted provider, or Ollama / LM Studio / vLLM locally.
 // Unset LLM_BASE_URL or LLM_MODEL leaves the model unconfigured; new steps then answer 503.

@@ -46,7 +46,15 @@ const llm: Llm = {
     return { content, raw: { choices: [{ message: { content } }] } };
   },
 };
-const app = createApp({ ...database, allowedOrigin: "http://localhost:3000", llm });
+const app = createApp({
+  ...database,
+  llm,
+  guards: {
+    allowedOrigins: ["http://localhost:3000"],
+    ipHashSecret: "fixture-secret",
+    limits: { windowSeconds: 3600, stepsPerIp: 1000, stepsPerCase: 1000 },
+  },
+});
 
 async function call(method: string, path: string, body?: unknown, ok = [200, 201]): Promise<unknown> {
   const res = await app.request(path, {

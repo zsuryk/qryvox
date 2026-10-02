@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 // The only table (spec decision 11). Append-only: triggers in drizzle/0001_append_only_triggers.sql.
 export const events = sqliteTable(
@@ -29,6 +29,8 @@ export const events = sqliteTable(
     uniqueIndex("events_step_completed_unique")
       .on(t.caseId, t.stepRunId)
       .where(sql`${t.type} = 'step.completed'`),
+    // The per-IP rate limit counts recent step.started events by ip_hash.
+    index("events_ip_hash_at_idx").on(t.ipHash, t.at),
   ],
 );
 

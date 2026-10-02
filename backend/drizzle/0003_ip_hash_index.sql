@@ -1,0 +1,1 @@
+CREATE INDEX `events_ip_hash_at_idx` ON `events` (`ip_hash`,`at`);

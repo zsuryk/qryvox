@@ -6,10 +6,17 @@ import { randomUUID } from "node:crypto";
 import type { IngestedDocument } from "@qryvox/shared";
 import { afterEach } from "vitest";
 import { createApp } from "../src/app";
+import type { Guards } from "../src/guards";
 import { openDatabase, runMigrations, type Database } from "../src/db/client";
 import { LlmError, type ChatMessage, type Completion, type Llm } from "../src/llm";
 
 export const ALLOWED_ORIGIN = "http://localhost:3000";
+
+export const TEST_GUARDS: Guards = {
+  allowedOrigins: [ALLOWED_ORIGIN],
+  ipHashSecret: "test-secret",
+  limits: { windowSeconds: 3600, stepsPerIp: 1000, stepsPerCase: 1000 },
+};
 
 const cleanups: (() => void)[] = [];
 afterEach(() => {
@@ -17,7 +24,7 @@ afterEach(() => {
 });
 
 // Every test gets its own temporary database file, so tests never share state.
-export async function setup({ llm = null }: { llm?: Llm | null } = {}) {
+export async function setup({ llm = null, guards = TEST_GUARDS }: { llm?: Llm | null; guards?: Guards } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "qryvox-test-"));
   const database: Database = openDatabase(pathToFileURL(join(dir, "test.db")).href);
   await runMigrations(database.db);
@@ -31,14 +38,9 @@ export async function setup({ llm = null }: { llm?: Llm | null } = {}) {
     }
   });
 
-  const app = createApp({ ...database, allowedOrigin: ALLOWED_ORIGIN, llm });
+  const app = createApp({ ...database, llm, guards });
 
-  const request = (method: string, path: string, body?: unknown) =>
-    app.request(path, {
-      method,
-      headers: { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+  const request = requester(app);
 
   async function openCase(eventId: string = randomUUID()): Promise<string> {
     const res = await request("POST", "/cases", { event_id: eventId });
@@ -46,10 +48,20 @@ export async function setup({ llm = null }: { llm?: Llm | null } = {}) {
     return ((await res.json()) as { case_id: string }).case_id;
   }
 
-  return { app, client: database.client, request, openCase };
+  return { app, client: database.client, database, request, openCase };
 }
 
 export type TestApp = Awaited<ReturnType<typeof setup>>;
+
+// JSON requests against an app in-process.
+export function requester(app: { request: (path: string, init: RequestInit) => Response | Promise<Response> }) {
+  return async (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) =>
+    app.request(path, {
+      method,
+      headers: { "content-type": "application/json", ...headers },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+}
 
 export function sampleDocument(overrides: Partial<IngestedDocument> = {}): IngestedDocument {
   return {

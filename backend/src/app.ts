@@ -16,15 +16,16 @@ import { cors } from "hono/cors";
 import { z } from "zod";
 import { assertAppendOnly } from "./db/append-only";
 import type { Database } from "./db/client";
+import { clientIp, type Guards, hashIp, originAllowList, RateLimited } from "./guards";
 import type { Llm } from "./llm";
 import { appendOnce, caseExists, EventIdConflict, getEvent, listEvents, toWire, verifyChain } from "./log";
 import { LlmNotConfigured, runStep } from "./steps/run";
 import { StepPrecondition } from "./steps/step";
 
 export type AppOptions = Database & {
-  allowedOrigin: string;
   // null when no model is configured: everything but running a new step still works.
   llm: Llm | null;
+  guards: Guards;
 };
 
 const PageQuery = z.object({
@@ -33,7 +34,7 @@ const PageQuery = z.object({
 });
 const SeqParam = z.coerce.number().int().positive();
 
-export function createApp({ client, db, allowedOrigin, llm }: AppOptions) {
+export function createApp({ client, db, llm, guards }: AppOptions) {
   const app = new Hono();
 
   // Checked once per process, before the first request touches the log; a missing trigger fails every request loudly.
@@ -44,11 +45,16 @@ export function createApp({ client, db, allowedOrigin, llm }: AppOptions) {
     await next();
   });
 
-  app.use(cors({ origin: allowedOrigin }));
+  app.use(originAllowList(guards.allowedOrigins));
+  app.use(cors({ origin: [...guards.allowedOrigins] }));
 
   app.onError((err, c) => {
     if (err instanceof EventIdConflict || err instanceof StepPrecondition) return c.json({ error: err.message }, 409);
     if (err instanceof LlmNotConfigured) return c.json({ error: err.message }, 503);
+    if (err instanceof RateLimited) {
+      c.header("Retry-After", String(err.retryAfterSeconds));
+      return c.json({ error: err.message }, 429);
+    }
     console.error(err);
     return c.json({ error: err.message }, 500);
   });
@@ -98,7 +104,8 @@ export function createApp({ client, db, allowedOrigin, llm }: AppOptions) {
     if (!body.success) return badRequest(c, body.error);
     if (!(await caseExists(db, caseId))) return notFound(c, caseId);
 
-    const outcome = await runStep(db, llm, caseId, body.data);
+    const ipHash = hashIp(guards.ipHashSecret, clientIp(c));
+    const outcome = await runStep(db, llm, caseId, body.data, { ipHash, limits: guards.limits });
     return c.json(outcome.body, outcome.status);
   });
 

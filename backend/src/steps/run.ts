@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ANALYST_ACTOR, PROMPT_VERSIONS, type RunStepRequest, type StepFailure, type StepResult } from "@qryvox/shared";
 import type { Db } from "../db/client";
 import type { EventRow } from "../db/schema";
+import { checkRateLimit, type RateLimits } from "../guards";
 import { extractJson, LlmError, type Llm } from "../llm";
 import { append, EventIdConflict, type EventDraft, findCompletedRun, isUniqueViolation, listEventsOfType, type Tx } from "../log";
 import { contradictions } from "./contradictions";
@@ -16,16 +17,26 @@ export class LlmNotConfigured extends Error {
   override name = "LlmNotConfigured";
 }
 
+// Who is asking, for the rate limit and the ip_hash stored on every event the run appends.
+export type StepCaller = { ipHash: string; limits: RateLimits };
+
 export type StepOutcome = { status: 200; body: StepResult } | { status: 422 | 502; body: StepFailure };
 
 // One analysis step as a single stateless call, safe to retry (ADR-0002):
 //   1. a run that already completed returns its stored result — before any model call, so a retry is free;
-//   2. otherwise step.started is appended, then the model is called with no transaction open;
+//   2. otherwise, within the rate limit, step.started is appended, then the model is called with no
+//      transaction open;
 //   3. step.completed, and for the findings step its findings plus a finding.superseded for every finding
 //      a previous run left on the board, is appended in one write transaction;
 //   4. if a concurrent duplicate completed first, the partial unique index rejects ours, the transaction
 //      rolls back whole, and the winner's stored result is returned instead.
-export async function runStep(db: Db, llm: Llm | null, caseId: string, req: RunStepRequest): Promise<StepOutcome> {
+export async function runStep(
+  db: Db,
+  llm: Llm | null,
+  caseId: string,
+  req: RunStepRequest,
+  caller: StepCaller,
+): Promise<StepOutcome> {
   const done = await findCompletedRun(db, caseId, req.step_run_id);
   if (done) return completedOutcome(done, req);
 
@@ -33,13 +44,15 @@ export async function runStep(db: Db, llm: Llm | null, caseId: string, req: RunS
   if (!llm) throw new LlmNotConfigured("no model is configured: set LLM_BASE_URL and LLM_MODEL");
 
   const input = await step.loadInput(db, caseId, req.input_run_id);
+  // Only a run about to spend tokens counts: a stored result or a precondition failure never gets here.
+  await checkRateLimit(db, caseId, caller.ipHash, caller.limits);
   const run = {
     step: req.step,
     model: llm.model,
     prompt_version: PROMPT_VERSIONS[req.step],
     input_run_id: req.input_run_id,
   };
-  const draft = { v: 1, actor: ANALYST_ACTOR, stepRunId: req.step_run_id };
+  const draft = { v: 1, actor: ANALYST_ACTOR, stepRunId: req.step_run_id, ipHash: caller.ipHash };
 
   await append(db, caseId, [{ ...draft, eventId: randomUUID(), type: "step.started", payload: run }]);
 

@@ -10,7 +10,7 @@ await runMigrations(database.db);
 await assertAppendOnly(database.client);
 
 const llm = env.llm ? createLlm(env.llm) : null;
-const app = createApp({ ...database, allowedOrigin: env.allowedOrigin, llm });
+const app = createApp({ ...database, llm, guards: env.guards });
 
 serve({ fetch: app.fetch, port: env.port }, (info) => {
   console.log(`backend listening on http://localhost:${info.port} (${env.databaseUrl})`);
