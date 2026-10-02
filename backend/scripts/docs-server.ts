@@ -1,4 +1,4 @@
-// pnpm --filter @qryvox/backend docs — local API explorer: Swagger UI at http://localhost:8788/docs over the
+// pnpm --filter @qryvox/backend api:docs — local API explorer: Swagger UI at http://localhost:8788/docs over the
 // real backend (same database, model and guards as `pnpm dev`, read from ../.env). A development tool only:
 // nothing deployed imports it, so production never serves /docs.
 //
