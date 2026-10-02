@@ -2,6 +2,7 @@
   "pack_id": "larkspur-v1",
   "product": "Larkspur Global Income Fund",
   "issuer": "Calderhaven Asset Management Ltd",
+  "pdfjs_version": "6.3.289",
   "documents": [
     {
       "document_id": "factsheet",

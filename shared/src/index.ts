@@ -48,5 +48,6 @@ export {
   PackCitation,
   PackDocument,
   PackManifest,
+  PDFJS_VERSION,
   PlantedKind,
 } from "./pack.js";

@@ -2,6 +2,13 @@ import { z } from "zod";
 import { DocumentKind, Sha256 } from "./events.js";
 import { Citation, FindingCategory, FindingKind } from "./finding.js";
 
+// The one pdf.js build the pack is quoted from, and the one the browser parses with. Pinned to an exact
+// version, not a range: a citation is a page plus a quote, and the quote is found in pdf.js's extracted
+// text, so a text-layer change would silently move every highlight. Two places declare the version — the
+// catalog entry that resolves the package and this constant — and they must agree; the manifest records
+// it so drift shows up in the artifact the browser reads, not only in a lockfile.
+export const PDFJS_VERSION = "6.3.289";
+
 // One document of the fabricated pack, served as a static asset at /pack/<filename>.
 export const PackDocument = z.object({
   document_id: z.string().min(1),
@@ -17,6 +24,7 @@ export const PackManifest = z.object({
   pack_id: z.string().min(1),
   product: z.string().min(1),
   issuer: z.string().min(1),
+  pdfjs_version: z.literal(PDFJS_VERSION),
   documents: z.array(PackDocument),
 });
 export type PackManifest = z.infer<typeof PackManifest>;

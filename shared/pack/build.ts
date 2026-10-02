@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
-import { GroundTruth, type PackCitation, PackManifest } from "../src";
+import { GroundTruth, type PackCitation, PackManifest, PDFJS_VERSION } from "../src";
 import { DOCUMENTS, FOOTER, GROUND_TRUTH, ISSUER, PACK_ID, PRODUCT, type SourceDocument } from "./source";
 
 export type BuiltPack = {
@@ -40,7 +40,13 @@ export async function buildPack(): Promise<BuiltPack> {
 
   return {
     pdfs,
-    manifest: PackManifest.parse({ pack_id: PACK_ID, product: PRODUCT, issuer: ISSUER, documents }),
+    manifest: PackManifest.parse({
+      pack_id: PACK_ID,
+      product: PRODUCT,
+      issuer: ISSUER,
+      pdfjs_version: PDFJS_VERSION,
+      documents,
+    }),
     groundTruth: GroundTruth.parse({ pack_id: PACK_ID, entries: GROUND_TRUTH }),
   };
 }
