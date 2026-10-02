@@ -1,6 +1,7 @@
 export { ANALYST_ACTOR } from "./actor.js";
 export {
   AppendResponse,
+  ChangeDispositionRequest,
   ErrorResponse,
   EVENT_PAGE_LIMIT,
   EventPage,
@@ -15,6 +16,7 @@ export {
 } from "./api.js";
 export {
   CaseOpened,
+  DispositionChanged,
   DocumentIngested,
   DocumentKind,
   Event,
@@ -36,12 +38,14 @@ export {
   activeFindings,
   type CaseDocument,
   type CaseFinding,
-  emptyCaseState,
   type CaseState,
+  dispositionOf,
+  emptyCaseState,
+  type FindingDisposition,
   type StepRun,
   type StepRunStatus,
 } from "./state.js";
-export { Citation, Finding, FindingCategory, FindingKind, Severity } from "./finding.js";
+export { Citation, Disposition, Finding, FindingCategory, FindingKind, Severity } from "./finding.js";
 export {
   GroundTruth,
   GroundTruthEntry,

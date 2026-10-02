@@ -1,5 +1,5 @@
 import type { SlimEvent } from "./events.js";
-import { emptyCaseState, type CaseState, type StepRun } from "./state.js";
+import { emptyCaseState, type CaseState, type FindingDisposition, type StepRun } from "./state.js";
 
 export class FoldError extends Error {
   override name = "FoldError";
@@ -78,6 +78,23 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
           f.finding_id === event.payload.finding_id && f.supersededAtSeq === null ? { ...f, supersededAtSeq: event.seq } : f,
         ),
       };
+    case "disposition.changed": {
+      // The latest decision for a finding wins, in the position it was first decided, so replaying the
+      // log to any seq shows what the analyst had decided by then. Who decided is the event's own actor.
+      const { finding_id, disposition } = event.payload;
+      const decided: FindingDisposition = {
+        findingId: finding_id,
+        disposition,
+        actor: event.actor,
+        changedAtSeq: event.seq,
+      };
+      return {
+        ...next,
+        dispositions: state.dispositions.some((d) => d.findingId === finding_id)
+          ? state.dispositions.map((d) => (d.findingId === finding_id ? decided : d))
+          : [...state.dispositions, decided],
+      };
+    }
     case "step.completed":
     case "step.failed": {
       const completed = event.type === "step.completed";

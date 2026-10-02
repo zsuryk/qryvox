@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { activeFindings, emptyCaseState, fold, FoldError, SlimEvent } from "../src";
+import {
+  activeFindings,
+  type Disposition,
+  dispositionOf,
+  emptyCaseState,
+  fold,
+  FoldError,
+  SlimEvent,
+} from "../src";
 import recorded from "../fixtures/case-recorded.json";
 
 // Recorded from the API by `pnpm --filter @qryvox/backend record:fixture`: the whole fabricated pack
@@ -9,6 +17,27 @@ const events = SlimEvent.array().parse(recorded);
 const caseId = events[0]!.case_id;
 // The seq the first findings run put its finding on the board, before the re-run supersedes it.
 const afterFirstFindings = events.filter((e) => e.type === "finding.created")[0]!.seq;
+
+// The three active findings of the re-run, by the order the board lists them.
+const activeIds = () => activeFindings(fold(events)).map((f) => f.finding_id);
+
+// One disposition.changed appended to the recorded stream at the next free seq. The recorded fixture is a
+// whole pipeline run with nobody in the room (no dispositions were ever recorded against it), and this is
+// the only event in the vocabulary the browser originates rather than a step, so it is the one thing a
+// fold test has to append by hand. Everything asserted below is read back off the folded log.
+function decide(findingId: string, disposition: Disposition, seq: number): SlimEvent {
+  return SlimEvent.parse({
+    seq,
+    event_id: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
+    case_id: caseId,
+    actor: "demo-analyst",
+    at: "2026-10-01T12:00:00.000Z",
+    step_run_id: null,
+    type: "disposition.changed",
+    v: 1,
+    payload: { finding_id: findingId, disposition },
+  });
+}
 
 describe("fold", () => {
   it("folds zero events into an empty case state", () => {
@@ -127,5 +156,73 @@ describe("fold", () => {
     const other = { ...events[2]!, case_id: "another-case" };
 
     expect(() => fold([events[0]!, events[1]!, other])).toThrow(FoldError);
+  });
+});
+
+describe("fold: dispositions", () => {
+  it("leaves every finding undecided until the analyst decides, naming no actor", () => {
+    const state = fold(events);
+
+    expect(state.dispositions).toEqual([]);
+    expect(activeIds().map((findingId) => dispositionOf(state, findingId))).toEqual(
+      activeIds().map(() => null),
+    );
+  });
+
+  it("records a decision against the finding, attributed to the actor on the event", () => {
+    const [fees] = activeIds();
+    const state = fold([...events, decide(fees!, "approved", 28)]);
+
+    expect(dispositionOf(state, fees!)).toEqual({
+      findingId: fees,
+      disposition: "approved",
+      actor: "demo-analyst",
+      changedAtSeq: 28,
+    });
+  });
+
+  it("resolves a finding to its latest decision when the analyst changes their mind", () => {
+    const [fees] = activeIds();
+    const approved = fold([...events, decide(fees!, "approved", 28)]);
+    const dismissed = fold([...events, decide(fees!, "approved", 28), decide(fees!, "dismissed", 29)]);
+
+    expect(dispositionOf(approved, fees!)!.disposition).toBe("approved");
+    expect(dispositionOf(dismissed, fees!)).toEqual({
+      findingId: fees,
+      disposition: "dismissed",
+      actor: "demo-analyst",
+      changedAtSeq: 29,
+    });
+    // One entry per finding, so a repeated decision replaces rather than accumulates.
+    expect(dismissed.dispositions).toHaveLength(1);
+  });
+
+  it("keeps a superseded finding's disposition in the log after the finding leaves the board", () => {
+    const superseded = fold(events).findings[0]!;
+    const withDecision = fold([...events, decide(superseded.finding_id, "dismissed", 28)]);
+
+    expect(activeFindings(withDecision).map((f) => f.finding_id)).not.toContain(superseded.finding_id);
+    expect(dispositionOf(withDecision, superseded.finding_id)).toMatchObject({
+      disposition: "dismissed",
+      changedAtSeq: 28,
+    });
+  });
+
+  it("replays a disposition only from the seq that carried it, like every other event", () => {
+    const [fees, , third] = activeIds();
+    // seq 28 approves the fee finding and seq 29 dismisses the third; both ride on the recorded 1..27.
+    const decided = [...events, decide(fees!, "approved", 28), decide(third!, "dismissed", 29)];
+    const at28 = fold(decided.slice(0, 28));
+
+    expect(at28.lastSeq).toBe(28);
+    expect(dispositionOf(at28, fees!)).toMatchObject({ disposition: "approved", changedAtSeq: 28 });
+    expect(dispositionOf(at28, third!)).toBeNull();
+    expect(dispositionOf(fold(decided), third!)).toMatchObject({ disposition: "dismissed", changedAtSeq: 29 });
+  });
+
+  it("refuses a decision that is neither approve nor dismiss", () => {
+    const [fees] = activeIds();
+
+    expect(() => decide(fees!, "flagged" as Disposition, 28)).toThrow();
   });
 });

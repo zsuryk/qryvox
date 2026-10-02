@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Finding } from "./finding.js";
+import { Disposition, Finding } from "./finding.js";
 
 // Envelope fields carried by every event, named as in ADR-0002.
 // seq is per case: 1, 2, 3… with no gaps, assigned inside the append transaction.
@@ -123,6 +123,17 @@ export const FindingSuperseded = z.object({
   payload: z.object({ finding_id: z.string().min(1) }),
 });
 
+// The analyst's decision, by button or keyboard, and the only disposition there is (spec decision 34).
+// Who decided is the envelope's actor, so the audit trail identifies who decided what (spec decision 21);
+// stage 1 has one fixed identity and no picker (spec decision 9). Deliberately not a step event: no
+// step_run_id, because no run decided this and no model was called to produce it.
+export const DispositionChanged = z.object({
+  ...envelope,
+  type: z.literal("disposition.changed"),
+  v: z.literal(1),
+  payload: z.object({ finding_id: z.string().min(1), disposition: Disposition }),
+});
+
 // Full events: what the hash covers and what the per-event payload endpoint returns.
 export const Event = z.discriminatedUnion("type", [
   CaseOpened,
@@ -132,6 +143,7 @@ export const Event = z.discriminatedUnion("type", [
   StepFailed,
   FindingCreated,
   FindingSuperseded,
+  DispositionChanged,
 ]);
 export type Event = z.infer<typeof Event>;
 
@@ -145,6 +157,7 @@ export const SlimEvent = z.discriminatedUnion("type", [
   StepFailed.extend({ payload: stepFailedPayload.omit({ raw_response: true }) }),
   FindingCreated,
   FindingSuperseded,
+  DispositionChanged,
 ]);
 export type SlimEvent = z.infer<typeof SlimEvent>;
 

@@ -1,5 +1,5 @@
 import type { DocumentKind, StepName } from "./events.js";
-import type { Finding } from "./finding.js";
+import type { Disposition, Finding } from "./finding.js";
 
 export type CaseDocument = {
   documentId: string;
@@ -34,6 +34,16 @@ export type CaseFinding = Finding & {
   supersededAtSeq: number | null;
 };
 
+// One finding's current disposition, whoever decided it and at which seq. Held apart from CaseFinding
+// rather than on it, so that a finding superseded off the board keeps the disposition it was given: the
+// finding leaves the board, its decision stays in the log (spec decision 10).
+export type FindingDisposition = {
+  findingId: string;
+  disposition: Disposition;
+  actor: string;
+  changedAtSeq: number;
+};
+
 export type CaseState = {
   caseId: string | null;
   openedAt: string | null;
@@ -42,15 +52,24 @@ export type CaseState = {
   stepRuns: StepRun[];
   // Every finding ever created, in creation order; see activeFindings() for the board.
   findings: CaseFinding[];
+  // The latest disposition per finding that has one, in the order it was first decided. A finding with no
+  // entry here has not been decided yet — which is not the same as dismissed, and never happens by itself.
+  dispositions: FindingDisposition[];
   // Highest seq folded so far; 0 means no events.
   lastSeq: number;
 };
 
 export function emptyCaseState(): CaseState {
-  return { caseId: null, openedAt: null, documents: [], stepRuns: [], findings: [], lastSeq: 0 };
+  return { caseId: null, openedAt: null, documents: [], stepRuns: [], findings: [], dispositions: [], lastSeq: 0 };
 }
 
 // The board: findings not superseded by a later run.
 export function activeFindings(state: CaseState): CaseFinding[] {
   return state.findings.filter((f) => f.supersededAtSeq === null);
+}
+
+// What the analyst decided about a finding, or null when they have not decided yet. Nothing else moves
+// this: no step, and no fold rule, ever approves or dismisses on the analyst's behalf.
+export function dispositionOf(state: CaseState, findingId: string): FindingDisposition | null {
+  return state.dispositions.find((d) => d.findingId === findingId) ?? null;
 }

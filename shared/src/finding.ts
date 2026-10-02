@@ -39,3 +39,9 @@ export const Finding = z.object({
   counterpart: Citation.nullable(),
 });
 export type Finding = z.infer<typeof Finding>;
+
+// The analyst's decision on a finding, and the whole of it (spec decision 34). Nothing else is a
+// disposition: the tool flags, the licensed human approves or dismisses, and no step ever decides
+// either way. There is no third state here because there is no automatic transition out of these two.
+export const Disposition = z.enum(["approved", "dismissed"]);
+export type Disposition = z.infer<typeof Disposition>;
