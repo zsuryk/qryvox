@@ -7,6 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "pack:generate": "tsx scripts/generate-pack.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -14,6 +15,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
+    "pdf-lib": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
