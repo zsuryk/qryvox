@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `events_step_completed_unique` ON `events` (`case_id`,`step_run_id`) WHERE "events"."type" = 'step.completed';

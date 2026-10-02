@@ -15,6 +15,13 @@
       "when": 1790910059227,
       "tag": "0001_append_only_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790911817165,
+      "tag": "0002_step_completed_once",
+      "breakpoints": true
     }
   ]
 }

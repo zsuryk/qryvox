@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 // The only table (spec decision 11). Append-only: triggers in drizzle/0001_append_only_triggers.sql.
@@ -23,6 +24,11 @@ export const events = sqliteTable(
     uniqueIndex("events_event_id_unique").on(t.eventId),
     // Also stops the chain forking: two appends that read the same latest seq cannot both commit.
     uniqueIndex("events_case_seq_unique").on(t.caseId, t.seq),
+    // A step run completes at most once (ADR-0002). Deliberately not (case_id, step_run_id, type):
+    // a findings run appends many finding.created events under one step_run_id.
+    uniqueIndex("events_step_completed_unique")
+      .on(t.caseId, t.stepRunId)
+      .where(sql`${t.type} = 'step.completed'`),
   ],
 );
 

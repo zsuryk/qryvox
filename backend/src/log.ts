@@ -171,3 +171,20 @@ export function toWire(row: EventRow) {
     payload: row.payload,
   };
 }
+
+export async function listEventsOfType(db: Db, caseId: string, type: Event["type"]): Promise<EventRow[]> {
+  return db
+    .select()
+    .from(events)
+    .where(and(eq(events.caseId, caseId), eq(events.type, type)))
+    .orderBy(asc(events.seq));
+}
+
+export async function findCompletedRun(db: Db, caseId: string, stepRunId: string): Promise<EventRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(events)
+    .where(and(eq(events.caseId, caseId), eq(events.stepRunId, stepRunId), eq(events.type, "step.completed")))
+    .limit(1);
+  return row;
+}

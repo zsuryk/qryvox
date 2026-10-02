@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { EventPage, EventPayloadResponse, VerifyResponse } from "@qryvox/shared";
+import { EVENT_TYPES, EventPage, EventPayloadResponse, VerifyResponse } from "@qryvox/shared";
 import { describe, expect, it } from "vitest";
 import { sampleDocument, setup, type TestApp } from "./helpers";
 
@@ -191,6 +191,7 @@ describe("GET /health", () => {
     const res = await t.request("GET", "/health");
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: "ok", eventTypes: ["case.opened", "document.ingested"] });
+    expect(await res.json()).toEqual({ status: "ok", eventTypes: [...EVENT_TYPES] });
+    expect(EVENT_TYPES).toContain("case.opened");
   });
 });

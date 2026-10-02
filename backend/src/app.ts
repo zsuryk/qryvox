@@ -8,6 +8,7 @@ import {
   IngestDocumentRequest,
   OpenCaseRequest,
   type OpenCaseResponse,
+  RunStepRequest,
   SlimEvent,
 } from "@qryvox/shared";
 import { Hono, type Context } from "hono";
@@ -15,9 +16,16 @@ import { cors } from "hono/cors";
 import { z } from "zod";
 import { assertAppendOnly } from "./db/append-only";
 import type { Database } from "./db/client";
+import type { Llm } from "./llm";
 import { appendOnce, caseExists, EventIdConflict, getEvent, listEvents, toWire, verifyChain } from "./log";
+import { LlmNotConfigured, runStep, StepNotImplemented } from "./steps/run";
+import { StepPrecondition } from "./steps/step";
 
-export type AppOptions = Database & { allowedOrigin: string };
+export type AppOptions = Database & {
+  allowedOrigin: string;
+  // null when no model is configured: everything but running a new step still works.
+  llm: Llm | null;
+};
 
 const PageQuery = z.object({
   after: z.coerce.number().int().min(0).default(0),
@@ -25,7 +33,7 @@ const PageQuery = z.object({
 });
 const SeqParam = z.coerce.number().int().positive();
 
-export function createApp({ client, db, allowedOrigin }: AppOptions) {
+export function createApp({ client, db, allowedOrigin, llm }: AppOptions) {
   const app = new Hono();
 
   // Checked once per process, before the first request touches the log; a missing trigger fails every request loudly.
@@ -39,7 +47,9 @@ export function createApp({ client, db, allowedOrigin }: AppOptions) {
   app.use(cors({ origin: allowedOrigin }));
 
   app.onError((err, c) => {
-    if (err instanceof EventIdConflict) return c.json({ error: err.message }, 409);
+    if (err instanceof EventIdConflict || err instanceof StepPrecondition) return c.json({ error: err.message }, 409);
+    if (err instanceof StepNotImplemented) return c.json({ error: err.message }, 501);
+    if (err instanceof LlmNotConfigured) return c.json({ error: err.message }, 503);
     console.error(err);
     return c.json({ error: err.message }, 500);
   });
@@ -81,6 +91,16 @@ export function createApp({ client, db, allowedOrigin }: AppOptions) {
       payload: document,
     });
     return c.json({ seq: row.seq } satisfies AppendResponse, 201);
+  });
+
+  app.post("/cases/:caseId/steps", async (c) => {
+    const caseId = c.req.param("caseId");
+    const body = RunStepRequest.safeParse(await readJson(c));
+    if (!body.success) return badRequest(c, body.error);
+    if (!(await caseExists(db, caseId))) return notFound(c, caseId);
+
+    const outcome = await runStep(db, llm, caseId, body.data);
+    return c.json(outcome.body, outcome.status);
   });
 
   app.get("/cases/:caseId/events", async (c) => {

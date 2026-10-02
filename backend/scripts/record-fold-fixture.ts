@@ -8,20 +8,37 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { EventPage, type IngestedDocument } from "@qryvox/shared";
 import { createApp } from "../src/app";
 import { openDatabase, runMigrations } from "../src/db/client";
+import { LlmError, type Llm } from "../src/llm";
 
-const out = fileURLToPath(new URL("../../shared/test/fixtures/case-ingested.json", import.meta.url));
+const out = fileURLToPath(new URL("../../shared/test/fixtures/case-recorded.json", import.meta.url));
 
 const database = openDatabase(pathToFileURL(join(mkdtempSync(join(tmpdir(), "qryvox-fixture-")), "fixture.db")).href);
 await runMigrations(database.db);
-const app = createApp({ ...database, allowedOrigin: "http://localhost:3000" });
+// A scripted model: the first extract call fails as if the endpoint were down, the retry succeeds.
+let calls = 0;
+const llm: Llm = {
+  model: "recorded-fake-model",
+  async complete() {
+    calls += 1;
+    if (calls === 1) throw new LlmError("model endpoint unreachable: recorded outage");
+    const content = JSON.stringify({
+      statements: [
+        { document_id: "factsheet", page: 1, quote: "Management fee: 0.85% per annum." },
+        { document_id: "ppm", page: 2, quote: "The management fee is 1.10% per annum." },
+      ],
+    });
+    return { content, raw: { choices: [{ message: { content } }] } };
+  },
+};
+const app = createApp({ ...database, allowedOrigin: "http://localhost:3000", llm });
 
-async function call(method: string, path: string, body?: unknown): Promise<unknown> {
+async function call(method: string, path: string, body?: unknown, ok = [200, 201]): Promise<unknown> {
   const res = await app.request(path, {
     method,
     headers: { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`${method} ${path}: ${res.status} ${await res.text()}`);
+  if (!ok.includes(res.status)) throw new Error(`${method} ${path}: ${res.status} ${await res.text()}`);
   return res.json();
 }
 
@@ -50,6 +67,10 @@ const { case_id } = (await call("POST", "/cases", { event_id: randomUUID() })) a
 for (const document of documents) {
   await call("POST", `/cases/${case_id}/documents`, { event_id: randomUUID(), document });
 }
+const extract = { step_run_id: randomUUID(), step: "extract", input_run_id: null };
+await call("POST", `/cases/${case_id}/steps`, extract, [502]);
+await call("POST", `/cases/${case_id}/steps`, extract);
+
 const { events } = EventPage.parse(await call("GET", `/cases/${case_id}/events`));
 
 writeFileSync(out, JSON.stringify(events, null, 2) + "\n");
