@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import type { Sha256 } from "@qryvox/shared";
 import { ingestDocument, openCase } from "../lib/api";
-import { errorMessage, type DocumentTile, intake, type IntakeFile } from "../lib/intake";
+import { errorMessage } from "../lib/errors";
+import { type DocumentTile, intake, type IntakeFile } from "../lib/intake";
 import { browserPdfAssets } from "../lib/pdf";
 import { packSources } from "../lib/pack";
 

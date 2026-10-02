@@ -33,18 +33,10 @@ const SEVERITIES = ["high", "medium", "low"] as const satisfies readonly Severit
 
 const SEVERITY_LABELS: Record<Severity, string> = { high: "High", medium: "Medium", low: "Low" };
 
-// One line saying what made this a finding, so a card can carry a reason and not only a claim. The word
-// for the kind goes with it: colour and shorthand alone would leave the reader guessing.
 const KIND_LABELS: Record<FindingKind, string> = {
   contradiction: "Contradiction",
   unsupported_claim: "Unsupported claim",
   disclosure_gap: "Disclosure gap",
-};
-
-const KIND_RATIONALES: Record<FindingKind, string> = {
-  contradiction: "Two documents state the same fact differently.",
-  unsupported_claim: "A claim the rest of the pack does not back.",
-  disclosure_gap: "A promise made without the risk disclosure that should go with it.",
 };
 
 // A citation as the board shows it: the document by name, the page, and the passage verbatim.
@@ -74,12 +66,14 @@ export type BoardCard = {
   seq: number;
 };
 
-// The run scope the board belongs to: which findings run put it up, and what it replaced.
+// The run scope the board belongs to: which findings run put it up, and what it replaced. The model and the
+// prompt version are null only when the log names a run it carries no step.started for, so that a missing
+// run reads as missing rather than as a model name nobody wrote.
 export type RunScope = {
   runIds: readonly string[];
-  step: StepName;
-  model: string;
-  promptVersion: string;
+  step: StepName | null;
+  model: string | null;
+  promptVersion: string | null;
   firstSeq: number;
   lastSeq: number;
   superseded: number;
@@ -92,7 +86,6 @@ export type BoardView = {
   cards: readonly BoardCard[];
   // Active findings per category, unfiltered: what a toggle would add back.
   counts: Record<FindingCategory, number>;
-  selected: readonly FindingCategory[];
   visible: number;
   active: number;
   scope: RunScope | null;
@@ -113,10 +106,10 @@ export function boardView(events: readonly SlimEvent[], selected: readonly Findi
   return {
     cards: shown.map((finding) => card(finding, state.documents)),
     counts,
-    selected,
     visible: shown.length,
     active: active.length,
-    scope: runScope(state, shown),
+    // The scope describes the board, so a filter never changes which run put it up or what it replaced.
+    scope: runScope(state, active),
     notice: shown.length > 0 ? null : emptyNotice(active.length, selected),
   };
 }
@@ -131,12 +124,29 @@ function card(finding: CaseFinding, documents: readonly CaseDocument[]): BoardCa
     severity: finding.severity,
     severityLabel: SEVERITY_LABELS[finding.severity],
     claim: finding.claim,
-    rationale: KIND_RATIONALES[finding.kind],
+    rationale: rationale(finding),
     citation: citation(finding.citation, documents),
     counterpart: citation(finding.counterpart, documents),
     runId: finding.stepRunId,
     seq: finding.createdAtSeq,
   };
+}
+
+// One line saying why this is a finding, in this finding's own terms: which document the claim comes from
+// and which document it runs into. The kind only decides the shape of the sentence.
+function rationale(finding: CaseFinding): string {
+  const from = finding.citation.document_id;
+  const against = finding.counterpart?.document_id;
+  switch (finding.kind) {
+    case "contradiction":
+      return against === undefined
+        ? "Two documents state the same fact differently."
+        : `Two documents state the same fact differently: ${from} and ${against}.`;
+    case "unsupported_claim":
+      return `Nothing else in the pack backs what ${from} states.`;
+    case "disclosure_gap":
+      return `${from} promises it without the risk disclosure ${against ?? "the pack"} attaches to it.`;
+  }
 }
 
 function citation(source: Citation | null, documents: readonly CaseDocument[]): BoardCitation | null {
@@ -149,18 +159,21 @@ function citation(source: Citation | null, documents: readonly CaseDocument[]): 
   };
 }
 
-// One scope for the whole board: the runs its findings came from, the model that answered them, and the
-// findings a later run replaced. Null when nothing is on the board.
-function runScope(state: CaseState, shown: readonly CaseFinding[]): RunScope | null {
-  const runIds = [...new Set(shown.map((finding) => finding.stepRunId))];
-  const latest = state.stepRuns.find((run) => run.stepRunId === runIds.at(-1));
-  const seqs = shown.map((finding) => finding.createdAtSeq);
-  if (runIds.length === 0 || seqs.length === 0) return null;
+// One scope for the whole board: the runs its findings came from, oldest first, the model that answered the
+// newest of them, and the findings a later run replaced. Null when nothing is on the board.
+function runScope(state: CaseState, active: readonly CaseFinding[]): RunScope | null {
+  if (active.length === 0) return null;
+  const runs = [...new Set(active.map((finding) => finding.stepRunId))].flatMap((stepRunId) => {
+    const run = state.stepRuns.find((candidate) => candidate.stepRunId === stepRunId);
+    return run ? [run] : [];
+  });
+  const newest = runs.sort((a, b) => a.startedAtSeq - b.startedAtSeq).at(-1) ?? null;
+  const seqs = active.map((finding) => finding.createdAtSeq);
   return {
-    runIds,
-    step: latest?.step ?? "findings",
-    model: latest?.model ?? "unknown",
-    promptVersion: latest?.promptVersion ?? "unknown",
+    runIds: [...new Set(active.map((finding) => finding.stepRunId))],
+    step: newest?.step ?? null,
+    model: newest?.model ?? null,
+    promptVersion: newest?.promptVersion ?? null,
     firstSeq: Math.min(...seqs),
     lastSeq: Math.max(...seqs),
     superseded: state.findings.filter((finding) => finding.supersededAtSeq !== null).length,

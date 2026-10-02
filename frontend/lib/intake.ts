@@ -1,4 +1,5 @@
 import { type DocumentKind, IngestedDocument, type Sha256, PDFJS_VERSION } from "@qryvox/shared";
+import { errorMessage } from "./errors";
 import { extractPageTexts, type PdfAssets } from "./pdf";
 
 // Intake: the pack arrives as files, the browser reads them, and each one becomes a document.ingested
@@ -37,9 +38,6 @@ export type DocumentTile = {
 export class RejectedDocument extends Error {
   override name = "RejectedDocument";
 }
-
-// What a tile shows when something goes wrong: whatever the browser, pdf.js or the server last said.
-export const errorMessage = (cause: unknown): string => (cause instanceof Error ? cause.message : String(cause));
 
 export async function sha256Hex(bytes: DocumentBytes): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);

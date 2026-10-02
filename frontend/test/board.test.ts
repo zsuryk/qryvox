@@ -28,7 +28,7 @@ describe("the board", () => {
       severity: "high",
       severityLabel: "High",
       claim: "The factsheet states a 0.85% management fee per annum; the fee table states 1.25% of net asset value.",
-      rationale: "Two documents state the same fact differently.",
+      rationale: "Two documents state the same fact differently: factsheet and fee-table.",
       citation: {
         documentId: "factsheet",
         documentName: "larkspur-factsheet.pdf",
@@ -44,7 +44,30 @@ describe("the board", () => {
       runId: expect.any(String),
       seq: 22,
     });
-    expect(cards.every((card) => card.rationale.length > 0 && card.citation !== null)).toBe(true);
+  });
+
+  it("gives every card a rationale in its own terms, naming the documents it runs into", () => {
+    const { cards } = boardView(events, all);
+
+    expect(cards.filter((card) => card.category === "fees").map((card) => card.rationale)).toEqual([
+      "Two documents state the same fact differently: factsheet and fee-table.",
+      "Two documents state the same fact differently: deck and fee-table.",
+    ]);
+    expect(cards.find((card) => card.kind === "disclosure_gap")!.rationale).toBe(
+      "deck promises it without the risk disclosure ppm attaches to it.",
+    );
+    expect(cards.find((card) => card.kind === "unsupported_claim")!.rationale).toBe(
+      "Nothing else in the pack backs what deck states.",
+    );
+    // Two findings can run between the same pair of documents; the quote under the rationale is what tells
+    // them apart, so the cards stay distinguishable even when the sentence is the same.
+    const factsheetAgainstPpm = cards.filter(
+      (card) => card.rationale === "Two documents state the same fact differently: factsheet and ppm.",
+    );
+    expect(factsheetAgainstPpm.map((card) => card.citation!.quote)).toEqual([
+      "The Fund invests only in investment-grade bonds.",
+      "Dealing: daily, on any business day",
+    ]);
   });
 
   it("leaves a superseded finding off the board while it stays in the log", () => {
@@ -122,6 +145,13 @@ describe("the board", () => {
       lastSeq: 27,
       superseded: 1,
     });
+  });
+
+  it("keeps the run scope the same whatever the filter shows", () => {
+    const scope = boardView(events, all).scope;
+
+    expect(boardView(events, selected("terms")).scope).toEqual(scope);
+    expect(boardView(events, []).scope).toEqual(scope);
   });
 
   it("folds the log it is given rather than holding findings of its own", () => {

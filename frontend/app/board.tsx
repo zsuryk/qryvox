@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { FindingCategory, Severity, SlimEvent } from "@qryvox/shared";
-import { boardView, categoryLabel, CATEGORIES, type BoardCard, type BoardView } from "../lib/board";
+import { boardView, categoryLabel, CATEGORIES, names, type BoardCard, type BoardView } from "../lib/board";
+import { errorMessage } from "../lib/errors";
 
 // The claim board. Simple by default: every finding on a pinned card, narrowed by category, with the run
 // scope and each card's provenance one disclosure layer down (spec decision 31). Nothing here asks the
@@ -25,8 +26,7 @@ export default function Board({ events }: { events: readonly SlimEvent[] }) {
   } catch (cause) {
     return (
       <p style={{ color: "#a02c2c" }}>
-        This board cannot be built from the case&apos;s log:{" "}
-        {cause instanceof Error ? cause.message : String(cause)}
+        This board cannot be built from the case&apos;s log: {errorMessage(cause)}
       </p>
     );
   }
@@ -46,7 +46,7 @@ export default function Board({ events }: { events: readonly SlimEvent[] }) {
         </h2>
         <p style={{ color: MUTED, margin: 0 }}>
           Showing <strong>{view.visible}</strong> of <strong>{view.active}</strong> active findings
-          {filtered ? ` · ${CATEGORIES.filter((category) => selected.includes(category)).join(", ")}` : ""}
+          {filtered ? ` · ${names(selected)}` : ""}
         </p>
       </div>
 
@@ -94,9 +94,16 @@ export default function Board({ events }: { events: readonly SlimEvent[] }) {
         <details style={{ marginTop: 20 }}>
           <summary style={{ color: MUTED, cursor: "pointer", fontSize: "0.8rem" }}>Run scope</summary>
           <p style={{ color: MUTED, fontSize: "0.8rem", margin: "6px 0 0" }}>
-            {view.scope.step} · {view.scope.promptVersion} · {view.scope.model} · run {view.scope.runIds.join(", ")} ·
-            events {view.scope.firstSeq}–{view.scope.lastSeq} · {view.scope.superseded} superseded finding
-            {view.scope.superseded === 1 ? "" : "s"} off the board, still in the log.
+            {[
+              view.scope.step,
+              view.scope.promptVersion,
+              view.scope.model,
+              `run ${view.scope.runIds.join(", ")}`,
+              `events ${view.scope.firstSeq}–${view.scope.lastSeq}`,
+              `${view.scope.superseded} superseded finding${view.scope.superseded === 1 ? "" : "s"} off the board, still in the log.`,
+            ]
+              .filter((part) => part !== null)
+              .join(" · ")}
           </p>
         </details>
       )}
