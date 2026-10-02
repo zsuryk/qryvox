@@ -2,11 +2,12 @@
 // stream into shared/fixtures, so the fold tests fold what the API actually emits and the browser has a
 // case to fold with no model key.
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { EventPage, type IngestedDocument, type StepName, StepResult } from "@qryvox/shared";
+import { DOCUMENTS } from "@qryvox/shared/pack-source";
+import { EventPage, type IngestedDocument, PackManifest, PDFJS_VERSION, type StepName, StepResult } from "@qryvox/shared";
 import { createApp } from "../src/app";
 import { openDatabase, runMigrations } from "../src/db/client";
 import { LlmError, type Llm } from "../src/llm";
@@ -17,130 +18,30 @@ import { FINDINGS_SYSTEM_PROMPT } from "../src/steps/findings";
 
 const out = fileURLToPath(new URL("../../shared/fixtures/case-recorded.json", import.meta.url));
 
-// The four documents of the fabricated pack, page by page, carrying the planted passages verbatim: every
-// quote the run cites below is a line of this text, exactly as pdf.js would extract it. The page text is
-// dropped from the recorded stream — slim events carry no document text — but the run has to be grounded
-// against it, so it has to be here.
-const documents: IngestedDocument[] = [
-  {
-    document_id: "factsheet",
-    sha256: "1f".repeat(32),
-    filename: "larkspur-factsheet.pdf",
-    kind: "factsheet",
-    page_count: 2,
-    pages: [
-      [
-        "Larkspur Global Income Fund",
-        "Factsheet - Share class A (USD) - 30 September 2026",
-        "Issuer: Calderhaven Asset Management Ltd",
-        "Fund objective",
-        "The Fund aims to provide a regular income with the potential for modest capital growth over a period of at least five years.",
-        "Investment approach",
-        "The Fund invests only in investment-grade bonds.",
-        "Holdings are diversified across government and corporate issuers in developed markets.",
-        "Key facts",
-        "Launch date: 14 March 2022",
-        "Base currency: US dollar",
-        "Annual management fee: 0.85% per annum",
-        "Minimum initial investment: USD 1,000",
-        "Dealing: daily, on any business day",
-      ].join("\n"),
-      [
-        "Risk and reward profile",
-        "The value of investments and the income from them can fall as well as rise.",
-        "Bond prices generally fall when interest rates rise.",
-        "Currency movements may affect the value of holdings not denominated in US dollars.",
-        "Important information",
-        "This factsheet is a summary. Read the private placement memorandum before investing.",
-      ].join("\n"),
-    ],
-    pdfjs_version: "5.0.0",
-  },
-  {
-    document_id: "ppm",
-    sha256: "2e".repeat(32),
-    filename: "larkspur-ppm-excerpt.pdf",
-    kind: "ppm",
-    page_count: 3,
-    pages: [
-      [
-        "Private Placement Memorandum (Excerpt)",
-        "Larkspur Global Income Fund - issued by Calderhaven Asset Management Ltd",
-        "Section 3. Investment objective and policy",
-        "3.1 The Fund aims to provide a regular income with the potential for modest capital growth over at least five years.",
-        "3.2 The Fund invests primarily in bonds issued by governments and companies in developed markets.",
-        "3.3 The Fund may invest up to 40% of its net assets in sub-investment-grade bonds.",
-        "3.4 Securities are selected by the investment manager's credit committee.",
-        "3.5 The Fund may use derivatives for hedging purposes only.",
-      ].join("\n"),
-      [
-        "Section 5. Risk factors",
-        "5.1 The Fund is not capital protected. Investors may lose some or all of the amount invested.",
-        "5.2 Distributions are not guaranteed and may be paid out of capital.",
-        "5.3 Sub-investment-grade bonds carry a higher risk of default than investment-grade bonds.",
-        "5.4 The Fund is exposed to interest rate, credit and currency risk.",
-      ].join("\n"),
-      [
-        "Section 7. Fees and dealing",
-        "7.1 The annual management fee is 1.25% of the net asset value of the Fund.",
-        "7.2 A redemption charge of 2.00% applies to units redeemed within 24 months of purchase.",
-        "7.3 Redemptions are processed monthly, on the last business day of each month.",
-        "7.4 Redemption requests must be received at least 30 calendar days before the dealing day.",
-        "7.5 The minimum initial investment is USD 1,000.",
-      ].join("\n"),
-    ],
-    pdfjs_version: "5.0.0",
-  },
-  {
-    document_id: "deck",
-    sha256: "3d".repeat(32),
-    filename: "larkspur-marketing-deck.pdf",
-    kind: "deck",
-    page_count: 3,
-    pages: [
-      [
-        "Larkspur Global Income Fund",
-        "Income for the next chapter - Calderhaven Asset Management",
-        "Why Larkspur",
-        "A diversified portfolio of government and corporate bonds.",
-        "Every holding is screened to exclude fossil fuel companies.",
-      ].join("\n"),
-      [
-        "Your income",
-        "Target income of 6% a year, paid every month.",
-        "Simple, transparent pricing.",
-        "No entry or exit charges.",
-      ].join("\n"),
-      [
-        "Getting started",
-        "Invest from USD 1,000.",
-        "Speak to your adviser or platform to find out more.",
-      ].join("\n"),
-    ],
-    pdfjs_version: "5.0.0",
-  },
-  {
-    document_id: "fee-table",
-    sha256: "4c".repeat(32),
-    filename: "larkspur-fee-table.pdf",
-    kind: "fee_table",
-    page_count: 1,
-    pages: [
-      [
-        "Schedule of Fees",
-        "Larkspur Global Income Fund - Share class A (USD)",
-        "Charges taken from your investment",
-        "Entry charge: none",
-        "Redemption charge: 2.00% on units redeemed within 24 months of purchase",
-        "Charges taken from the Fund over a year",
-        "Annual management fee: 1.25% of net asset value",
-        "Performance fee: none",
-        "Transaction costs are charged to the Fund as they are incurred.",
-      ].join("\n"),
-    ],
-    pdfjs_version: "5.0.0",
-  },
-];
+// The four documents of the fabricated pack, ingested as the pack describes itself: the page text comes
+// from the pack's one authored source, so every quote the run cites below is a line of it, exactly as
+// pdf.js extracts it, and the identities and hashes come from the manifest the browser serves the pack
+// from. The page text is dropped from the recorded stream — slim events carry no document text — but the
+// run has to be grounded against it, so it has to be here.
+const manifest = PackManifest.parse(
+  JSON.parse(readFileSync(fileURLToPath(new URL("../../frontend/public/pack/manifest.json", import.meta.url)), "utf8")),
+);
+const documents: IngestedDocument[] = DOCUMENTS.map((source) => {
+  const served = manifest.documents.find((d) => d.document_id === source.document_id);
+  if (!served || served.filename !== source.filename || served.page_count !== source.pages.length) {
+    throw new Error(`${source.document_id} is not in the served manifest as the pack source describes it`);
+  }
+  return {
+    document_id: source.document_id,
+    sha256: served.sha256,
+    filename: served.filename,
+    kind: source.kind,
+    page_count: source.pages.length,
+    // The markup tells the pack generator how to draw a line; pdf.js reads back the words.
+    pages: source.pages.map((page) => page.map((line) => line.replace(/^#+ /, "")).join("\n")),
+    pdfjs_version: PDFJS_VERSION,
+  };
+});
 
 // One claim per planted passage, each quoting its page verbatim. The two claims of a planted
 // contradiction share a topic so the contradictions step can pair them.
