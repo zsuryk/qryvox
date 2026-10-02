@@ -8,6 +8,7 @@ import { errorMessage } from "../lib/errors";
 import { type DocumentTile, intake, type IntakeFile } from "../lib/intake";
 import { browserPdfAssets } from "../lib/pdf";
 import { packSources } from "../lib/pack";
+import { PIPELINE_STEPS, STEP_LABELS } from "../lib/pipeline";
 
 // The one place a document enters the system. Nothing here asks for a file dialog and nothing waits to
 // be told to go: a drop, or the fabricated pack behind the button, are the whole of intake. Both land
@@ -157,13 +158,21 @@ export default function Intake() {
       )}
 
       {caseId && (
-        <p style={{ color: MUTED, fontSize: "0.75rem", letterSpacing: "0.04em", margin: "20px 0 0", textTransform: "uppercase" }}>
-          Case opened
-          <br />
-          <Link href={`/cases/${caseId}`} style={{ color: ACCENT, fontWeight: 600, letterSpacing: 0, textTransform: "none" }}>
-            Open the case log →
-          </Link>
-        </p>
+        <>
+          <p style={{ color: MUTED, fontSize: "0.75rem", letterSpacing: "0.04em", margin: "20px 0 0", textTransform: "uppercase" }}>
+            Case opened
+            <br />
+            <Link href={`/cases/${caseId}`} style={{ color: ACCENT, fontWeight: 600, letterSpacing: 0, textTransform: "none" }}>
+              Run the pipeline on it →
+            </Link>
+          </p>
+          {/* The case page is where the run lives, so it says which way is onward rather than leaving the
+              analyst to find it: the four steps in order, and the board they fill. */}
+          <p style={{ color: MUTED, fontSize: "0.8rem", margin: "6px 0 0" }}>
+            On the case page you run the four steps in order — {PIPELINE_STEPS.map((step) => STEP_LABELS[step]).join(" → ")} — and the claim board fills as
+            they go.
+          </p>
+        </>
       )}
     </>
   );

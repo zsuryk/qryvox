@@ -1,8 +1,20 @@
 import { fold } from "@qryvox/shared";
+import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
 import { fetchEvents, fetchVerify, NotFound } from "../../../lib/api";
+import CaseView from "../../case-view";
 
-// Read-only view of one case: the state folded from its log, the chain verdict and the raw stream.
+// Re-reads one case on the server. A server action because the page is a server component and the case
+// view is not: what the shell needs is for the server's own copy of the case — its event count, its chain
+// verdict — to be current again once a run has appended to the log.
+async function refetchCase(caseId: string) {
+  "use server";
+  revalidatePath(`/cases/${caseId}`);
+}
+
+// One case: the run and the board it fills, then what the pack was and the log it all came from. The
+// events are fetched and folded here once, and the run below takes over from them in the browser
+// (spec decision 19, ADR-0001).
 export default async function CasePage({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = await params;
   const [events, verify] = await Promise.all([fetchEvents(caseId), fetchVerify(caseId)]).catch((err: unknown) => {
@@ -21,6 +33,8 @@ export default async function CasePage({ params }: { params: Promise<{ caseId: s
         {" · latest hash "}
         <code>{verify.latest_hash}</code>
       </p>
+
+      <CaseView events={events} caseId={caseId} refetch={refetchCase.bind(null, caseId)} />
 
       <h2>Documents</h2>
       {state.documents.length === 0 ? (
@@ -52,7 +66,7 @@ export default async function CasePage({ params }: { params: Promise<{ caseId: s
         </table>
       )}
 
-      <h2>Event stream</h2>
+      <h2>Event log</h2>
       <table cellPadding={6}>
         <thead>
           <tr>

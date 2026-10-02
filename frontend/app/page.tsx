@@ -1,12 +1,13 @@
 import Link from "next/link";
 import Intake from "./intake";
 
-// Intake is the front of the flow: drop the pack, watch each document fan out, then open the case log.
+// Intake is the front of the flow: drop the pack, watch each document fan out, then open the case the run
+// happens on. Nothing is analysed until the analyst starts it, and nothing is typed at any point.
 export default function Home() {
   return (
     <main style={{ fontFamily: "system-ui, sans-serif", padding: 32, maxWidth: 900 }}>
       <h1>Qryvox</h1>
-      <p style={{ color: "#5b6270", margin: "0 0 4px" }}>Drop a product pack to open a case on it.</p>
+      <p style={{ color: "#5b6270", margin: "0 0 4px" }}>Drop a product pack, then run the four steps on the case it opens.</p>
       <p style={{ color: "#5b6270", fontSize: "0.75rem", letterSpacing: "0.04em", margin: "0 0 24px", textTransform: "uppercase" }}>
         Or read a case already reviewed
         <br />
