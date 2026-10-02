@@ -11,6 +11,7 @@
 import { serve } from "@hono/node-server";
 import {
   AppendResponse,
+  ChangeDispositionRequest,
   ErrorResponse,
   EVENT_PAGE_LIMIT,
   EventPage,
@@ -66,6 +67,14 @@ const TEXT = {
     noModel: "No model configured",
     events: "List events (slim), paged by seq",
     eventsOk: "Events with seq > after",
+    dispose: "Approve or dismiss a finding",
+    disposeDesc:
+      "Appends disposition.changed, attributed to the analyst. Only a person decides: no step ever approves or " +
+      "dismisses. Deciding again replaces the decision on the board; both stay in the log. Idempotent by event_id.",
+    disposed: "Recorded",
+    disposeInvalid: "Invalid body; disposition must be approved or dismissed",
+    noFinding: "Unknown case, or the case never produced this finding",
+    superseded: "The finding was superseded by a later findings run and is off the board",
     payload: "One event's full payload, heavy fields included",
     payloadOk: "Full payload",
     noEvent: "No such event",
@@ -100,6 +109,14 @@ const TEXT = {
     noModel: "尚未設定模型",
     events: "列出事件（精簡版），依 seq 分頁",
     eventsOk: "seq 大於 after 的事件",
+    dispose: "核准或駁回一筆發現",
+    disposeDesc:
+      "追加一筆 disposition.changed，記錄為分析師所做。只有人能做決定：任何步驟都不會自動核准或駁回。" +
+      "再次決定會取代看板上的結果，兩筆都保留在日誌中。以 event_id 確保冪等。",
+    disposed: "已記錄",
+    disposeInvalid: "請求內容不正確；disposition 必須是 approved 或 dismissed",
+    noFinding: "找不到此案件，或此案件沒有這筆發現",
+    superseded: "這筆發現已被之後的 findings 執行取代，不在看板上",
     payload: "單一事件的完整內容，包含大型欄位",
     payloadOk: "完整內容",
     noEvent: "找不到此事件",
@@ -119,6 +136,7 @@ const schemas = {
   RunStepRequest,
   StepResult,
   StepFailure,
+  ChangeDispositionRequest,
   ErrorResponse,
 };
 
@@ -185,6 +203,20 @@ function openapi(lang: Lang) {
             429: error(t.rateLimited),
             502: json("StepFailure", t.stepUnreachable),
             503: error(t.noModel),
+          },
+        },
+      },
+      "/cases/{caseId}/dispositions": {
+        post: {
+          summary: t.dispose,
+          description: t.disposeDesc,
+          parameters: [caseId],
+          requestBody: body("ChangeDispositionRequest"),
+          responses: {
+            201: json("AppendResponse", t.disposed),
+            400: error(t.disposeInvalid),
+            404: error(t.noFinding),
+            409: error(t.superseded),
           },
         },
       },

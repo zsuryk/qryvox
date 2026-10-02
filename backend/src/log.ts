@@ -1,5 +1,5 @@
 import type { Event, VerifyResponse } from "@qryvox/shared";
-import { and, asc, desc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import type { Db } from "./db/client.js";
 import { events, type EventRow } from "./db/schema.js";
 import { hashEvent } from "./hash.js";
@@ -109,7 +109,7 @@ export function isUniqueViolation(err: unknown, column: string): boolean {
   return false;
 }
 
-async function findByEventId(db: Db, eventId: string): Promise<EventRow | undefined> {
+export async function findByEventId(db: Db, eventId: string): Promise<EventRow | undefined> {
   const [row] = await db.select().from(events).where(eq(events.eventId, eventId)).limit(1);
   return row;
 }
@@ -194,4 +194,20 @@ export async function findCompletedRun(db: Db, caseId: string, stepRunId: string
     .where(and(eq(events.caseId, caseId), eq(events.stepRunId, stepRunId), eq(events.type, "step.completed")))
     .limit(1);
   return row;
+}
+
+// Where a finding stands: created and still on the board, superseded by a later findings run, or unknown.
+export async function findingStatus(db: Db, caseId: string, findingId: string): Promise<"active" | "superseded" | null> {
+  const rows = await db
+    .select({ type: events.type })
+    .from(events)
+    .where(
+      and(
+        eq(events.caseId, caseId),
+        inArray(events.type, ["finding.created", "finding.superseded"]),
+        sql`json_extract(${events.payload}, '$.finding_id') = ${findingId}`,
+      ),
+    );
+  if (!rows.some((r) => r.type === "finding.created")) return null;
+  return rows.some((r) => r.type === "finding.superseded") ? "superseded" : "active";
 }

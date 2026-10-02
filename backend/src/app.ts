@@ -1,6 +1,7 @@
 import {
   ANALYST_ACTOR,
   type AppendResponse,
+  ChangeDispositionRequest,
   EVENT_PAGE_LIMIT,
   EVENT_TYPES,
   type EventPage,
@@ -18,7 +19,17 @@ import { assertAppendOnly } from "./db/append-only.js";
 import type { Database } from "./db/client.js";
 import { clientIp, type Guards, hashIp, originAllowList, RateLimited } from "./guards.js";
 import type { Llm } from "./llm.js";
-import { appendOnce, caseExists, EventIdConflict, getEvent, listEvents, toWire, verifyChain } from "./log.js";
+import {
+  appendOnce,
+  caseExists,
+  EventIdConflict,
+  findByEventId,
+  findingStatus,
+  getEvent,
+  listEvents,
+  toWire,
+  verifyChain,
+} from "./log.js";
 import { LlmNotConfigured, runStep } from "./steps/run.js";
 import { StepPrecondition } from "./steps/step.js";
 
@@ -107,6 +118,34 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
     const ipHash = hashIp(guards.ipHashSecret, clientIp(c));
     const outcome = await runStep(db, llm, caseId, body.data, { ipHash, limits: guards.limits });
     return c.json(outcome.body, outcome.status);
+  });
+
+  // The analyst's explicit decision on one finding (spec decision 34). Only a human appends this: no step
+  // ever approves or dismisses. Deciding again replaces the decision on the board; the log keeps both.
+  app.post("/cases/:caseId/dispositions", async (c) => {
+    const caseId = c.req.param("caseId");
+    const body = ChangeDispositionRequest.safeParse(await readJson(c));
+    if (!body.success) return badRequest(c, body.error);
+    if (!(await caseExists(db, caseId))) return notFound(c, caseId);
+    const { event_id, finding_id, disposition } = body.data;
+
+    // A retry of a decision already recorded returns it, even if the finding has been superseded since.
+    if (!(await findByEventId(db, event_id))) {
+      const status = await findingStatus(db, caseId, finding_id);
+      if (status === null) return c.json({ error: `finding ${finding_id} not found in case ${caseId}` }, 404);
+      if (status === "superseded") {
+        return c.json({ error: `finding ${finding_id} was superseded by a later findings run and is off the board` }, 409);
+      }
+    }
+
+    const row = await appendOnce(db, caseId, {
+      eventId: event_id,
+      type: "disposition.changed",
+      v: 1,
+      actor: ANALYST_ACTOR,
+      payload: { finding_id, disposition },
+    });
+    return c.json({ seq: row.seq } satisfies AppendResponse, 201);
   });
 
   app.get("/cases/:caseId/events", async (c) => {
