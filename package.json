@@ -9,7 +9,12 @@
   "scripts": {
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "deploy": "bash scripts/deploy.sh",
+    "deploy:setup": "bash scripts/deploy.sh setup",
+    "deploy:api": "bash scripts/deploy.sh api",
+    "deploy:check": "bash scripts/deploy.sh check",
+    "deploy:web": "bash scripts/deploy.sh web"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",
