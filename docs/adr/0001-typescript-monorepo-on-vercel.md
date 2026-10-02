@@ -25,21 +25,38 @@ We build the product end-to-end in TypeScript — Next.js UI in `/frontend`, Hon
 - **Document storage.** The fabricated product pack ships as static assets keyed by SHA-256; anything beyond the pack would use Vercel Blob client uploads, never a function body (Vercel Function request bodies are capped at 4.5 MB). `document.ingested` records the PDF hash, the extracted text, and the pdf.js version. Citations are stored as page + quoted text, not character offsets, and pdf.js is pinned — so the highlight stays correct across pdf.js versions and text-layer changes. The PDF itself is re-fetched from its static asset by hash on every render, reload or replay; nothing is cached in the event log.
 - **Env-only database swap.** `file:./dev.db` locally, `libsql://` + auth token on Vercel — same Drizzle schema and queries in both places.
 
-### Deployment: owner-only CLI deploys
+### Deployment: owner-only CLI deploys from a git-less copy
 
-The repo stays private and we pay nothing, which rules out the obvious path: Hobby allows no collaboration, and a Git-triggered deploy only proceeds when the commit author is the Hobby account owner. So the two Vercel projects are **not** connected to the Git integration; each has its Root Directory set (`frontend` / `backend`), and only the owner deploys, from the repo root of a clean checkout of `main` so `/shared` is uploaded too:
+The repo stays private and we pay nothing, which rules out the obvious path: **Hobby allows no collaboration at all.** A team on Hobby cannot have members (`invites_not_allowed`), and Vercel authorises a deploy by matching the git commit author against the team owner. So no second author can ever deploy, and changing one's commit email to the owner's is a workaround we rejected — it rewrites authorship across the whole repo.
+
+The two Vercel projects are therefore **not** connected to the Git integration, and each has its Root Directory set (`frontend` / `backend`). Deploys go through `scripts/deploy.sh`, which stages a copy of the committed tree **without a `.git` directory** and uploads from there:
 
 ```sh
-git pull --rebase origin main
-vercel deploy --prod --project <backend-project>
-vercel deploy --prod --project <frontend-project>
+pnpm deploy:check     # Vercel's own build pipeline locally, deploys nothing
+pnpm deploy:preview   # real upload as a Preview; production untouched
+pnpm deploy:api       # migrate, deploy the backend, verify /health
+pnpm deploy:web       # deploy the frontend
 ```
 
-Deploy order matters: **backend first, then frontend, both from the same commit** — otherwise production ends up with a new frontend talking to an old backend.
+With no git metadata in the upload there is no commit author for Vercel to match, so the authorisation check has nothing to reject. `main` stays the single source of truth: the script refuses to run on a dirty or out-of-date tree, stages the committed state, prints the commit it staged, and asserts the staging copy has no `.git` before uploading. This is the only approach found that keeps a free account, a private repo, and multiple commit authors.
+
+Deploy order matters: **backend first, then frontend, from the same commit** — otherwise production ends up with a new frontend talking to an old backend.
+
+Two things that look like failures and are not:
+
+- **Previews redirect to Vercel SSO** (HTTP 302) because Deployment Protection is on. Preview health checks go through `vercel curl`; production URLs are not protected.
+- **The deploy prints TypeScript errors and still succeeds.** Vercel's Hono builder transpiles without type-checking. `pnpm typecheck` is the real gate, so keep it clean and treat that log as noise.
+
+Things that do break the deploy, each found the hard way:
+
+- `@qryvox/shared` must publish **built JavaScript** (`dist/`), not TypeScript source. Vercel's builder does not transpile a `.ts` entry inside `node_modules`, and every request then fails `ERR_MODULE_NOT_FOUND`.
+- Relative imports need explicit `.js` extensions, because `tsc` does not rewrite specifiers and Node ESM will not guess them.
+- `builds` in `vercel.json` disables Project Settings, including `installCommand`, so Vercel falls back to `npm install` against a pnpm workspace and fails. Serve from `backend/api/index.ts`, which the zero-config builder compiles, and set `buildCommand` explicitly so the default `pnpm run build` (which no root script satisfies) never runs.
 
 Backend-only deploys (the reason we keep two projects, above) are safe only because **API contract changes are additive**: new fields and endpoints are optional, and nothing is renamed or removed while the live frontend still uses it. A breaking change ships in steps — add the new shape, deploy both, remove the old shape in a later deploy — never as a backend-only deploy. Under that rule, skipping the frontend deploy is fine; deploying the frontend ahead of the backend is not.
 
 - **Vercel Git integration (auto-deploy on push)** — rejected. Pushes from anyone but the owner are blocked, and the Vercel bot comments on every blocked commit.
+- **Setting `git config user.email` to the account owner's address** — rejected, having tried it. It does work, but it re-authors every subsequent commit with someone else's identity and permanently rewrites shared history once pushed. The git-less upload gets the same result without touching anyone's git config.
 - **GitHub Actions with the owner's `VERCEL_TOKEN`** — rejected. It works mechanically, but routing teammates' commits through the owner's token sidesteps the rule Hobby enforces; a flagged account could be paused right before the demo. It also puts an account token in reach of anyone who can edit a workflow.
 - **Public repo** — rejected; we keep the code private.
 - **Vercel Pro** — rejected on cost ($20 per developer seat per month).
@@ -51,7 +68,8 @@ Backend-only deploys (the reason we keep two projects, above) are safe only beca
 - **Two projects means CORS:** the backend allow-lists the frontend origin; the frontend reads the backend URL from `NEXT_PUBLIC_API_URL` (declared in `.env.example` when contracts land).
 - **Protect token spend:** a public judge URL lets anyone spend the Anthropic credits. Three layers: (1) a judge-link token — the demo URL carries `?k=…`, the frontend stores it in `sessionStorage` and sends it as a request header, so no passcode prompt and no text box, keeping the zero-text-box promise; (2) rate limiting by counting recent `step.started` events per IP/case **in the `events` table** — in-memory counters are useless on serverless because function instances don't share them. Events are immutable (ADR-0002), so they store `ip_hash` — an HMAC-SHA-256 of the client IP keyed by a server-side secret (`IP_HASH_SECRET`) — never the raw address, which could never be deleted afterwards; (3) a hard spend limit in the Anthropic console, which remains the real backstop.
 - **Turso free-plan risk:** exceeding any single metric (storage, rows read, rows written) blocks the database until resolved. Keep large quota headroom during demo week, and **before demo night export the demo case's events to a JSON snapshot** the frontend can load from a static asset — the fallback must not depend on the database it is protecting. Last resort is a second Turso database (a separate free account) or a libSQL server on the owner's laptop; **not Neon/Postgres**, which would reintroduce the second dialect this ADR rejected mid-week.
-- The owner is the release bottleneck: `main` and production can drift, and nothing ships while they're away. Teammates verify on local dev; agree a deploy cadence (e.g. after each merged feature, and a freeze before demo night).
+- The owner is the release bottleneck: `main` and production can drift, and nothing ships while they're away.
+- **Deployment is coupled to one machine, not one email:** `scripts/deploy.sh` stages a git-less copy and needs the `VERCEL_*` ids in `.deploy/projects.env` (gitignored), so a new machine has to run `pnpm deploy:setup` first. Nothing about the deploy depends on who authored the commit, but it does depend on having the owner's Vercel credentials. Teammates verify on local dev; agree a deploy cadence (e.g. after each merged feature, and a freeze before demo night).
 - Production env vars (Turso URL + token, Anthropic key, judge-link token, `IP_HASH_SECRET`) live only in the Vercel projects, managed by the owner; teammates use `.env.example` with the local `file:` database.
 - Progress UI is driven by awaited step calls instead of a live stream — simpler, but a failed step must surface as resumable board state, not a dead job.
 - Vercel Hobby is non-commercial, and exceeding a quota **pauses that feature for up to 30 days** rather than charging (no overage billing). Set usage alerts before demo night so a runaway loop can't burn the quota.

@@ -9,6 +9,11 @@
 - **Verify before push**: make sure local code runs before pushing.
 - **Conventional commits**: use lightweight messages scoped to the layer, e.g. `feat(fe): ...`, `fix(be): ...`.
 - **Shared contracts**: immediately commit updates to `.env.example` or shared API contracts whenever shared interfaces change.
+- **Never change the user's git identity**: do not run `git config user.name` or `git config user.email`, and do not re-author existing commits. If a tool seems to need a different author, stop and ask — rewriting identity is the user's decision alone, and it rewrites shared history once pushed.
+
+## Deploying
+
+Deploys are owner-only Vercel CLI, never the Git integration, and they run from a staged copy of the repo that has **no `.git` directory** — Vercel matches commit authors against the account owner on Hobby and blocks everyone else. **Read `docs/deploying.md` before deploying.** Commands: `pnpm deploy:check` (build only), `pnpm deploy:preview` (upload, production untouched), `pnpm deploy:api`, `pnpm deploy:web`, `pnpm deploy:setup` (one-time). Rationale in ADR-0001.
 
 ## Agent skills
 
