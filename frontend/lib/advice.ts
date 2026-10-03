@@ -86,18 +86,18 @@ export function profileSummary(profile: ClientProfile): string[] {
 export const RISK_QUESTIONS = [
   {
     id: "fall",
-    question: "If this investment fell by a fifth in a year, what would the client do?",
+    question: { adviser: "If this investment fell by a fifth in a year, what would the client do?", client: "If this investment fell by a fifth in a year, what would you do?" },
     options: ["Sell everything", "Sell some", "Wait and see", "Hold calmly", "Buy more"],
   },
   {
     id: "priority",
-    question: "Which matters more to them?",
+    question: { adviser: "Which matters more to them?", client: "Which matters more to you?" },
     options: ["Never losing money", "Mostly safety", "A balance", "Mostly growth", "The most growth"],
   },
   {
     id: "loss",
-    question: "How would a large loss affect their plans?",
-    options: ["It would change their life", "It would hurt a lot", "They could manage", "A setback, no more", "They could absorb it"],
+    question: { adviser: "How would a large loss affect their plans?", client: "How would a large loss affect your plans?" },
+    options: ["It would change everything", "It would hurt a lot", "Manageable", "A setback, no more", "Easily absorbed"],
   },
 ] as const;
 

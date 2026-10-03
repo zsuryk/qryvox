@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { ANALYST_ACTOR, type Citation, type KnowledgeLevel, ruleById, type SlimEvent } from "@qryvox/shared";
-import { EFFECT } from "../lib/advice";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { ANALYST_ACTOR, type Citation, type ClientProfile, type KnowledgeLevel, ruleById, type SlimEvent } from "@qryvox/shared";
+import { answerText, EFFECT } from "../lib/advice";
+import { when } from "../lib/case";
 import { recordReading } from "../lib/api";
 import { clientView, DEPTH, HEADLINE } from "../lib/client-view";
 import CitationSheet from "./citation-sheet";
@@ -23,7 +25,7 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
 
   if (view.status !== "approved") {
     const message = {
-      reviewing: "Your adviser is reviewing advice for you. It appears here once they have approved it.",
+      reviewing: "Your answers are in, and the institution's rules have been applied. Your adviser is checking the result; it appears here as soon as they confirm it.",
       rejected: "Your adviser is preparing new advice for you.",
       none: "There is no advice for you here yet.",
     }[view.status];
@@ -33,9 +35,11 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
         <h1 className="t-large" style={{ marginTop: "0.5rem" }}>
           {view.product}
         </h1>
-        <div className="card" style={{ marginTop: "2rem" }}>
+        <div className="card stack" style={{ "--stack-gap": "0.5rem", marginTop: "2rem" } as React.CSSProperties}>
           <p className="t-body">{message}</p>
+          {view.status === "reviewing" && <Waiting />}
         </div>
+        {view.profile && <YourAnswers profile={view.profile} open />}
       </main>
     );
   }
@@ -145,6 +149,8 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
         </p>
       )}
 
+      <YourAnswers profile={view.profile} />
+
       {explanation && (
         <label className="switch" style={{ marginTop: "2rem" }}>
           <input type="checkbox" checked={sharing} onChange={(e) => setSharing(e.target.checked)} />
@@ -158,7 +164,7 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
       <footer className="t-footnote muted stack" style={{ "--stack-gap": "0.25rem", marginTop: "2.5rem" } as React.CSSProperties}>
         <p>
           Approved by your adviser ({ANALYST_ACTOR})
-          {decidedAt ? ` on ${new Date(decidedAt).toLocaleDateString("en-GB", { dateStyle: "long" })}` : ""}. Drafted by the
+          {decidedAt ? ` on ${when(decidedAt, "date")}` : ""}. Drafted by the
           institution&apos;s rules, {advice.rules_version}.
         </p>
         <p className="faint">The product, its issuer and this client are fabricated for a demonstration. Nothing here is an offer.</p>
@@ -168,3 +174,53 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
     </main>
   );
 }
+
+// While the adviser checks: the page reads itself again every few seconds, so the advice appears without
+// the client having to do anything, and says that it is doing so.
+function Waiting() {
+  const router = useRouter();
+  useEffect(() => {
+    const timer = window.setInterval(() => router.refresh(), 10_000);
+    return () => window.clearInterval(timer);
+  }, [router]);
+  return (
+    <p className="row t-footnote muted" style={{ "--row-gap": "0.5rem" } as React.CSSProperties}>
+      <span className="step__index step__index--doing" aria-hidden>
+        …
+      </span>
+      Waiting for your adviser. This page updates by itself.
+    </p>
+  );
+}
+
+// What the client told us, in their words back to them: the advice rests on these answers, so they can
+// check them.
+function YourAnswers({ profile, open = false }: { profile: ClientProfile; open?: boolean }) {
+  const fields = ["goal", "horizon_years", "risk_level", "knowledge", "relies_on_income", "may_need_cash_at_short_notice", "exclusions"] as const;
+  return (
+    <details className="card" open={open} style={{ marginTop: "1.5rem" }}>
+      <summary>What you told us</summary>
+      <dl className="facts" style={{ marginTop: "0.75rem" }}>
+        {fields.map((field) => (
+          <div key={field}>
+            <dt>{FIELD[field]}</dt>
+            <dd>{answerText(profile, field)}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="t-caption faint" style={{ marginTop: "0.75rem" }}>
+        Something wrong? Tell your adviser: new answers set this advice aside and the rules are applied again.
+      </p>
+    </details>
+  );
+}
+
+const FIELD = {
+  goal: "The money is for",
+  horizon_years: "You can leave it invested",
+  risk_level: "Your attitude to risk",
+  knowledge: "Your investing knowledge",
+  relies_on_income: "Income",
+  may_need_cash_at_short_notice: "Access to your money",
+  exclusions: "You will not invest in",
+} as const;

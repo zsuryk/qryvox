@@ -2,6 +2,7 @@
 
 import { type KeyboardEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { fold, type SlimEvent } from "@qryvox/shared";
+import { when } from "../lib/case";
 import { describe, positionOf, project, seqAt, springStep, tickKind, tracked } from "../lib/replay";
 import Board from "./board";
 import { FindingsEval } from "./eval-tiles";
@@ -172,7 +173,7 @@ export default function Replay({ events }: { events: readonly SlimEvent[] }) {
             <span className="muted"> of {count} · </span>
             {describe(now)}
           </p>
-          <span className="t-caption faint">{new Date(now.at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "medium" })}</span>
+          <span className="t-caption faint">{when(now.at)}</span>
         </div>
 
         <div className="scrubber" ref={track} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>

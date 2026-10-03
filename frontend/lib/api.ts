@@ -150,8 +150,9 @@ export async function changeDisposition(caseId: string, req: ChangeDispositionRe
 // response returns the event already written rather than writing a second (ADR-0002).
 
 // A new version of a client's answers. The server supersedes advice drafted on the old version.
-export async function recordProfile(caseId: string, eventId: string, profile: ClientProfile): Promise<AppendResponse> {
-  return AppendResponse.parse(await post(`/cases/${caseId}/clients`, { event_id: eventId, profile }));
+// byClient: the client gave these answers themselves, so the log records them as the actor.
+export async function recordProfile(caseId: string, eventId: string, profile: ClientProfile, byClient = false): Promise<AppendResponse> {
+  return AppendResponse.parse(await post(`/cases/${caseId}/clients`, { event_id: eventId, profile, ...(byClient ? { by_client: true } : {}) }));
 }
 
 // Advice drafted by the suitability rules, never a model; the advice's id is this event_id.

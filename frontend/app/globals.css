@@ -1126,3 +1126,17 @@ details[open] > summary::before {
   outline-offset: 3px;
   border-radius: 50%;
 }
+
+.step__index--done {
+  background: var(--positive);
+  color: #ffffff;
+}
+.step__index--doing {
+  background: var(--tint);
+  color: #ffffff;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .step__index--doing {
+    animation: breathe 1.6s ease-in-out infinite;
+  }
+}

@@ -2,7 +2,7 @@ import { fold } from "@qryvox/shared";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { fetchEvents, fetchVerify, NotFound } from "../../../lib/api";
-import { productName } from "../../../lib/case";
+import { productName, when } from "../../../lib/case";
 import CaseNav from "./case-nav";
 
 // What every section of a case shares: which product this is, the state of its chain, and the three places
@@ -15,7 +15,6 @@ export default async function CaseLayout({ children, params }: { children: React
     throw err;
   });
   const state = fold(events);
-  const opened = state.openedAt ? new Date(state.openedAt) : null;
 
   return (
     <main className="page">
@@ -24,7 +23,7 @@ export default async function CaseLayout({ children, params }: { children: React
         <h1 className="t-large">{productName(events) ?? "Product review"}</h1>
         <div className="row row--baseline" style={{ "--row-gap": "0.375rem 0.75rem" } as React.CSSProperties}>
           <span className="t-footnote muted">
-            {opened ? `Opened ${opened.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}` : "Not opened"} ·{" "}
+            {state.openedAt ? `Opened ${when(state.openedAt)}` : "Not opened"} ·{" "}
             {state.lastSeq} events
           </span>
           {verify.intact ? (

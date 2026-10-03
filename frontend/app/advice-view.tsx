@@ -82,6 +82,10 @@ export default function AdviceSection({ caseId, events, refetch }: { caseId: str
     await refetch();
   };
 
+  // The review queue: drafts no adviser has decided, first, so nothing waits behind decided work.
+  const waiting = view.clients.filter((row) => row.advice !== null && row.advice.decision === null);
+  const ordered = [...waiting, ...view.clients.filter((row) => !waiting.includes(row))];
+
   return (
     <>
       <section className="section" aria-labelledby="product-heading">
@@ -127,6 +131,7 @@ export default function AdviceSection({ caseId, events, refetch }: { caseId: str
             </button>
             <span className="t-caption faint">Every value is quoted from the documents, the PPM first.</span>
           </div>
+          {view.blocked === null && <ClientLink caseId={caseId} />}
         </div>
       </section>
 
@@ -145,6 +150,17 @@ export default function AdviceSection({ caseId, events, refetch }: { caseId: str
           </button>
         </div>
 
+        {waiting.length > 0 && (
+          <div className="notice notice--caution row spread" style={{ marginBottom: "1rem" }}>
+            <p className="t-callout strong" style={{ color: "var(--label)" }}>
+              {waiting.length === 1 ? "1 draft is" : `${waiting.length} drafts are`} waiting for your decision
+            </p>
+            <span className="t-footnote" style={{ color: "var(--label)" }}>
+              Listed first. Clients see nothing until you approve.
+            </span>
+          </div>
+        )}
+
         {view.clients.length === 0 ? (
           <div className="card card--quiet stack" style={{ "--stack-gap": "0.25rem" } as React.CSSProperties}>
             <p className="t-headline">No clients yet</p>
@@ -152,7 +168,7 @@ export default function AdviceSection({ caseId, events, refetch }: { caseId: str
           </div>
         ) : (
           <ul className="list-plain stack" style={{ "--stack-gap": "1rem" } as React.CSSProperties}>
-            {view.clients.map((row) => (
+            {ordered.map((row) => (
               <ClientCard
                 key={row.client.clientId}
                 caseId={caseId}
@@ -421,5 +437,34 @@ function Quote({ citation, onOpen }: { citation: Citation; onOpen: () => void })
         </button>
       </figcaption>
     </figure>
+  );
+}
+
+// The link a client uses to check this product for themselves. Copied, not typed; the page it opens asks
+// for no name and creates no account.
+function ClientLink({ caseId }: { caseId: string }) {
+  const [copied, setCopied] = useState(false);
+  const path = `/start/${caseId}`;
+  return (
+    <div className="inset row spread">
+      <div className="stack" style={{ "--stack-gap": "0.125rem" } as React.CSSProperties}>
+        <p className="t-footnote strong">Clients can check this product themselves</p>
+        <p className="t-caption muted">
+          They answer the questions; the rules draft their advice at once; it waits here for you. <Link href={path}>Open the client link →</Link>
+        </p>
+      </div>
+      <button
+        type="button"
+        className="btn btn--small"
+        onClick={() =>
+          void navigator.clipboard.writeText(new URL(path, window.location.origin).toString()).then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1600);
+          })
+        }
+      >
+        {copied ? "Copied ✓" : "Copy client link"}
+      </button>
+    </div>
   );
 }
