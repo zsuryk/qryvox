@@ -1,0 +1,36 @@
+{
+  "pack_id": "wrenfield-v1",
+  "product": "Wrenfield Short Duration Fund",
+  "issuer": "Ashcombe Investment Partners Ltd",
+  "pdfjs_version": "6.3.289",
+  "documents": [
+    {
+      "document_id": "factsheet",
+      "kind": "factsheet",
+      "filename": "wrenfield-factsheet.pdf",
+      "sha256": "7554fbc2997d8aeb6f39c78d724deb04391f85f142c6c68779a7a2a1d5ce4466",
+      "page_count": 2
+    },
+    {
+      "document_id": "ppm",
+      "kind": "ppm",
+      "filename": "wrenfield-ppm-excerpt.pdf",
+      "sha256": "540109381de4b0b5ad6f2b478768b3ed87493bb7d9d7d86d62f724a676b3e9dc",
+      "page_count": 3
+    },
+    {
+      "document_id": "deck",
+      "kind": "deck",
+      "filename": "wrenfield-marketing-deck.pdf",
+      "sha256": "f3f57d8618f6684914695122a039aa07e8e42c9be03388f44c031d2f8cfdf9a0",
+      "page_count": 2
+    },
+    {
+      "document_id": "fee-table",
+      "kind": "fee_table",
+      "filename": "wrenfield-fee-table.pdf",
+      "sha256": "2d782ef05a27454b820e7e6a7cf9706a25e45fb05cf535bdec04be6a2dbf9b8b",
+      "page_count": 1
+    }
+  ]
+}

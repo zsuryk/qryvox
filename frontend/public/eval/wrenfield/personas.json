@@ -1,0 +1,103 @@
+{
+  "pack_id": "wrenfield-v1",
+  "personas": [
+    {
+      "name": "Mrs Chan",
+      "summary": "Retired, cautious, needs the monthly income and may need the money at short notice; new to investing.",
+      "profile": {
+        "client_id": "persona-chan",
+        "goal": "income",
+        "horizon_years": 2,
+        "risk_level": 2,
+        "knowledge": "novice",
+        "relies_on_income": true,
+        "may_need_cash_at_short_notice": true,
+        "exclusions": []
+      },
+      "expected_verdict": "suitable",
+      "expected_reasons": [
+        {
+          "rule": "S1",
+          "effect": "meets"
+        },
+        {
+          "rule": "S2",
+          "effect": "meets"
+        },
+        {
+          "rule": "S3",
+          "effect": "meets"
+        },
+        {
+          "rule": "S4",
+          "effect": "meets"
+        }
+      ],
+      "expected_disclosures": [
+        "wrenfield-fees-management-fee"
+      ]
+    },
+    {
+      "name": "Mr Lee",
+      "summary": "In his forties, investing for growth over ten years, comfortable with risk, and excludes fossil fuels.",
+      "profile": {
+        "client_id": "persona-lee",
+        "goal": "growth",
+        "horizon_years": 10,
+        "risk_level": 4,
+        "knowledge": "informed",
+        "relies_on_income": false,
+        "may_need_cash_at_short_notice": false,
+        "exclusions": [
+          "fossil_fuels"
+        ]
+      },
+      "expected_verdict": "not_suitable",
+      "expected_reasons": [
+        {
+          "rule": "S1",
+          "effect": "meets"
+        },
+        {
+          "rule": "S2",
+          "effect": "meets"
+        },
+        {
+          "rule": "S5",
+          "effect": "blocks"
+        }
+      ],
+      "expected_disclosures": [
+        "wrenfield-fees-management-fee"
+      ]
+    },
+    {
+      "name": "Ms Wong",
+      "summary": "An experienced investor with a six-year horizon, a moderate risk level and no exclusions.",
+      "profile": {
+        "client_id": "persona-wong",
+        "goal": "income",
+        "horizon_years": 6,
+        "risk_level": 3,
+        "knowledge": "expert",
+        "relies_on_income": false,
+        "may_need_cash_at_short_notice": false,
+        "exclusions": []
+      },
+      "expected_verdict": "suitable",
+      "expected_reasons": [
+        {
+          "rule": "S1",
+          "effect": "meets"
+        },
+        {
+          "rule": "S2",
+          "effect": "meets"
+        }
+      ],
+      "expected_disclosures": [
+        "wrenfield-fees-management-fee"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "pack_id": "wrenfield-v1",
+  "entries": [
+    {
+      "id": "wrenfield-fees-management-fee",
+      "category": "fees",
+      "kind": "contradiction",
+      "summary": "The factsheet states a 0.30% management fee; the fee table states 0.45%.",
+      "citation": {
+        "document_id": "factsheet",
+        "page": 1,
+        "quote": "Annual management fee: 0.30% per annum"
+      },
+      "counterpart": {
+        "document_id": "fee-table",
+        "page": 1,
+        "quote": "Annual management fee: 0.45% of net asset value"
+      }
+    },
+    {
+      "id": "wrenfield-income-not-guaranteed",
+      "category": "risk",
+      "kind": "disclosure_gap",
+      "summary": "The deck promises quarterly income without saying, as the PPM does, that distributions are not guaranteed.",
+      "citation": {
+        "document_id": "deck",
+        "page": 2,
+        "quote": "Income paid every quarter."
+      },
+      "counterpart": {
+        "document_id": "ppm",
+        "page": 2,
+        "quote": "4.2 Distributions are not guaranteed and are paid only from income."
+      }
+    }
+  ]
+}
