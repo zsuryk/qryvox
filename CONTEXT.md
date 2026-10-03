@@ -138,7 +138,7 @@ event records as having acted. In stage 1 every event's actor is one fixed ident
 
 ## Policy and advice (stage 2)
 
-**Rules** — the institution's own rules, versioned as one set (`rules@1`) in two groups: **product rules**
+**Rules** — the institution's own rules, versioned as one set (`rules@1`, now `rules@2`, which added S7) in two groups: **product rules**
 (P1, P2, …), which a document must meet to go on the shelf, and **suitability rules** (S1, S2, …), which
 decide whether a product fits a client. Fabricated institutional policy, never quoted regulation. Every
 event that applies a rule records the rules version.
@@ -189,6 +189,17 @@ profile or the product changes (`advice.superseded`). A client sees approved adv
 
 **Adviser** — the licensed human who approves or rejects advice. In stage 2, like the analyst, the fixed
 `demo-analyst` actor (ADR-0004).
+
+**Vulnerable client** — a client who calls for extra care: 65 or over (a coarse, optional answer), or new
+to investing while relying on the income (`vulnerability` in `shared`). Their advice is approved only once
+the adviser confirms they explained it to the client directly; the confirmation is on the decision
+(ADR-0005). Not a verdict: it changes how advice is approved, never whether a product fits.
+
+**Rejection reason** — why an adviser rejected a draft, chosen from a short list and required on every
+rejection (ADR-0005).
+
+**Primary objective** — what a product is built mainly for (income, growth, keeping capital safe), read
+from its PPM; S7 compares it with the client's goal (rules@2, ADR-0005).
 
 **Reading** — the depth a client chose to read their advice at, recorded as `client.read` only once they
 switched on sharing it on their own page (#38). Its actor is the client's pseudonymous id — the one event a
