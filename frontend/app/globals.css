@@ -1157,6 +1157,9 @@ details[open] > summary::before {
   position: relative;
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  /* A finger held on a card picks it up (#61); it does not ask for the page's callout. */
+  -webkit-touch-callout: none;
 }
 .canvas[data-panning="true"] {
   cursor: grabbing;
@@ -1341,6 +1344,14 @@ details[open] > summary::before {
 .canvas-item--lifted .canvas-card {
   box-shadow: var(--shadow-2);
   cursor: grabbing;
+  transform: scale(1.03);
+  transition: transform 160ms var(--ease-settle);
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-item--lifted .canvas-card {
+    transform: none;
+    transition: none;
+  }
 }
 .canvas[data-dragging="true"] {
   cursor: grabbing;
@@ -1699,5 +1710,97 @@ details[open] > summary::before {
 @media (prefers-contrast: more) {
   .canvas-status {
     outline: 1px solid var(--separator);
+  }
+}
+
+/* --- Touch and the phone (#61) ------------------------------------------------------------------- */
+
+/* A finger needs 44 points to land on. The card's action row keeps its look and the card its fixed height:
+   each button's target reaches past its edges into the padding around the row, so the press lands where
+   the finger does. The floating controls simply grow. */
+@media (pointer: coarse) {
+  .canvas-card__actions .btn {
+    position: relative;
+  }
+  .canvas-card__actions .btn::after {
+    content: "";
+    inset: -9px -2px;
+    position: absolute;
+  }
+  .canvas__toolbar .btn {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  .canvas-bin,
+  .canvas-status__head {
+    min-height: 2.75rem;
+  }
+  .canvas-tray .btn,
+  .plan-sheet__group .btn {
+    min-height: 2.75rem;
+  }
+}
+
+/* The phone's top bar: the Plan button, and the status panel's closed line beside it. Both open sheets. */
+.canvas__top {
+  align-items: stretch;
+  display: flex;
+  gap: 0.5rem;
+  left: 0.75rem;
+  position: absolute;
+  right: 0.75rem;
+  top: 0.75rem;
+  z-index: 6;
+}
+.canvas__top .canvas-status {
+  flex: 1 1 auto;
+  max-height: none;
+  max-width: none;
+  min-width: 0;
+  position: static;
+  width: auto;
+}
+.canvas-plan {
+  border-radius: var(--radius-m);
+  flex: none;
+  padding-left: 0.875rem;
+  position: static;
+}
+.canvas-plan--armed {
+  box-shadow: var(--shadow-2), inset 0 0 0 1.5px var(--tint);
+}
+.canvas-plan--over {
+  background: var(--tint-fill);
+  color: var(--tint);
+  transform: scale(1.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-plan--over {
+    transform: none;
+  }
+}
+/* On a phone the bin is its icon and its count, so it and the zoom controls share the canvas's foot. */
+.canvas[data-narrow="true"] .canvas-bin__label {
+  display: none;
+}
+/* In a sheet the record is the sheet's to scroll. */
+.canvas-status__list--sheet {
+  border-top: 0;
+  overflow: visible;
+  padding: 0;
+}
+.plan-sheet__group {
+  margin-top: 1rem;
+}
+.plan-sheet__empty {
+  margin-top: 0.75rem;
+}
+
+/* A phone's canvas is most of the screen below the case's heading, so the zoom controls and the bin at its
+   foot are on screen without scrolling the page. */
+@media (max-width: 40rem) {
+  .canvas {
+    border-radius: var(--radius-m);
+    height: max(22rem, calc(100dvh - var(--canvas-top, 18rem) - 0.75rem));
   }
 }

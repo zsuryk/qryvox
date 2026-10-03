@@ -47,6 +47,28 @@ export function zoomBy(v: Viewport, factor: number, anchor: Point): Viewport {
   return zoomAt(v, v.zoom * factor, anchor);
 }
 
+// Two fingers on a touch screen (#61): from where they came down (`from`, over the viewport `start` they
+// found) to where they are now (`to`). The zoom scales with how far apart they have spread, clamped like any
+// other zoom, and the world point that was under their midpoint stays under their midpoint, wherever the
+// midpoint has gone since. So fingers that spread zoom about the point between them, fingers that move
+// together pan, and both at once do both, as a photo does under two fingers. Computed from the start every
+// time, never by accumulating per-move factors, so the world under the fingers cannot drift.
+export function pinch(start: Viewport, from: readonly [Point, Point], to: readonly [Point, Point]): Viewport {
+  const spread = distance(from[0], from[1]);
+  const zoom = clampZoom(spread > 0 ? (start.zoom * distance(to[0], to[1])) / spread : start.zoom);
+  const anchor = toWorld(start, midpoint(from[0], from[1]));
+  const mid = midpoint(to[0], to[1]);
+  return { zoom, panX: mid.x - anchor.x * zoom, panY: mid.y - anchor.y * zoom };
+}
+
+export function midpoint(a: Point, b: Point): Point {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+export function distance(a: Point, b: Point): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
 // A wheel or pinch delta as a zoom factor. Exponential, so zooming in and back out by the same amount
 // returns to the same zoom, and a trackpad's many small deltas add up to what one mouse notch does.
 export function wheelFactor(deltaY: number): number {

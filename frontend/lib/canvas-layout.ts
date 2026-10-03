@@ -1,4 +1,4 @@
-import { type CardId, isDiscarded, planGroups, type WorldPos } from "@qryvox/shared";
+import { type CardId, isDiscarded, type PlanGroup, planGroups, type WorldPos } from "@qryvox/shared";
 import type { CanvasCard, CanvasView } from "./canvas-source";
 import { type PlanLayout, planLayout } from "./plan-region";
 import { tile } from "./tiling";
@@ -15,11 +15,18 @@ export type CanvasLayout = {
   // The cards docked to the plan, in the plan region's order.
   docked: PlacedCard[];
   plan: PlanLayout;
+  // The plan's groups that have cards, in the plan's order: what a narrow screen lists in its plan sheet.
+  groups: PlanGroup[];
   // Everything there is to see, for fit-to-content.
   bounds: Rect | null;
 };
 
-export function canvasLayout(view: CanvasView): CanvasLayout {
+// A narrow screen (a phone, #61) has no room for the plan beside the flow: the plan region leaves the world
+// for a sheet, so it is not in the bounds there, and the flow is one column, read top to bottom the way a
+// phone is. Only the flow's shape changes: pins are world positions and stay exactly where they were put.
+export type LayoutOptions = { narrow?: boolean };
+
+export function canvasLayout(view: CanvasView, { narrow = false }: LayoutOptions = {}): CanvasLayout {
   const { state } = view;
   const byId = new Map(view.cards.map((c) => [c.cardId, c]));
   // A docked card whose finding a later run superseded has nothing left to show, so the plan leaves it out;
@@ -34,8 +41,9 @@ export function canvasLayout(view: CanvasView): CanvasLayout {
   const rects = tile(
     onFlow.map((c) => c.cardId),
     pins,
-    { obstacles: [plan.bounds] },
+    { obstacles: [plan.bounds], columns: narrow ? 1 : undefined },
   );
   const flow = onFlow.map((card) => ({ card, rect: rects.get(card.cardId)!, pinned: pins.has(card.cardId) }));
-  return { flow, docked, plan, bounds: boundsOf([plan.bounds, ...flow.map((p) => p.rect)]) };
+  const shown = flow.map((p) => p.rect);
+  return { flow, docked, plan, groups, bounds: boundsOf(narrow ? shown : [plan.bounds, ...shown]) };
 }

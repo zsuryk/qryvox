@@ -3,12 +3,15 @@ import {
   boundsOf,
   centreOn,
   clampZoom,
+  distance,
   fitTo,
   glide,
   gridStyle,
   MAX_ZOOM,
+  midpoint,
   MIN_ZOOM,
   panBy,
+  pinch,
   toScreen,
   toWorld,
   type Viewport,
@@ -76,6 +79,69 @@ describe("zoom", () => {
       expect(still.x).toBeCloseTo(anchor.x, 9);
       expect(still.y).toBeCloseTo(anchor.y, 9);
     }
+  });
+
+  it("keeps the world point under the fingers' midpoint under it, however they move (#61)", () => {
+    const from = [
+      { x: 100, y: 300 },
+      { x: 300, y: 340 },
+    ] as const;
+    // Spread apart, turned a little and carried across the screen at once.
+    const to = [
+      { x: 40, y: 200 },
+      { x: 420, y: 330 },
+    ] as const;
+    for (const v of views) {
+      const under = toWorld(v, midpoint(from[0], from[1]));
+      const pinched = pinch(v, from, to);
+      const still = toScreen(pinched, under);
+      const mid = midpoint(to[0], to[1]);
+      expect(still.x).toBeCloseTo(mid.x, 9);
+      expect(still.y).toBeCloseTo(mid.y, 9);
+      // The zoom follows the spread, within the clamp.
+      expect(pinched.zoom).toBeCloseTo(clampZoom((v.zoom * distance(to[0], to[1])) / distance(from[0], from[1])), 12);
+    }
+  });
+
+  it("zooms by the ratio of the spread, and two fingers moving together only pan", () => {
+    const v = { panX: 10, panY: -20, zoom: 0.8 };
+    const from = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ] as const;
+    expect(pinch(v, from, [{ x: -50, y: 0 }, { x: 150, y: 0 }]).zoom).toBeCloseTo(1.6, 12);
+    expect(pinch(v, from, [{ x: 25, y: 0 }, { x: 75, y: 0 }]).zoom).toBeCloseTo(0.4, 12);
+    const carried = pinch(v, from, [
+      { x: 30, y: 45 },
+      { x: 130, y: 45 },
+    ]);
+    expect(carried.zoom).toBe(0.8);
+    expect(carried.panX).toBeCloseTo(panBy(v, 30, 45).panX, 9);
+    expect(carried.panY).toBeCloseTo(panBy(v, 30, 45).panY, 9);
+    // Not moved at all: the viewport it started from.
+    const still = pinch(v, from, from);
+    expect(still.zoom).toBe(v.zoom);
+    expect(still.panX).toBeCloseTo(v.panX, 9);
+    expect(still.panY).toBeCloseTo(v.panY, 9);
+  });
+
+  it("clamps a pinch like any other zoom, and still holds the midpoint at the clamp", () => {
+    const v = views[1]!;
+    const from = [
+      { x: 200, y: 200 },
+      { x: 210, y: 200 },
+    ] as const;
+    const wide = [
+      { x: 0, y: 200 },
+      { x: 2000, y: 200 },
+    ] as const;
+    const out = pinch(v, from, wide);
+    expect(out.zoom).toBe(MAX_ZOOM);
+    const under = toWorld(v, midpoint(from[0], from[1]));
+    expect(toScreen(out, under).x).toBeCloseTo(1000, 9);
+    expect(pinch(v, wide, from).zoom).toBe(MIN_ZOOM);
+    // Fingers that came down on the same spot have no spread to scale: the zoom stays.
+    expect(pinch(v, [from[0], from[0]], wide).zoom).toBe(v.zoom);
   });
 
   it("turns wheel deltas into factors that undo each other", () => {

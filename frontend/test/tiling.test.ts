@@ -126,4 +126,21 @@ describe("on the fixtures", () => {
     expect(plan.bounds.x + plan.bounds.w).toBeLessThan(0);
     expect(bounds).toMatchObject({ x: plan.bounds.x, y: 0 });
   });
+
+  it("on a narrow screen (#61) flows one column, keeps the pin, and leaves the plan to its sheet", () => {
+    const view = canvasView(fixtureEvents());
+    const wide = canvasLayout(view);
+    const narrow = canvasLayout(view, { narrow: true });
+    expectNoOverlap(narrow.flow.map((p) => p.rect));
+    expect(narrow.flow.map((p) => p.card.cardId)).toEqual(wide.flow.map((p) => p.card.cardId));
+    // The pin is a world position, whatever the screen.
+    expect(narrow.flow.filter((p) => p.pinned)).toEqual(wide.flow.filter((p) => p.pinned));
+    // Every card the flow places sits in the one column at x = 0, below the one before.
+    const flowed = narrow.flow.filter((p) => !p.pinned).map((p) => p.rect);
+    expect(flowed.every((r) => r.x === 0)).toBe(true);
+    for (const [i, r] of flowed.slice(1).entries()) expect(r.y).toBeGreaterThan(flowed[i]!.y);
+    // The plan is not in the world here, so fitting looks at the flow only; its groups are still there to list.
+    expect(narrow.bounds).toMatchObject({ x: 0, y: 0, w: CARD_W });
+    expect(narrow.groups.flatMap((g) => g.cards.map((c) => c.cardId))).toEqual(wide.docked.map((p) => p.card.cardId));
+  });
 });

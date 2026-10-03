@@ -1,11 +1,12 @@
 "use client";
 
-import { type KeyboardEvent, type PointerEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type CardId, CardOperationRequest, type FindingCategory, type SlimEvent, type WorldPos } from "@qryvox/shared";
+import { type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type CardId, CardOperationRequest, type FindingCategory, type PlanGroup, type SlimEvent, type WorldPos } from "@qryvox/shared";
 import { categoryLabel } from "../lib/board";
-import { type CardCitation, cardModel, dockableCategories, DOCUMENT_KIND_LABELS, naturalSlot } from "../lib/canvas-cards";
+import { type CardCitation, type CardModel, cardModel, dockableCategories, DOCUMENT_KIND_LABELS, naturalSlot } from "../lib/canvas-cards";
 import { type DropTarget, resolveDrop } from "../lib/canvas-drop";
 import { canvasLayout } from "../lib/canvas-layout";
+import { CARD_W } from "../lib/tiling";
 import { type PlanLayout, planHit } from "../lib/plan-region";
 import { type CanvasMode, type CanvasView as View, canvasView } from "../lib/canvas-source";
 import { candidatesOf, hasRecording, planSimilar, playback, similarFailure, similarRequest } from "../lib/canvas-similar";
@@ -19,6 +20,7 @@ import {
   gridStyle,
   IDENTITY,
   panBy,
+  pinch as pinchViewport,
   placeAt,
   type Point,
   type Rect,
@@ -34,6 +36,7 @@ import {
 import { Card, type CardActions } from "./canvas-card";
 import CanvasStatus from "./canvas-status";
 import CitationSheet from "./citation-sheet";
+import { Sheet } from "./ui";
 
 // The canvas (#48): the case's findings and the passages they cite, laid out as cards on a board that pans
 // and zooms without end. It is a view over the case's log and nothing else: the cards are folded from the
@@ -46,6 +49,8 @@ import CitationSheet from "./citation-sheet";
 // pointer. The same moves are on the keyboard and on real buttons, for anyone not using a pointer.
 
 const KEY_PAN = 64;
+// How long a finger is held still on a card before the card is picked up, as a long press is elsewhere.
+const LONG_PRESS = 450;
 
 export type CanvasViewProps = { events: readonly SlimEvent[]; mode: CanvasMode };
 
@@ -212,15 +217,27 @@ type CanvasProps = {
 function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
   const dispatch = store.dispatch;
   const { similar, searching, arrived } = useFindSimilar(view, mode, store, say);
-  const layout = useMemo(() => canvasLayout(view), [view]);
+  // Both layouts, wide and narrow (#61): the frame's width picks one, and the first fit has to know the
+  // bounds of whichever it picks before anything is drawn.
+  const layouts = useMemo(() => ({ wide: canvasLayout(view), narrow: canvasLayout(view, { narrow: true }) }), [view]);
+  const bounds = useMemo(() => ({ wide: layouts.wide.bounds, narrow: layouts.narrow.bounds }), [layouts]);
   const frame = useRef<HTMLDivElement | null>(null);
   const bin = useRef<HTMLButtonElement | null>(null);
-  const { viewport, ready, fit, zoom, reset, reveal, gestures } = useViewport(frame, layout.bounds);
+  const planButton = useRef<HTMLButtonElement | null>(null);
+  const { viewport, ready, narrow, fit, zoom, reset, reveal, release, gestures } = useViewport(frame, bounds);
+  const layout = narrow ? layouts.narrow : layouts.wide;
+  // The viewport as it now is, for a long press that picks a card up a while after it went down.
+  const seen = useRef(viewport);
+  useEffect(() => {
+    seen.current = viewport;
+  }, [viewport]);
   const [sheet, setSheet] = useState<{ citation: CardCitation; label: string } | null>(null);
   const [trayOpen, setTrayOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const hint = "canvas-hint";
   const board = view.state.board;
   const pinnedCount = layout.flow.filter((p) => p.pinned).length;
+  const dockedCount = layouts.wide.docked.length;
   const models = useMemo(() => new Map(view.cards.map((card) => [card.cardId, cardModel(card, view.state)])), [view]);
   const discarded = board.discarded.flatMap((d) => models.get(d.cardId) ?? []);
 
@@ -289,49 +306,122 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
 
   // Dragging a card. It follows the pointer 1:1 from where it was grabbed, in world units, lifted above
   // the rest; let go, and the drop is decided by lib/canvas-drop.ts: the bin discards it, open canvas pins
-  // it there, a slot of the plan region in the card's category docks it there, and anything else sends it back to where it came from, on the same curve it would have
-  // settled on. A press only becomes a drag after a few pixels, so a click on a card is still a click.
+  // it there, a slot of the plan region in the card's category docks it there (on a phone, the Plan button
+  // docks it in its own slot), and anything else sends it back to where it came from, on the same curve it
+  // would have settled on. With a mouse or a pen a press becomes a drag after a few pixels, so a click on a
+  // card is still a click. A finger on a card pans the canvas like a finger anywhere else (#61), until it is
+  // held still for a moment: then the card is picked up under it, and from there it drags the same way.
   const [drag, setDrag] = useState<{ id: CardId; at: WorldPos; target: DropTarget; categories: readonly FindingCategory[] } | null>(null);
-  const press = useRef<{ id: CardId; pointer: number; start: Point; grab: Point; moving: boolean } | null>(null);
-  const local = (event: PointerEvent) => {
+  const press = useRef<{
+    id: CardId;
+    pointer: number;
+    touch: boolean;
+    // Where the pointer came down and where it is now, in the frame's coordinates.
+    start: Point;
+    last: Point;
+    grab: Point;
+    // Where the card became the pointer's to drag: the press, or for a finger the moment it was picked up.
+    armedAt: Point | null;
+    moving: boolean;
+    timer: number | null;
+  } | null>(null);
+  const frameAt = (event: { clientX: number; clientY: number }): Point => {
     const box = frame.current!.getBoundingClientRect();
-    return toWorld(viewport, { x: event.clientX - box.left, y: event.clientY - box.top });
+    return { x: event.clientX - box.left, y: event.clientY - box.top };
   };
-  // What the pointer is over: the bin, a slot of the plan or the plan between slots, open canvas (where
-  // the card's own corner is what would be pinned), or none of the canvas at all.
-  const targetOf = (event: PointerEvent, corner: WorldPos): DropTarget => {
+  const local = (event: PointerEvent) => toWorld(viewport, frameAt(event));
+  // What the pointer is over: the bin, the Plan button on a phone, a slot of the plan or the plan between
+  // slots, open canvas (where the card's own corner is what would be pinned), or none of the canvas at all.
+  const targetOf = (event: PointerEvent, corner: WorldPos, id: CardId): DropTarget => {
     const inside = (el: Element | null) => {
       const box = el?.getBoundingClientRect();
       return !!box && event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
     };
     if (inside(bin.current)) return { kind: "bin" };
+    if (narrow && inside(planButton.current)) {
+      const card = view.cards.find((c) => c.cardId === id);
+      return { kind: "dock", slot: card ? naturalSlot(card, view) : null };
+    }
     if (!inside(frame.current)) return { kind: "outside" };
-    return planHit(layout.plan, local(event)) ?? { kind: "canvas", at: corner };
+    return (narrow ? null : planHit(layout.plan, local(event))) ?? { kind: "canvas", at: corner };
+  };
+  const categoriesOf = (id: CardId) => {
+    const card = view.cards.find((c) => c.cardId === id);
+    return card ? dockableCategories(card, view) : [];
   };
   const cardGesture = (id: CardId, rect: Rect) => ({
     onPointerDown(event: PointerEvent<HTMLDivElement>) {
-      // A card is a thing of its own: pressing it never pans the background behind it.
-      event.stopPropagation();
+      const touch = event.pointerType === "touch";
+      // With a mouse or a pen a card is a thing of its own: pressing it never pans the background behind it.
+      // A finger is left to the canvas, which pans under it until the card is picked up.
+      if (!touch) event.stopPropagation();
       if (event.button !== 0 || (event.target as Element).closest("button, a")) return;
       // Grabbed while still settling: it is picked up from where it is on screen, not from its slot.
-      const shown = presented(event.currentTarget) ?? rect;
+      const el = event.currentTarget;
+      const shown = presented(el) ?? rect;
       const at = local(event);
-      press.current = { id, pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, grab: { x: at.x - shown.x, y: at.y - shown.y }, moving: false };
-      event.currentTarget.setPointerCapture(event.pointerId);
+      const p = {
+        id,
+        pointer: event.pointerId,
+        touch,
+        start: frameAt(event),
+        last: frameAt(event),
+        grab: { x: at.x - shown.x, y: at.y - shown.y },
+        armedAt: touch ? null : frameAt(event),
+        moving: false,
+        timer: null as number | null,
+      };
+      press.current = p;
+      if (!touch) {
+        el.setPointerCapture(event.pointerId);
+        return;
+      }
+      p.timer = window.setTimeout(() => {
+        p.timer = null;
+        // Only a finger still alone and still where it came down picks a card up: one that has been panning,
+        // or is half of a pinch, keeps doing that.
+        if (press.current !== p || !release(p.pointer)) {
+          if (press.current === p) press.current = null;
+          return;
+        }
+        const corner = presented(el) ?? rect;
+        const under = toWorld(seen.current, p.last);
+        p.grab = { x: under.x - corner.x, y: under.y - corner.y };
+        p.armedAt = p.last;
+        try {
+          el.setPointerCapture(p.pointer);
+        } catch {
+          // A finger already lifted cannot be captured; its pointerup has the card back in place.
+        }
+        // A tick under the finger where the hardware has one: the card is in the hand now.
+        navigator.vibrate?.(8);
+        setDrag({ id, at: corner, target: { kind: "canvas", at: corner }, categories: categoriesOf(id) });
+      }, LONG_PRESS);
     },
     onPointerMove(event: PointerEvent<HTMLDivElement>) {
       const p = press.current;
       if (!p || p.pointer !== event.pointerId) return;
-      if (!p.moving && Math.hypot(event.clientX - p.start.x, event.clientY - p.start.y) < 6) return;
+      p.last = frameAt(event);
+      // A finger not yet holding the card is the canvas's pan, which the frame is following; once it has
+      // gone further than a press wanders, it is not going to pick the card up.
+      if (!p.armedAt) {
+        if (p.timer !== null && Math.hypot(p.last.x - p.start.x, p.last.y - p.start.y) > SLOP) {
+          window.clearTimeout(p.timer);
+          press.current = null;
+        }
+        return;
+      }
+      if (!p.moving && Math.hypot(p.last.x - p.armedAt.x, p.last.y - p.armedAt.y) < 6) return;
       p.moving = true;
       const at = local(event);
       const corner = { x: at.x - p.grab.x, y: at.y - p.grab.y };
-      const card = view.cards.find((c) => c.cardId === id);
-      setDrag({ id, at: corner, target: targetOf(event, corner), categories: card ? dockableCategories(card, view) : [] });
+      setDrag({ id, at: corner, target: targetOf(event, corner, id), categories: categoriesOf(id) });
     },
     onPointerUp() {
       const p = press.current;
       press.current = null;
+      if (p?.timer) window.clearTimeout(p.timer);
+      // Picked up and put straight back down, or never picked up at all: nothing happened to it.
       if (!p || !p.moving || !drag) return setDrag(null);
       const outcome = resolveDrop(id, drag.target, {
         pinned: layout.flow.filter((placed) => placed.pinned).map((placed) => ({ cardId: placed.card.cardId, rect: placed.rect })),
@@ -347,8 +437,14 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
       } else say(outcome.returned);
     },
     onPointerCancel() {
+      const p = press.current;
+      if (p?.timer) window.clearTimeout(p.timer);
       press.current = null;
       setDrag(null);
+    },
+    // A finger held on a card is picking it up, not asking for the page's menu.
+    onContextMenu(event: MouseEvent<HTMLDivElement>) {
+      if (press.current?.touch) event.preventDefault();
     },
   });
 
@@ -359,7 +455,7 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
           {[
             counted(layout.flow.length, "card on the canvas", "cards on the canvas"),
             pinnedCount > 0 ? `${pinnedCount} pinned` : null,
-            board.docked.length > 0 ? `${board.docked.length} docked to the plan` : null,
+            dockedCount > 0 ? `${dockedCount} docked to the plan` : null,
             board.discarded.length > 0 ? `${board.discarded.length} discarded` : null,
           ]
             .filter((part) => part !== null)
@@ -379,14 +475,15 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
         aria-label={mode.kind === "fixture" ? "Canvas of the recorded case" : "Canvas of this case"}
         aria-describedby={hint}
         data-dragging={drag ? "true" : undefined}
+        data-narrow={narrow ? "true" : undefined}
         {...gestures}
       >
         <div className="canvas__world" style={{ transform: worldTransform(viewport) }}>
           {/* Nothing is dealt until the frame has a size and the world is fitted to it, so the cards
               arrive where they will stay instead of arriving and then jumping to fit. */}
-          {ready && <PlanRegion plan={layout.plan} drag={drag} />}
+          {ready && !narrow && <PlanRegion plan={layout.plan} drag={drag} />}
           {ready &&
-            [...layout.docked.map((p) => ({ ...p, docked: true })), ...layout.flow.map((p) => ({ ...p, docked: false }))].map(
+            [...(narrow ? [] : layout.docked.map((p) => ({ ...p, docked: true }))), ...layout.flow.map((p) => ({ ...p, docked: false }))].map(
               ({ card, rect, pinned, docked }, index) => {
                 const lifted = drag?.id === card.cardId;
                 return (
@@ -426,13 +523,14 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
           className={`canvas-bin${drag ? " canvas-bin--armed" : ""}${drag?.target.kind === "bin" ? " canvas-bin--over" : ""}`}
           aria-expanded={trayOpen}
           aria-controls="canvas-tray"
+          aria-label={`Discarded, ${board.discarded.length}`}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={() => setTrayOpen((open) => !open)}
         >
           <span aria-hidden className="canvas-bin__icon">
             <BinIcon />
           </span>
-          Discarded
+          <span className="canvas-bin__label">Discarded</span>
           <span className="canvas-bin__count">{board.discarded.length}</span>
         </button>
         {trayOpen && (
@@ -476,7 +574,25 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
           </div>
         )}
 
-        <CanvasStatus events={log} />
+        {/* On a phone the plan and the status panel are not laid over the cards: each is a button along
+            the top that opens a sheet, and the Plan button takes a dropped card as the plan region does. */}
+        {narrow ? (
+          <div className="canvas__top" onPointerDown={(event) => event.stopPropagation()}>
+            <button
+              ref={planButton}
+              type="button"
+              className={`canvas-bin canvas-plan${drag ? " canvas-plan--armed" : ""}${drag?.target.kind === "dock" ? " canvas-plan--over" : ""}`}
+              aria-haspopup="dialog"
+              onClick={() => setPlanOpen(true)}
+            >
+              Plan
+              <span className="canvas-bin__count">{dockedCount}</span>
+            </button>
+            <CanvasStatus events={log} sheet />
+          </div>
+        ) : (
+          <CanvasStatus events={log} />
+        )}
 
         <div className="canvas__toolbar" role="toolbar" aria-label="Zoom" onPointerDown={(event) => event.stopPropagation()}>
           <button type="button" className="btn btn--small" aria-label="Zoom out" onClick={() => zoom(1 / 1.25)}>
@@ -494,10 +610,12 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
         </div>
       </div>
       <p id={hint} className="t-caption faint canvas-hint">
-        Drag the background to move around. Scroll to pan; hold ⌘ or Ctrl and scroll, or pinch, to zoom. With the canvas
-        focused, the arrow keys pan, + and − zoom, 0 fits everything and 1 is actual size. Drag a card to pin it
-        somewhere, or onto the bin to discard it; each card&apos;s buttons do the same.
+        Drag the background to move around, or one finger anywhere. Scroll to pan; hold ⌘ or Ctrl and scroll, or pinch with
+        two fingers, to zoom. With the canvas focused, the arrow keys pan, + and − zoom, 0 fits everything and 1 is actual
+        size. Drag a card (on a touch screen, hold it a moment first) to pin it somewhere, onto the bin to discard it, or
+        onto the plan to dock it; each card&apos;s buttons do the same.
       </p>
+      {planOpen && <PlanSheet groups={layouts.wide.groups} models={models} onUndock={actions.undock} onClose={() => setPlanOpen(false)} />}
       {sheet && <CitationSheet events={log} citation={sheet.citation.citation} label={sheet.label} onClose={() => setSheet(null)} />}
     </section>
   );
@@ -546,6 +664,56 @@ function PlanRegion({ plan, drag }: { plan: PlanLayout; drag: { target: DropTarg
   );
 }
 
+// The plan on a phone (#61): the reportable set as a list in a sheet, grouped the way the plan region
+// groups it, by category and then by the authority of the document each card is reported under. A card
+// leaves it by Undock, back into the flow; it arrives by its Dock button or by being dropped on Plan.
+function PlanSheet({
+  groups,
+  models,
+  onUndock,
+  onClose,
+}: {
+  groups: readonly PlanGroup[];
+  models: ReadonlyMap<CardId, CardModel>;
+  onUndock: (id: CardId) => void;
+  onClose: () => void;
+}) {
+  const count = groups.reduce((n, g) => n + g.cards.length, 0);
+  return (
+    <Sheet title="Plan" onClose={onClose}>
+      <p className="t-footnote muted">{count === 0 ? "The reportable set is empty." : `The reportable set · ${count} card${count === 1 ? "" : "s"}`}</p>
+      {count === 0 ? (
+        <p className="t-callout muted plan-sheet__empty">Drag a card onto Plan, or press its Dock button, to report it.</p>
+      ) : (
+        groups.map((group) => (
+          <section key={`${group.category}:${group.authority}`} className="plan-sheet__group" aria-label={`${categoryLabel(group.category)}, ${DOCUMENT_KIND_LABELS[group.authority]}`}>
+            <p className="t-eyebrow">
+              {categoryLabel(group.category)} · {DOCUMENT_KIND_LABELS[group.authority]}
+            </p>
+            <ul className="list-plain canvas-tray__list">
+              {group.cards.flatMap((docked) => {
+                const model = models.get(docked.cardId);
+                if (!model) return [];
+                return (
+                  <li key={docked.cardId} className="canvas-tray__row">
+                    <div className="canvas-tray__what">
+                      <p className="t-caption faint">{model.kind === "finding" ? `Finding · ${model.severityLabel}` : `Excerpt · ${model.documentKind ?? model.documentName}, page ${model.page}`}</p>
+                      <p className="t-footnote canvas-tray__text">{model.kind === "finding" ? model.title : model.quote}</p>
+                    </div>
+                    <button type="button" className="btn btn--small" onClick={() => onUndock(docked.cardId)}>
+                      Undock
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))
+      )}
+    </Sheet>
+  );
+}
+
 const NO_SLOT = "No finding cites this passage, so it has no place in the plan";
 const NO_RECORDING =
   "The recorded case has no model behind it, and no find-similar run was recorded from this card. On a live case it runs the model.";
@@ -574,17 +742,48 @@ function counted(n: number, one: string, many: string): string {
 
 // The viewport as React state, and the gestures that move it. Everything that changes the viewport goes
 // through lib/viewport.ts; this hook only decides when.
-function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | null) {
+//
+// Pointer Events throughout, so a mouse, a pen and a finger are one code path (#61). One pointer down on
+// the background pans; a second one turns the gesture into a pinch about the two fingers' midpoint
+// (lib/viewport.ts pinch), and lifting either finger goes back to panning under the one left, without a
+// jump. A finger is tracked on whatever it landed on (touch pointers are captured there by the browser), so
+// a pan may start on a card; a pan that started on a card's button does not then press it.
+//
+// The frame's own width decides the layout: narrower than NARROW_BELOW, it is a phone's (one column of
+// cards, the plan and the status panel in sheets), and crossing that width fits the canvas afresh.
+const NARROW_BELOW = 640;
+// How far a press may wander and still be a press, in screen pixels: a long press that moved further than
+// this was a pan, and a pan that moved further than this does not press what it started on.
+const SLOP = 10;
+// The phone's top bar, in screen pixels at life size: the first view starts the cards below it.
+const TOP_BAR = 60;
+
+type Bounds = { wide: Rect | null; narrow: Rect | null };
+
+function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Bounds) {
   const [viewport, setViewport] = useState<Viewport>(IDENTITY);
   const [ready, setReady] = useState(false);
+  const [narrow, setNarrow] = useState(false);
   const size = useRef<Size>({ width: 0, height: 0 });
   // What a fit fits, for the observer and the keyboard, which outlive any one render.
   const content = useRef(bounds);
   useEffect(() => {
     content.current = bounds;
   }, [bounds]);
+  const isNarrow = useRef(false);
+  // The viewport as it now is, for a pinch, which starts from it.
+  const live = useRef(viewport);
+  useEffect(() => {
+    live.current = viewport;
+  }, [viewport]);
   const fitted = useRef(false);
-  const pan = useRef<{ id: number; last: Point; history: { t: number; x: number; y: number }[] } | null>(null);
+  // Every pointer down on the canvas, where it is now in frame coordinates; the pan, if one pointer is
+  // moving the world; the pinch, if two are.
+  const pointers = useRef(new Map<number, Point>());
+  const pan = useRef<{ id: number; start: Point; last: Point; history: { t: number; x: number; y: number }[] } | null>(null);
+  const pinching = useRef<{ ids: [number, number]; start: Viewport; from: [Point, Point] } | null>(null);
+  // Whether the gesture just ended moved far enough that the click it ends with is not a press.
+  const travelled = useRef(false);
   const frameId = useRef<number | null>(null);
 
   const stopGlide = () => {
@@ -592,11 +791,25 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
     frameId.current = null;
   };
 
+  // The whole of the content in view. The first view is no smaller than a card can be read at, and on a
+  // touch screen it is life size wherever a card fits across at life size, so the cards' buttons are a
+  // finger's 44 points (#61). On a phone the margin is the screen's own, with room left at the top for
+  // the bar the Plan and Activity buttons float in. Fit, asked for, shows everything.
+  const fitWith = useCallback((first: boolean) => {
+    const narrowNow = isNarrow.current;
+    const content_ = narrowNow ? content.current.narrow : content.current.wide;
+    const { width } = size.current;
+    if (!content_ || width === 0) return;
+    const padding = narrowNow ? 16 : 48;
+    const rect = narrowNow ? { ...content_, y: content_.y - TOP_BAR, h: content_.h + TOP_BAR } : content_;
+    const touch = window.matchMedia("(pointer: coarse)").matches;
+    const readable = touch || narrowNow ? Math.min(1, (width - 2 * padding) / CARD_W) : 0.7;
+    setViewport(fitTo(rect, size.current, { padding, maxZoom: 1, minZoom: first ? Math.max(0.7, readable) : undefined }));
+  }, []);
   const fit = useCallback(() => {
     stopGlide();
-    const rect = content.current;
-    if (rect && size.current.width > 0) setViewport(fitTo(rect, size.current, { padding: 48, maxZoom: 1 }));
-  }, []);
+    fitWith(false);
+  }, [fitWith]);
 
   // Bring a world rectangle into view if any of it is off screen, centred, at the zoom already chosen.
   const reveal = useCallback((rect: Rect) => {
@@ -617,28 +830,40 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
     setViewport((v) => zoomAt(v, 1, centre()));
   };
 
-  // The frame's size, and the first fit once there is a size to fit to.
+  // The frame's size, the layout its width calls for, and a fit whenever there is a first size to fit to
+  // or the layout changed under it (a phone turned on its side).
   useEffect(() => {
     const el = frame.current;
     if (!el) return;
+    // On a phone the canvas is as tall as the screen has room for below the case's heading
+    // (globals.css), so its zoom controls and bin are on screen without scrolling: the stylesheet is told
+    // where in the page the canvas starts.
+    const placeFrame = () => el.style.setProperty("--canvas-top", `${Math.round(el.getBoundingClientRect().top + window.scrollY)}px`);
+    placeFrame();
+    window.addEventListener("resize", placeFrame);
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
       size.current = { width: entry.contentRect.width, height: entry.contentRect.height };
-      // The first view fits the canvas, but no smaller than a card can be read at: a big case opens
-      // readable from its top-left corner, and Fit is one press away for the whole of it.
-      if (!fitted.current) {
+      const nowNarrow = entry.contentRect.width < NARROW_BELOW;
+      const changed = nowNarrow !== isNarrow.current;
+      isNarrow.current = nowNarrow;
+      if (changed) setNarrow(nowNarrow);
+      if (!fitted.current || changed) {
+        fitWith(true);
         fitted.current = true;
-        const rect = content.current;
-        if (rect) setViewport(fitTo(rect, size.current, { padding: 48, maxZoom: 1, minZoom: 0.7 }));
         setReady(true);
       }
     });
     observer.observe(el);
-    return () => observer.disconnect();
-  }, [frame, fit]);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", placeFrame);
+    };
+  }, [frame, fitWith]);
 
   // The wheel, natively: React's wheel listener is passive, and a canvas that zooms must stop the page
-  // from scrolling (and the browser from zooming the whole page on a pinch) underneath it.
+  // from scrolling (and the browser from zooming the whole page on a pinch) underneath it. Safari's own
+  // pinch events are refused for the same reason: the canvas's pinch is the Pointer Events one below.
   useEffect(() => {
     const el = frame.current;
     if (!el) return;
@@ -653,8 +878,13 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
       if (event.ctrlKey || event.metaKey) setViewport((v) => zoomBy(v, wheelFactor(event.deltaY * scale), at));
       else setViewport((v) => panBy(v, -event.deltaX * scale, -event.deltaY * scale));
     };
+    const onGesture = (event: Event) => event.preventDefault();
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    el.addEventListener("gesturestart", onGesture);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("gesturestart", onGesture);
+    };
   }, [frame]);
   useEffect(() => stopGlide, []);
 
@@ -678,38 +908,108 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
     frameId.current = requestAnimationFrame(tick);
   };
 
+  const local = (event: PointerEvent<HTMLDivElement>): Point => {
+    const box = event.currentTarget.getBoundingClientRect();
+    return { x: event.clientX - box.left, y: event.clientY - box.top };
+  };
+  const panFrom = (id: number, at: Point, t: number) => {
+    pan.current = { id, start: at, last: at, history: [{ t, ...at }] };
+  };
+  const endPan = (el: HTMLElement) => {
+    pan.current = null;
+    delete el.dataset.panning;
+  };
+
+  // A long press on a card asks for its finger (#61): granted only while that finger is still the one
+  // panning, alone and within the slop of where it came down, so a drag of a card never starts out of a pan
+  // or a pinch already under way. Granted, the canvas lets go of that finger and the card has it.
+  const release = useCallback((id: number): boolean => {
+    const p = pan.current;
+    if (!p || p.id !== id || pinching.current || Math.hypot(p.last.x - p.start.x, p.last.y - p.start.y) > SLOP) return false;
+    pointers.current.delete(id);
+    pan.current = null;
+    delete frame.current?.dataset.panning;
+    return true;
+  }, [frame]);
+
+  const lift = (event: PointerEvent<HTMLDivElement>) => {
+    const id = event.pointerId;
+    if (!pointers.current.delete(id)) return;
+    const pinch = pinching.current;
+    if (pinch?.ids.includes(id)) {
+      // One finger of a pinch lifted: the other carries on as a pan from where it is, with no speed to
+      // carry (a pinch is let go of, not thrown).
+      pinching.current = null;
+      const [other] = [...pointers.current.entries()];
+      if (other) panFrom(other[0], other[1], event.timeStamp);
+      else endPan(event.currentTarget);
+      return;
+    }
+    const p = pan.current;
+    if (!p || p.id !== id) return;
+    endPan(event.currentTarget);
+    if (event.type === "pointercancel") return;
+    const first = p.history[0]!;
+    const last = p.history.at(-1)!;
+    const dt = (last.t - first.t) / 1000;
+    // A hand that stopped before letting go has no speed left to carry.
+    if (dt > 0 && event.timeStamp - last.t < 60) coast({ x: (last.x - first.x) / dt, y: (last.y - first.y) / dt });
+  };
+
   const gestures = {
+    // Before anything inside sees the press: a new gesture has not travelled yet.
+    onPointerDownCapture() {
+      travelled.current = false;
+    },
     onPointerDown(event: PointerEvent<HTMLDivElement>) {
-      if (event.button !== 0) return;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
       stopGlide(); // Caught mid-glide: it stops under the hand.
-      event.currentTarget.setPointerCapture(event.pointerId);
-      const at = { x: event.clientX, y: event.clientY };
-      pan.current = { id: event.pointerId, last: at, history: [{ t: event.timeStamp, ...at }] };
+      // A mouse is captured here so a pan carries on off the frame; a finger is already captured by what it
+      // landed on, and capturing it here would take a tap away from a card's button.
+      if (event.pointerType === "mouse") event.currentTarget.setPointerCapture(event.pointerId);
+      // The first finger of a new touch, or any mouse press, starts afresh: a pointer whose lift was never
+      // heard (its element left the page under it) must not turn the next touch into a pinch.
+      if (event.isPrimary) {
+        pointers.current.clear();
+        pinching.current = null;
+      }
+      const at = local(event);
+      pointers.current.set(event.pointerId, at);
       event.currentTarget.dataset.panning = "true";
+      if (pointers.current.size === 2) {
+        const [a, b] = [...pointers.current.entries()];
+        pinching.current = { ids: [a![0], b![0]], start: live.current, from: [a![1], b![1]] };
+        pan.current = null;
+        travelled.current = true;
+      } else if (pointers.current.size === 1) panFrom(event.pointerId, at, event.timeStamp);
     },
     onPointerMove(event: PointerEvent<HTMLDivElement>) {
+      if (!pointers.current.has(event.pointerId)) return;
+      const at = local(event);
+      pointers.current.set(event.pointerId, at);
+      const pinch = pinching.current;
+      if (pinch) {
+        const [a, b] = pinch.ids.map((id) => pointers.current.get(id));
+        if (a && b) setViewport(pinchViewport(pinch.start, pinch.from, [a, b]));
+        return;
+      }
       const p = pan.current;
       if (!p || p.id !== event.pointerId) return;
-      const dx = event.clientX - p.last.x;
-      const dy = event.clientY - p.last.y;
-      p.last = { x: event.clientX, y: event.clientY };
-      p.history = [...p.history.filter((h) => event.timeStamp - h.t < 100), { t: event.timeStamp, x: event.clientX, y: event.clientY }];
+      const dx = at.x - p.last.x;
+      const dy = at.y - p.last.y;
+      p.last = at;
+      if (Math.hypot(at.x - p.start.x, at.y - p.start.y) > SLOP) travelled.current = true;
+      p.history = [...p.history.filter((h) => event.timeStamp - h.t < 100), { t: event.timeStamp, ...at }];
       setViewport((v) => panBy(v, dx, dy));
     },
-    onPointerUp(event: PointerEvent<HTMLDivElement>) {
-      const p = pan.current;
-      if (!p || p.id !== event.pointerId) return;
-      pan.current = null;
-      delete event.currentTarget.dataset.panning;
-      const first = p.history[0]!;
-      const last = p.history.at(-1)!;
-      const dt = (last.t - first.t) / 1000;
-      // A hand that stopped before letting go has no speed left to carry.
-      if (dt > 0 && event.timeStamp - last.t < 60) coast({ x: (last.x - first.x) / dt, y: (last.y - first.y) / dt });
-    },
-    onPointerCancel(event: PointerEvent<HTMLDivElement>) {
-      pan.current = null;
-      delete event.currentTarget.dataset.panning;
+    onPointerUp: lift,
+    onPointerCancel: lift,
+    // A pan that began on a card's button ends with a click on it, which is not the analyst pressing it.
+    onClickCapture(event: MouseEvent<HTMLDivElement>) {
+      if (!travelled.current) return;
+      travelled.current = false;
+      event.preventDefault();
+      event.stopPropagation();
     },
     onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
       // Only the canvas's own keys, and only when the canvas itself has focus: a card's buttons keep theirs.
@@ -733,5 +1033,5 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
     },
   };
 
-  return { viewport, ready, fit, zoom, reset, reveal, gestures };
+  return { viewport, ready, narrow, fit, zoom, reset, reveal, release, gestures };
 }

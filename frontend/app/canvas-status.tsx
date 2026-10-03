@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { SlimEvent, StepRunStatus } from "@qryvox/shared";
 import { type StatusLine, statusLines } from "../lib/canvas-status";
+import { Sheet } from "./ui";
 
 // The status panel (#58): the case's step log and the canvas's own operations, as lines read out of the
 // events the canvas folds (lib/canvas-status.ts). It floats in the canvas's top corner as a parallel
 // panel, a light material with no scrim, so the board stays in reach behind it. Closed, it is one line:
 // how many runs, how many failed, and the latest thing that happened. Open, it is the whole record, the
 // newest at the bottom, each failed step with the reason its step.failed gave.
+//
+// On a phone (`sheet`, #61) there is no room to lay the record over the cards: the closed line sits in the
+// canvas's top bar, and opening it raises the record as a sheet from the bottom of the screen. The sheet is
+// put on the page itself rather than inside the canvas, whose floating layers would otherwise hold it.
 
 const WORD: Record<StepRunStatus, { label: string; tone: string; mark: string }> = {
   running: { label: "Running", tone: "badge--tint", mark: "…" },
@@ -16,7 +22,7 @@ const WORD: Record<StepRunStatus, { label: string; tone: string; mark: string }>
   failed: { label: "Failed", tone: "badge--negative", mark: "!" },
 };
 
-export default function CanvasStatus({ events }: { events: readonly SlimEvent[] }) {
+export default function CanvasStatus({ events, sheet = false }: { events: readonly SlimEvent[]; sheet?: boolean }) {
   const lines = useMemo(() => statusLines(events), [events]);
   const [open, setOpen] = useState(false);
   const list = useRef<HTMLOListElement | null>(null);
@@ -27,12 +33,34 @@ export default function CanvasStatus({ events }: { events: readonly SlimEvent[] 
 
   // Opened, or grown while open: the newest line is the one in view.
   useEffect(() => {
-    if (open && list.current) list.current.scrollTop = list.current.scrollHeight;
-  }, [open, lines.length]);
+    const scroller = sheet ? list.current?.closest(".sheet") : list.current;
+    if (open && scroller) scroller.scrollTop = scroller.scrollHeight;
+  }, [open, lines.length, sheet]);
+
+  const record = (
+    <ol
+      ref={list}
+      id="canvas-status-list"
+      className={`canvas-status__list${sheet ? " canvas-status__list--sheet" : " materialize"}`}
+      data-scrolls={sheet ? undefined : true}
+      aria-label="Steps and card operations, oldest first"
+    >
+      {lines.map((line) => (
+        <Line key={`${line.kind}:${line.seq}`} line={line} />
+      ))}
+    </ol>
+  );
 
   return (
-    <div className="canvas-status" onPointerDown={(event) => event.stopPropagation()}>
-      <button type="button" className="canvas-status__head" aria-expanded={open} aria-controls="canvas-status-list" onClick={() => setOpen((o) => !o)}>
+    <div className={`canvas-status${sheet ? " canvas-status--bar" : ""}`} onPointerDown={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        className="canvas-status__head"
+        aria-expanded={open}
+        aria-controls={sheet ? undefined : "canvas-status-list"}
+        aria-haspopup={sheet ? "dialog" : undefined}
+        onClick={() => setOpen((o) => !o)}
+      >
         <span className={`dot ${failed > 0 ? "text-negative" : running ? "text-tint" : "text-positive"}`} aria-hidden />
         <span className="t-footnote strong">Activity</span>
         <span className="t-caption muted">
@@ -44,13 +72,15 @@ export default function CanvasStatus({ events }: { events: readonly SlimEvent[] 
           ›
         </span>
       </button>
-      {open && (
-        <ol ref={list} id="canvas-status-list" className="canvas-status__list materialize" data-scrolls aria-label="Steps and card operations, oldest first">
-          {lines.map((line) => (
-            <Line key={`${line.kind}:${line.seq}`} line={line} />
-          ))}
-        </ol>
-      )}
+      {open &&
+        (sheet
+          ? createPortal(
+              <Sheet title="Activity" onClose={() => setOpen(false)}>
+                {record}
+              </Sheet>,
+              document.body,
+            )
+          : record)}
     </div>
   );
 }

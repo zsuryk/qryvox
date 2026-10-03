@@ -15,6 +15,9 @@ export type DropTarget =
   | { kind: "slot"; slot: PlanSlot }
   // Over the plan region, but no slot in it.
   | { kind: "plan" }
+  // Over the plan as a whole, where it is not in the world: a narrow screen's Plan button (#61). The card
+  // goes in its own slot, the one its Dock button uses, or null when it has none.
+  | { kind: "dock"; slot: PlanSlot | null }
   // On the open canvas, the card's top-left corner at this world position.
   | { kind: "canvas"; at: WorldPos }
   // Anywhere else: off the canvas, or over its controls.
@@ -47,6 +50,10 @@ export function resolveDrop(cardId: CardId, target: DropTarget, context: DropCon
       return { returned: `${BACK}: it was let go off the canvas.` };
     case "plan":
       return { returned: `${BACK}: drop it on one of the plan's slots.` };
+    case "dock":
+      return target.slot === null
+        ? { returned: `${BACK}: no finding cites this passage, so it has no place in the plan.` }
+        : resolveDrop(cardId, { kind: "slot", slot: target.slot }, context);
     case "slot": {
       const { slot } = target;
       if (context.categories.length === 0) return { returned: `${BACK}: no finding cites this passage, so it has no place in the plan.` };

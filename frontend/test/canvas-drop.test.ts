@@ -25,6 +25,12 @@ describe("a drop", () => {
     });
   });
 
+  it("on the plan as a whole (a narrow screen's Plan button, #61) docks it in its own slot, if it has one", () => {
+    const slot = { category: "fees" as const, authority: "ppm" as const };
+    expect(resolveDrop(card, { kind: "dock", slot }, context)).toMatchObject({ ops: [{ type: "card.docked", payload: { card_id: card, plan_slot: slot } }] });
+    expect(resolveDrop(card, { kind: "dock", slot: null }, { ...context, categories: [] })).toMatchObject({ returned: expect.stringMatching(/no finding cites/) });
+  });
+
   it("returns the card when it would land on another pin, on an obstacle, or off the canvas", () => {
     expect(resolveDrop(card, { kind: "canvas", at: { x: 100, y: 50 } }, context)).toHaveProperty("returned");
     expect(resolveDrop(card, { kind: "canvas", at: { x: -300, y: 100 } }, context)).toHaveProperty("returned");
