@@ -1,11 +1,12 @@
-import { FindingCategory, FindingKind, type IngestedDocument, ProductRuleId } from "@qryvox/shared";
+import { type Citation, FindingCategory, FindingKind, type IngestedDocument, ProductRuleId } from "@qryvox/shared";
 import { z } from "zod";
 import { type Claim, DecomposeOutput } from "./decompose.js";
-import { loadCompletedOutput, loadDocuments } from "./inputs.js";
+import { loadCompletedOutput, loadDocuments, seedPassage } from "./inputs.js";
 import type { StepDefinition } from "./step.js";
 
 // contradictions@1 — compares claims across the pack and names the issues: contradictions between
-// documents, marketing claims the PPM does not support, and promises missing their risk disclosure.
+// documents, marketing claims the PPM does not support, and promises missing their risk disclosure. Seeded
+// by find-similar (#64), it names only the issues about the seed passage's subject, across the whole pack.
 
 export const Issue = z.object({
   kind: FindingKind,
@@ -44,6 +45,16 @@ Report each issue once. Ignore claims that agree, and wording differences that d
 Respond with only a JSON object and no other text, in exactly this shape:
 {"issues":[{"kind":"contradiction","category":"fees","claim_id":"c3","counterpart_claim_id":"c21","explanation":"<one sentence>"}]}`;
 
+// Appended to the prompt above only when the run is seeded, so an unseeded contradictions@1 prompt is unchanged.
+export function contradictionsSeedPrompt(passage: string): string {
+  return `
+
+This time, report only the issues about the same subject as this passage, which the analyst picked:
+${passage}
+
+The same subject means the same fee, charge, limit, risk, term or strategy point, whichever documents the claims are in. The passage itself need not be one of the claims. Every rule above still applies, and an empty list is a valid answer.`;
+}
+
 export const contradictions: StepDefinition<ContradictionsInput, ContradictionsOutput> = {
   name: "contradictions",
 
@@ -52,7 +63,7 @@ export const contradictions: StepDefinition<ContradictionsInput, ContradictionsO
     return { claims: output.claims, documents: await loadDocuments(db, caseId) };
   },
 
-  messages({ claims, documents }) {
+  messages({ claims, documents }, seed?: Citation) {
     const kinds = new Map(documents.map((d) => [d.document_id, d.kind]));
     const text = claims
       .map(
@@ -60,11 +71,16 @@ export const contradictions: StepDefinition<ContradictionsInput, ContradictionsO
           `- ${c.id} [${kinds.get(c.document_id)} p${c.page}] ${c.category} / ${c.topic}: ${c.assertion} (quote: "${c.quote}")`,
       )
       .join("\n");
+    const system = seed
+      ? CONTRADICTIONS_SYSTEM_PROMPT + contradictionsSeedPrompt(seedPassage(documents, seed))
+      : CONTRADICTIONS_SYSTEM_PROMPT;
     return [
-      { role: "system", content: CONTRADICTIONS_SYSTEM_PROMPT },
+      { role: "system", content: system },
       { role: "user", content: `Claims:\n${text}` },
     ];
   },
+
+  seedDocuments: ({ documents }) => documents,
 
   output: ContradictionsOutput,
 

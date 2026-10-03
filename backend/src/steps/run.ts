@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ANALYST_ACTOR, PROMPT_VERSIONS, type RunStepRequest, type StepFailure, type StepName, type StepResult } from "@qryvox/shared";
+import { ANALYST_ACTOR, type Citation, PROMPT_VERSIONS, type RunStepRequest, type StepFailure, type StepName, type StepResult } from "@qryvox/shared";
 import type { Db } from "../db/client.js";
 import type { EventRow } from "../db/schema.js";
 import { checkRateLimit, type RateLimits } from "../guards.js";
@@ -12,6 +12,7 @@ import { decompose } from "./decompose.js";
 import { explain } from "./explain.js";
 import { extract } from "./extract.js";
 import { findings } from "./findings.js";
+import { groundCitation } from "./inputs.js";
 import type { AnyStep } from "./step.js";
 
 // parse (#51) has a contract in shared and no runner yet: no prompt, no step definition.
@@ -20,6 +21,12 @@ const STEPS: Record<Exclude<StepName, "parse">, AnyStep> = { extract, decompose,
 // A step the contract names that this server cannot run yet. Refused before anything is read or appended.
 export class StepNotRunnable extends Error {
   override name = "StepNotRunnable";
+}
+
+// A find-similar seed (#64) the server will not run: on a step that takes none, or quoting a passage that is
+// not on the page it cites. Refused before anything is appended or any model is called.
+export class SeedRefused extends Error {
+  override name = "SeedRefused";
 }
 
 export class LlmNotConfigured extends Error {
@@ -54,6 +61,7 @@ export async function runStep(
   if (!llm) throw new LlmNotConfigured("no model is configured: set LLM_BASE_URL and LLM_MODEL");
 
   const input = await step.loadInput(db, caseId, req.input_run_id);
+  const seed = req.seed && groundSeed(step, input, req.seed);
   // Only a run about to spend tokens counts: a stored result or a precondition failure never gets here.
   await checkRateLimit(db, caseId, caller.ipHash, caller.limits);
   const run = {
@@ -61,6 +69,7 @@ export async function runStep(
     model: llm.model,
     prompt_version: PROMPT_VERSIONS[req.step],
     input_run_id: req.input_run_id,
+    ...(seed && { seed }),
   };
   const draft = { v: 1, actor: ANALYST_ACTOR, stepRunId: req.step_run_id, ipHash: caller.ipHash };
 
@@ -75,7 +84,7 @@ export async function runStep(
 
   let completion;
   try {
-    completion = await llm.complete(step.messages(input));
+    completion = await llm.complete(step.messages(input, seed));
   } catch (err) {
     if (!(err instanceof LlmError)) throw err;
     return fail(502, err.message, err.raw);
@@ -107,6 +116,18 @@ export async function runStep(
     if (!winner) throw err;
     return completedOutcome(winner, req);
   }
+}
+
+// The seed as the run records it, once its quote is found on its cited page of the documents the step
+// reads, as grounding checks every quote a step produces; the find-similar card it came from is trusted no
+// further than a model's citation would be.
+function groundSeed(step: AnyStep, input: unknown, seed: Citation): Citation {
+  if (!step.seedDocuments) throw new SeedRefused(`the ${step.name} step takes no seed`);
+  const grounded = groundCitation(step.seedDocuments(input), seed);
+  if (!grounded) {
+    throw new SeedRefused(`the seed's quote does not appear on page ${seed.page} of document ${seed.document_id}`);
+  }
+  return grounded;
 }
 
 // One finding.superseded for each finding still on the board: the new run replaces it.

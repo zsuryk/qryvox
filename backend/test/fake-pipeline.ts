@@ -64,8 +64,9 @@ const PROMPTS: [string, StepName][] = [
   [EXPLAIN_SYSTEM_PROMPT, "explain"],
 ];
 
+// A seeded run (#64) appends a section to its step's prompt, so a prompt is matched by how it begins.
 function stepOf(messages: ChatMessage[]): StepName {
-  const step = PROMPTS.find(([prompt]) => messages[0]?.content === prompt)?.[1];
+  const step = PROMPTS.find(([prompt]) => messages[0]?.content.startsWith(prompt))?.[1];
   if (!step) throw new Error("unknown prompt");
   return step;
 }

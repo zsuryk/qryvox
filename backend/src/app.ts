@@ -36,7 +36,7 @@ import {
   toWire,
   verifyChain,
 } from "./log.js";
-import { LlmNotConfigured, runStep, StepNotRunnable } from "./steps/run.js";
+import { LlmNotConfigured, runStep, SeedRefused, StepNotRunnable } from "./steps/run.js";
 import { StepPrecondition } from "./steps/step.js";
 
 export type AppOptions = Database & {
@@ -70,7 +70,7 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
       return c.json({ error: err.message }, 409);
     }
     if (err instanceof AdviceNotFound) return c.json({ error: err.message }, 404);
-    if (err instanceof StepNotRunnable) return c.json({ error: err.message }, 400);
+    if (err instanceof StepNotRunnable || err instanceof SeedRefused) return c.json({ error: err.message }, 400);
     if (err instanceof LlmNotConfigured) return c.json({ error: err.message }, 503);
     if (err instanceof RateLimited) {
       c.header("Retry-After", String(err.retryAfterSeconds));

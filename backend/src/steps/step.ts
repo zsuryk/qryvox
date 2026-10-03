@@ -1,4 +1,4 @@
-import type { Finding, StepName } from "@qryvox/shared";
+import type { Citation, Finding, IngestedDocument, StepName } from "@qryvox/shared";
 import type { z } from "zod";
 import type { Db } from "../db/client.js";
 import type { EventDraft, Tx } from "../log.js";
@@ -14,8 +14,11 @@ export type StepDefinition<Input, Output extends Record<string, unknown>, Reply 
   name: StepName;
   // Reads what the step consumes from the log. Steps are stateless: the log is their only input.
   loadInput(db: Db, caseId: string, inputRunId: string | null): Promise<Input>;
-  // The versioned prompt. Never sent to the interface; only PROMPT_VERSIONS[name] is recorded.
-  messages(input: Input): ChatMessage[];
+  // The versioned prompt. Never sent to the interface; only PROMPT_VERSIONS[name] is recorded. A seeded
+  // run (#64) passes its seed, already checked against the documents; unseeded, the prompt is unchanged.
+  messages(input: Input, seed?: Citation): ChatMessage[];
+  // Only on the steps find-similar re-runs: the documents a seed's quote must appear in, on its page.
+  seedDocuments?(input: Input): readonly IngestedDocument[];
   output: z.ZodType<Reply>;
   // Checks the parsed reply against the input (e.g. quotes really appear on the cited page).
   // Returns the output to store, or an error that fails the run.

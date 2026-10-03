@@ -1,4 +1,4 @@
-import { IngestedDocument, type StepName } from "@qryvox/shared";
+import { type Citation, IngestedDocument, type StepName } from "@qryvox/shared";
 import type { z } from "zod";
 import type { Db } from "../db/client.js";
 import { findCompletedRun, listEventsOfType } from "../log.js";
@@ -26,10 +26,15 @@ export async function loadCompletedOutput<T>(
   schema: z.ZodType<T>,
 ): Promise<{ output: T; inputRunId: string | null; step: StepName }> {
   const row = runId === null ? undefined : await findCompletedRun(db, caseId, runId);
-  const payload = row?.payload as { step?: string; output?: unknown; input_run_id?: string | null } | undefined;
+  const payload = row?.payload as { step?: string; output?: unknown; input_run_id?: string | null; seed?: unknown } | undefined;
   const steps: readonly StepName[] = typeof step === "string" ? [step] : step;
   if (!payload || !steps.includes(payload.step as StepName)) {
     throw new StepPrecondition(`input_run_id must name a completed ${steps.join(" or ")} run in this case`);
+  }
+  // A find-similar run (#64) answers one passage, not the pack: its output is candidate cards for the
+  // canvas, and feeding it on would let it reach the findings on the board.
+  if (payload.seed !== undefined) {
+    throw new StepPrecondition(`input_run_id ${runId} is a seeded find-similar run, which no step consumes`);
   }
   return { output: schema.parse(payload.output), inputRunId: payload.input_run_id ?? null, step: payload.step as StepName };
 }
@@ -83,4 +88,11 @@ export function documentsAsText(documents: readonly IngestedDocument[]): string 
       ].join("\n"),
     )
     .join("\n\n");
+}
+
+// The passage a find-similar run is seeded with, as a seeded prompt shows it: document, kind and page, then
+// the quote, which the run has already found verbatim on that page.
+export function seedPassage(documents: readonly IngestedDocument[], seed: Citation): string {
+  const kind = documents.find((d) => d.document_id === seed.document_id)?.kind;
+  return `document_id: ${seed.document_id} (${kind}), page ${seed.page}\n"${seed.quote}"`;
 }

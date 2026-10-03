@@ -1,9 +1,10 @@
-import type { IngestedDocument } from "@qryvox/shared";
+import type { Citation, IngestedDocument } from "@qryvox/shared";
 import { z } from "zod";
-import { documentsAsText, groundCitation, loadDocuments } from "./inputs.js";
+import { documentsAsText, groundCitation, loadDocuments, seedPassage } from "./inputs.js";
 import { StepPrecondition, type StepDefinition } from "./step.js";
 
-// extract@1 — lists every statement each document makes, verbatim, with its page.
+// extract@1 — lists every statement each document makes, verbatim, with its page. Seeded by find-similar
+// (#64), it lists only the statements about the seed passage's subject, still across the whole pack.
 
 export const ExtractOutput = z.object({
   statements: z.array(
@@ -31,6 +32,16 @@ Rules:
 Respond with only a JSON object and no other text, in exactly this shape:
 {"statements":[{"document_id":"<document_id>","page":<page number>,"quote":"<verbatim statement>"}]}`;
 
+// Appended to the prompt above only when the run is seeded, so an unseeded extract@1 prompt is unchanged.
+export function extractSeedPrompt(passage: string): string {
+  return `
+
+This time, list only the statements about the same subject as this passage, which the analyst picked:
+${passage}
+
+The same subject means the same fee, charge, limit, risk, term or strategy point, in any document of the pack, whether it agrees with the passage or not. Include the passage itself. Every rule above still applies.`;
+}
+
 export const extract: StepDefinition<ExtractInput, ExtractOutput> = {
   name: "extract",
 
@@ -39,12 +50,15 @@ export const extract: StepDefinition<ExtractInput, ExtractOutput> = {
     return { documents: await loadDocuments(db, caseId) };
   },
 
-  messages({ documents }) {
+  messages({ documents }, seed?: Citation) {
+    const system = seed ? EXTRACT_SYSTEM_PROMPT + extractSeedPrompt(seedPassage(documents, seed)) : EXTRACT_SYSTEM_PROMPT;
     return [
-      { role: "system", content: EXTRACT_SYSTEM_PROMPT },
+      { role: "system", content: system },
       { role: "user", content: documentsAsText(documents) },
     ];
   },
+
+  seedDocuments: ({ documents }) => documents,
 
   output: ExtractOutput,
 

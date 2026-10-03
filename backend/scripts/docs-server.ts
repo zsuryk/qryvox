@@ -63,8 +63,12 @@ const TEXT = {
     step: "Run one analysis step",
     stepDesc:
       "extract (input_run_id null) → decompose → contradictions → findings, each consuming the previous " +
-      "completed run. A completed step_run_id returns its stored result without calling the model.",
+      "completed run. A completed step_run_id returns its stored result without calling the model. " +
+      "seed (extract and contradictions only) makes a find-similar run: a citation whose quote must appear on its " +
+      "page; the run returns only statements or issues about that passage's subject, and no step consumes it, so " +
+      "the findings on the board never change.",
     stepOk: "Completed, now or earlier",
+    stepInvalid: "Invalid body, a seed on a step that takes none, or a seed quote not found on its cited page",
     stepPrecondition: "Cannot run yet: no documents, or input_run_id is not a completed run of the previous step",
     stepSchema: "Model output failed its schema or grounding; step.failed appended",
     rateLimited: "Rate limited; see Retry-After",
@@ -134,8 +138,11 @@ const TEXT = {
     step: "執行一個分析步驟",
     stepDesc:
       "extract（input_run_id 為 null）→ decompose → contradictions → findings，每一步都讀取上一步已完成的結果。" +
-      "已完成的 step_run_id 會直接回傳儲存的結果，不會呼叫模型。",
+      "已完成的 step_run_id 會直接回傳儲存的結果，不會呼叫模型。" +
+      "seed（僅限 extract 與 contradictions）代表「找相似」執行：一筆引文，其引文內容必須出現在所標示的頁面上；" +
+      "此執行只回傳與該段落同一主題的陳述或問題，且不會被任何步驟讀取，因此看板上的發現不會改變。",
     stepOk: "已完成（本次或先前）",
+    stepInvalid: "請求內容不正確、對不接受 seed 的步驟送出 seed，或 seed 的引文不在所標示的頁面上",
     stepPrecondition: "目前無法執行：尚未匯入文件，或 input_run_id 不是上一步已完成的執行",
     stepSchema: "模型輸出未通過結構或原文比對檢查；已追加 step.failed",
     rateLimited: "超過頻率限制；請見 Retry-After",
@@ -263,6 +270,7 @@ function openapi(lang: Lang) {
           requestBody: body("RunStepRequest"),
           responses: {
             200: json("StepResult", t.stepOk),
+            400: error(t.stepInvalid),
             401: error(t.noJudgeToken),
             404: error(t.unknownCase),
             409: error(t.stepPrecondition),
