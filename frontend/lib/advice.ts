@@ -66,6 +66,8 @@ export function answerText(profile: ClientProfile, field: ProfileField): string 
       return profile.exclusions.length === 0 ? "No exclusions" : `Excludes ${profile.exclusions.map((e) => EXCLUSION[e].toLowerCase()).join(", ")}`;
     case "aged_65_or_over":
       return profile.aged_65_or_over ? "65 or over" : "Under 65";
+    case "language":
+      return profile.language === "zh-Hant" ? "Reads in Traditional Chinese" : "Reads in English";
   }
 }
 
@@ -80,6 +82,7 @@ export function profileSummary(profile: ClientProfile): string[] {
     ...(profile.may_need_cash_at_short_notice ? ["May need cash quickly"] : []),
     ...profile.exclusions.map((e) => `No ${EXCLUSION[e].toLowerCase()}`),
     ...(profile.aged_65_or_over ? ["65 or over"] : []),
+    ...(profile.language === "zh-Hant" ? ["繁體中文"] : []),
   ];
 }
 

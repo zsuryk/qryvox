@@ -3,77 +3,91 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ANALYST_ACTOR, type Citation, type ClientProfile, type KnowledgeLevel, ruleById, type SlimEvent, vulnerability } from "@qryvox/shared";
-import { answerText, EFFECT } from "../lib/advice";
-import { when } from "../lib/case";
+import { EFFECT } from "../lib/advice";
 import { recordReading } from "../lib/api";
-import { clientView, DEPTH, HEADLINE } from "../lib/client-view";
+import { clientView } from "../lib/client-view";
+import { answerIn, dateIn, type Lang, WORDS } from "../lib/i18n";
 import CitationSheet from "./citation-sheet";
+import LanguageSwitch from "./language-switch";
 import { Segmented } from "./ui";
 
 // The client's page (#34): the key client journey. Calm and plain — the verdict as a sentence, each reason
 // at the depth the client reads at (they can change it), what they must know as prominently as the
 // verdict, and where every statement comes from one tap away. Only advice an adviser approved is shown.
+// In the client's language (#43): the one they answered in, and switchable here. The explanation itself
+// is written once, in the language they chose; quoted document text stays in the document's language.
 
 export default function ClientAdvice({ caseId, events, clientId }: { caseId: string; events: readonly SlimEvent[]; clientId: string }) {
   const view = clientView(events, clientId);
+  const [lang, setLang] = useState<Lang>(view.profile?.language ?? "en");
   const [depth, setDepth] = useState<KnowledgeLevel>(view.profile?.knowledge ?? "novice");
   const [citing, setCiting] = useState<{ citation: Citation; label: string } | null>(null);
   // Whether the client lets their adviser see which depth they choose (#38). Off until they turn it on,
   // and said on the page: nothing about how they read is recorded otherwise.
   const [sharing, setSharing] = useState(false);
   const [shared, setShared] = useState(0);
+  const w = WORDS[lang];
+  const pageLang = lang === "en" ? "en" : "zh-Hant-HK";
+
+  const header = (
+    <div className="stack" style={{ "--stack-gap": "0.5rem" } as React.CSSProperties}>
+      <div className="row spread">
+        <p className="t-eyebrow">{w.advice.eyebrow}</p>
+        <LanguageSwitch lang={lang} onChange={setLang} />
+      </div>
+      <h1 className="t-large">{view.product}</h1>
+    </div>
+  );
 
   if (view.status !== "approved") {
-    const message = {
-      reviewing: "Your answers are in, and the institution's rules have been applied. Your adviser is checking the result; it appears here as soon as they confirm it.",
-      rejected: "Your adviser is preparing new advice for you.",
-      none: "There is no advice for you here yet.",
-    }[view.status];
     return (
-      <main className="page page--narrow">
-        <p className="t-eyebrow">Your advice</p>
-        <h1 className="t-large" style={{ marginTop: "0.5rem" }}>
-          {view.product}
-        </h1>
+      <main className="page page--narrow" lang={pageLang}>
+        {header}
         <div className="card stack" style={{ "--stack-gap": "0.5rem", marginTop: "2rem" } as React.CSSProperties}>
-          <p className="t-body">{message}</p>
-          {view.status === "reviewing" && view.profile && vulnerability(view.profile).length > 0 && (
-            <p className="t-callout">Your adviser will speak with you before confirming it, to make sure it is explained properly.</p>
-          )}
-          {view.status === "reviewing" && <Waiting />}
+          <p className="t-body">{w.advice[view.status]}</p>
+          {view.status === "reviewing" && view.profile && vulnerability(view.profile).length > 0 && <p className="t-callout">{w.advice.vulnerable}</p>}
+          {view.status === "reviewing" && <Waiting text={w.advice.waiting} />}
         </div>
-        {view.profile && <YourAnswers profile={view.profile} open />}
+        {view.profile && <YourAnswers profile={view.profile} lang={lang} open />}
       </main>
     );
   }
 
-  const { advice, explanation, product } = view;
+  const { advice, explanation } = view;
   const text = explanation?.depths[depth];
   const passage = (ref: string) => text?.passages.find((p) => p.ref === ref)?.text ?? null;
   // When the adviser approved it, as the log recorded it: the decision event's own time.
   const decidedAt = events.find((e) => e.seq === advice.decision!.decidedAtSeq)?.at ?? null;
+  const source = (citation: Citation, label: string) => (
+    <div>
+      <button type="button" className="chip chip--link" onClick={() => setCiting({ citation, label })}>
+        {w.advice.source(citation.document_id, citation.page)}
+      </button>
+    </div>
+  );
 
   return (
-    <main className="page page--narrow">
-      <div className="stack" style={{ "--stack-gap": "0.5rem" } as React.CSSProperties}>
-        <p className="t-eyebrow">Your advice</p>
-        <h1 className="t-large">{product}</h1>
-      </div>
+    <main className="page page--narrow" lang={pageLang}>
+      {header}
 
       <section className={`card verdict-hero verdict-hero--${advice.verdict}`} aria-labelledby="verdict" style={{ marginTop: "1.75rem" }}>
         <p id="verdict" className="t-title">
-          {HEADLINE[advice.verdict]}
+          {w.verdict[advice.verdict]}
         </p>
-        {text && <p className="t-body" style={{ marginTop: "0.625rem" }}>{text.summary}</p>}
+        {text && (
+          <p className="t-body" style={{ marginTop: "0.625rem" }}>
+            {text.summary}
+          </p>
+        )}
       </section>
 
       <div className="row spread" style={{ margin: "2rem 0 1rem" }}>
-        <h2 className="t-title">Why</h2>
+        <h2 className="t-title">{w.advice.why}</h2>
         {explanation && (
           <Segmented<KnowledgeLevel>
-            label="How much detail"
+            label={w.advice.detail}
             value={depth}
-            options={(["novice", "informed", "expert"] as const).map((d) => ({ value: d, label: DEPTH[d] }))}
+            options={(["novice", "informed", "expert"] as const).map((d) => ({ value: d, label: w.depth[d] }))}
             onChange={(next) => {
               setDepth(next);
               if (sharing) void recordReading(caseId, clientId, advice.adviceId, next).then(() => setShared((n) => n + 1)).catch(() => {});
@@ -84,30 +98,22 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
 
       <ol className="list-plain stack" style={{ "--stack-gap": "0.75rem" } as React.CSSProperties}>
         {advice.reasons.map((reason, i) => {
-          const rule = ruleById(reason.rule);
+          const title = w.rule[reason.rule];
           const words = passage(`r${i}`);
           return (
             <li key={i} className="card stack" style={{ "--stack-gap": "0.5rem" } as React.CSSProperties}>
               <div className="row" style={{ "--row-gap": "0.5rem" } as React.CSSProperties}>
                 <span className={`badge badge--strong badge--${EFFECT[reason.effect].tone}`}>
                   <span className="dot" />
-                  {EFFECT[reason.effect].label}
+                  {w.effect[reason.effect]}
                 </span>
-                <span className="t-callout strong">{rule.title}</span>
+                <span className="t-callout strong">{title}</span>
               </div>
               {/* The words change with the depth; the evidence under them does not. */}
               <p key={depth} className="t-body materialize" style={{ "--origin": "top center" } as React.CSSProperties}>
-                {words ?? rule.text}
+                {words ?? (lang === "en" ? ruleById(reason.rule).text : title)}
               </p>
-              {reason.citation ? (
-                <div>
-                  <button type="button" className="chip chip--link" onClick={() => setCiting({ citation: reason.citation!, label: rule.title })}>
-                    Where this comes from · {reason.citation.document_id} page {reason.citation.page}
-                  </button>
-                </div>
-              ) : (
-                <p className="t-footnote muted">Nothing in the product&apos;s documents speaks to this.</p>
-              )}
+              {reason.citation ? source(reason.citation, title) : <p className="t-footnote muted">{w.advice.noSource}</p>}
             </li>
           );
         })}
@@ -116,16 +122,12 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
       {advice.disclosures.length > 0 && (
         <section aria-labelledby="know" className="card notice--caution stack" style={{ "--stack-gap": "0.625rem", marginTop: "1.5rem" } as React.CSSProperties}>
           <h2 id="know" className="t-title" style={{ color: "var(--label)" }}>
-            Things you should know
+            {w.advice.know}
           </h2>
           {advice.disclosures.map((d, i) => (
             <div key={d.finding_id} className="stack" style={{ "--stack-gap": "0.375rem", color: "var(--label)" } as React.CSSProperties}>
               <p className="t-body">{passage(`d${i}`) ?? d.citation.quote}</p>
-              <div>
-                <button type="button" className="chip chip--link" onClick={() => setCiting({ citation: d.citation, label: "Things you should know" })}>
-                  Where this comes from · {d.citation.document_id} page {d.citation.page}
-                </button>
-              </div>
+              {source(d.citation, w.advice.knowSource)}
             </div>
           ))}
         </section>
@@ -134,13 +136,13 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
       {advice.alternatives && advice.alternatives.length > 0 && (
         <section aria-labelledby="fits" className="card stack" style={{ "--stack-gap": "0.5rem", marginTop: "1.5rem" } as React.CSSProperties}>
           <p id="fits" className="t-eyebrow">
-            {advice.alternatives.length === 1 ? "A product that fits you" : "Products that fit you"}
+            {w.advice.fits(advice.alternatives.length)}
           </p>
           {advice.alternatives.map((alt) => (
             <div key={alt.case_id}>
               <h3 className="t-title">{alt.product_name}</h3>
               <p className="t-callout muted" style={{ marginTop: "0.25rem" }}>
-                Checked by the same rules, it suits you on every one. Ask your adviser about it.
+                {w.advice.fitsBody}
               </p>
             </div>
           ))}
@@ -148,29 +150,25 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
       )}
       {advice.alternatives && advice.alternatives.length === 0 && advice.verdict === "not_suitable" && (
         <p className="t-callout muted" style={{ marginTop: "1.5rem" }}>
-          Nothing else your adviser has checked fits you either. They will talk you through what to do next.
+          {w.advice.noneFit}
         </p>
       )}
 
-      <YourAnswers profile={view.profile} />
+      <YourAnswers profile={view.profile} lang={lang} />
 
       {explanation && (
         <label className="switch" style={{ marginTop: "2rem" }}>
           <input type="checkbox" checked={sharing} onChange={(e) => setSharing(e.target.checked)} />
           <span className="t-footnote">
-            Let my adviser see which level of detail I choose, so they can explain things my way.
-            {sharing && <span className="muted"> {shared > 0 ? `Shared ${shared} ${shared === 1 ? "choice" : "choices"}.` : "Nothing shared yet."}</span>}
+            {w.advice.share}
+            {sharing && <span className="muted"> {w.advice.shared(shared)}</span>}
           </span>
         </label>
       )}
 
       <footer className="t-footnote muted stack" style={{ "--stack-gap": "0.25rem", marginTop: "2.5rem" } as React.CSSProperties}>
-        <p>
-          Approved by your adviser ({ANALYST_ACTOR})
-          {decidedAt ? ` on ${when(decidedAt, "date")}` : ""}. Drafted by the
-          institution&apos;s rules, {advice.rules_version}.
-        </p>
-        <p className="faint">The product, its issuer and this client are fabricated for a demonstration. Nothing here is an offer.</p>
+        <p>{w.advice.approved(ANALYST_ACTOR, decidedAt ? dateIn(lang, decidedAt) : null, advice.rules_version)}</p>
+        <p className="faint">{w.advice.fabricated}</p>
       </footer>
 
       {citing && <CitationSheet events={events} citation={citing.citation} label={citing.label} onClose={() => setCiting(null)} />}
@@ -180,7 +178,7 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
 
 // While the adviser checks: the page reads itself again every few seconds, so the advice appears without
 // the client having to do anything, and says that it is doing so.
-function Waiting() {
+function Waiting({ text }: { text: string }) {
   const router = useRouter();
   useEffect(() => {
     const timer = window.setInterval(() => router.refresh(), 10_000);
@@ -191,40 +189,30 @@ function Waiting() {
       <span className="step__index step__index--doing" aria-hidden>
         …
       </span>
-      Waiting for your adviser. This page updates by itself.
+      {text}
     </p>
   );
 }
 
 // What the client told us, in their words back to them: the advice rests on these answers, so they can
 // check them.
-function YourAnswers({ profile, open = false }: { profile: ClientProfile; open?: boolean }) {
+function YourAnswers({ profile, lang, open = false }: { profile: ClientProfile; lang: Lang; open?: boolean }) {
+  const w = WORDS[lang].answers;
   const fields = ["goal", "horizon_years", "risk_level", "knowledge", "relies_on_income", "may_need_cash_at_short_notice", "aged_65_or_over", "exclusions"] as const;
   return (
     <details className="card" open={open} style={{ marginTop: "1.5rem" }}>
-      <summary>What you told us</summary>
+      <summary>{w.title}</summary>
       <dl className="facts" style={{ marginTop: "0.75rem" }}>
         {fields.map((field) => (
           <div key={field}>
-            <dt>{FIELD[field]}</dt>
-            <dd>{answerText(profile, field)}</dd>
+            <dt>{w.field[field]}</dt>
+            <dd>{answerIn(lang, profile, field)}</dd>
           </div>
         ))}
       </dl>
       <p className="t-caption faint" style={{ marginTop: "0.75rem" }}>
-        Something wrong? Tell your adviser: new answers set this advice aside and the rules are applied again.
+        {w.note}
       </p>
     </details>
   );
 }
-
-const FIELD = {
-  goal: "The money is for",
-  horizon_years: "You can leave it invested",
-  risk_level: "Your attitude to risk",
-  knowledge: "Your investing knowledge",
-  relies_on_income: "Income",
-  may_need_cash_at_short_notice: "Access to your money",
-  exclusions: "You will not invest in",
-  aged_65_or_over: "Your age",
-} as const;

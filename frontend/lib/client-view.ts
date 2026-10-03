@@ -5,9 +5,7 @@ import {
   type Explanation,
   explanationFor,
   fold,
-  type KnowledgeLevel,
   type SlimEvent,
-  type Verdict,
 } from "@qryvox/shared";
 import { productName } from "./case";
 
@@ -30,13 +28,3 @@ export function clientView(events: readonly SlimEvent[], clientId: string): Clie
   if (!inPlay) return { status: "none", profile, product };
   return { status: inPlay.decision?.decision === "rejected" ? "rejected" : "reviewing", profile, product };
 }
-
-// The verdict as a sentence to the client, not a label.
-export const HEADLINE: Record<Verdict, string> = {
-  suitable: "This product suits you.",
-  conditional: "This product may suit you, once your adviser confirms one thing.",
-  not_suitable: "This product does not suit you.",
-};
-
-// The three depths, named for the reader rather than for their expertise.
-export const DEPTH: Record<KnowledgeLevel, string> = { novice: "Simple", informed: "Detailed", expert: "In full" };

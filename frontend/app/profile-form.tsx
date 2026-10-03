@@ -3,6 +3,7 @@
 import { type ReactNode, useState } from "react";
 import { type ClientGoal, type ClientProfile, Exclusion, type KnowledgeLevel } from "@qryvox/shared";
 import { answersFor, EXCLUSION, GOAL, KNOWLEDGE, RISK_QUESTIONS, riskLevelFrom } from "../lib/advice";
+import { type Lang, WORDS as CLIENT } from "../lib/i18n";
 import { Field, Segmented, Stepper } from "./ui";
 
 // The questionnaire's form, in one of two voices: the adviser's, asking about "the client", or the
@@ -11,8 +12,8 @@ import { Field, Segmented, Stepper } from "./ui";
 
 export type Voice = "adviser" | "client";
 
-const WORDS = {
-  adviser: {
+// The adviser's voice is English; the client's comes from lib/i18n.ts in their language (#43).
+const ADVISER = {
     goal: "What is the money for?",
     horizon: "How long can it stay invested?",
     risk: "Attitude to risk",
@@ -24,25 +25,38 @@ const WORDS = {
     cash: "May need the money at short notice",
     age: "Aged 65 or over",
     exclusions: "Will not invest in",
-  },
-  client: {
-    goal: "What is this money for?",
-    horizon: "How long can you leave it invested?",
-    risk: "How you feel about losses",
-    riskHint: "Three quick questions. There are no wrong answers.",
-    knowledge: "How much do you know about investing?",
-    knowledgeHint: "Your advice will be explained at this level. You can change it when you read it.",
-    circumstances: "Your situation",
-    income: "I rely on the income it pays",
-    cash: "I may need the money at short notice",
-    age: "I am 65 or over",
-    exclusions: "I will not invest in",
-  },
 } as const;
+
+function words(voice: Voice, lang: Lang) {
+  if (voice === "adviser") {
+    return {
+      ...ADVISER,
+      goalLabel: GOAL,
+      knowledgeLabel: KNOWLEDGE,
+      exclusionLabel: EXCLUSION,
+      years: (n: number) => `${n} ${n === 1 ? "year" : "years"}`,
+      questions: RISK_QUESTIONS.map((q) => ({ question: q.question.adviser, options: q.options })),
+      unanswered: "Answer all three to set the level.",
+      result: (n: number) => `These answers give risk level ${n} of 5.`,
+    };
+  }
+  const c = CLIENT[lang];
+  return {
+    ...c.form,
+    goalLabel: c.goal,
+    knowledgeLabel: c.knowledge,
+    exclusionLabel: c.exclusion,
+    years: c.years,
+    questions: c.form.riskQuestions,
+    unanswered: c.form.riskUnanswered,
+    result: c.form.riskResult,
+  };
+}
 
 export default function ProfileForm({
   initial,
   voice,
+  lang = "en",
   before,
   submitLabel,
   busyLabel,
@@ -51,6 +65,7 @@ export default function ProfileForm({
 }: {
   initial: ClientProfile;
   voice: Voice;
+  lang?: Lang;
   // Anything above the questions, such as the adviser's persona chips; handed the setter so it can fill them.
   before?: (load: (profile: ClientProfile) => void, current: ClientProfile) => ReactNode;
   submitLabel: string;
@@ -58,7 +73,7 @@ export default function ProfileForm({
   onSubmit: (profile: ClientProfile) => Promise<void>;
   onLoaded?: () => void;
 }) {
-  const w = WORDS[voice];
+  const w = words(voice, lang);
   const [profile, setProfile] = useState<ClientProfile>(initial);
   const [answers, setAnswers] = useState<(number | null)[]>(voice === "client" ? RISK_QUESTIONS.map(() => null) : answersFor(initial.risk_level));
   const [busy, setBusy] = useState(false);
@@ -92,7 +107,7 @@ export default function ProfileForm({
         <Segmented<ClientGoal>
           label="Goal"
           value={profile.goal}
-          options={(["income", "growth", "preservation"] as const).map((g) => ({ value: g, label: GOAL[g] }))}
+          options={(["income", "growth", "preservation"] as const).map((g) => ({ value: g, label: w.goalLabel[g] }))}
           onChange={(g) => set("goal", g)}
         />
       </Field>
@@ -103,7 +118,7 @@ export default function ProfileForm({
           value={profile.horizon_years}
           min={1}
           max={40}
-          unit={(n) => `${n} ${n === 1 ? "year" : "years"}`}
+          unit={w.years}
           presets={[1, 2, 5, 10]}
           onChange={(n) => set("horizon_years", n)}
         />
@@ -111,9 +126,9 @@ export default function ProfileForm({
 
       <Field label={w.risk} hint={w.riskHint}>
         <div className="stack" style={{ "--stack-gap": "0.875rem" } as React.CSSProperties}>
-          {RISK_QUESTIONS.map((q, qi) => (
-            <div key={q.id} role="group" aria-label={q.question[voice]} className="stack" style={{ "--stack-gap": "0.375rem" } as React.CSSProperties}>
-              <p className="t-callout">{q.question[voice]}</p>
+          {w.questions.map((q, qi) => (
+            <div key={qi} role="group" aria-label={q.question} className="stack" style={{ "--stack-gap": "0.375rem" } as React.CSSProperties}>
+              <p className="t-callout">{q.question}</p>
               <div className="choices">
                 {q.options.map((option, oi) => (
                   <button
@@ -131,11 +146,9 @@ export default function ProfileForm({
           ))}
           <p className="t-callout" aria-live="polite">
             {level === null ? (
-              <span className="muted">Answer all three to set the level.</span>
+              <span className="muted">{w.unanswered}</span>
             ) : (
-              <>
-                {voice === "client" ? "Your answers give" : "These answers give"} <strong>risk level {level} of 5</strong>.
-              </>
+              <strong>{w.result(level)}</strong>
             )}
           </p>
         </div>
@@ -145,7 +158,7 @@ export default function ProfileForm({
         <Segmented<KnowledgeLevel>
           label="Knowledge"
           value={profile.knowledge}
-          options={(["novice", "informed", "expert"] as const).map((k) => ({ value: k, label: KNOWLEDGE[k] }))}
+          options={(["novice", "informed", "expert"] as const).map((k) => ({ value: k, label: w.knowledgeLabel[k] }))}
           onChange={(k) => set("knowledge", k)}
         />
       </Field>
@@ -177,7 +190,7 @@ export default function ProfileForm({
               aria-pressed={profile.exclusions.includes(e)}
               onClick={() => set("exclusions", profile.exclusions.includes(e) ? profile.exclusions.filter((x) => x !== e) : [...profile.exclusions, e])}
             >
-              {EXCLUSION[e]}
+              {w.exclusionLabel[e]}
             </button>
           ))}
         </div>
