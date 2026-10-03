@@ -145,6 +145,14 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
             : a,
         ),
       };
+    case "client.read":
+      return {
+        ...next,
+        readings: [
+          ...state.readings,
+          { clientId: event.payload.client_id, adviceId: event.payload.advice_id, depth: event.payload.depth, atSeq: event.seq },
+        ],
+      };
     case "step.completed":
     case "step.failed": {
       const completed = event.type === "step.completed";

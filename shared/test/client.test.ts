@@ -7,6 +7,7 @@ import {
   approvedAdviceFor,
   ClientProfile,
   fold,
+  knowledgeSuggestion,
   ProductAttributes,
   productRiskLevel,
   type Reason,
@@ -233,5 +234,33 @@ describe("adviceToRedraft", () => {
       { type: "advice.drafted", payload: draft(profiledAt), event_id: "00000000-0000-4000-8000-0000000000ab" },
     ));
     expect(adviceToRedraft(redrafted)).toEqual([]);
+  });
+});
+
+describe("readings and the knowledge suggestion (#38)", () => {
+  const read = (depth: "novice" | "informed" | "expert") => ({ type: "client.read", payload: { client_id: "persona-chan", advice_id: ADVICE_ID, depth } });
+
+  it("suggests nothing until the client has chosen another depth three times in a row", () => {
+    const two = fold(after({ type: "client.profiled", payload: chan }, read("informed"), read("informed")));
+    expect(knowledgeSuggestion(two, "persona-chan")).toBeNull();
+
+    const three = fold(after({ type: "client.profiled", payload: chan }, read("informed"), read("informed"), read("informed")));
+    expect(knowledgeSuggestion(three, "persona-chan")).toEqual({ depth: "informed", count: 3 });
+  });
+
+  it("suggests nothing when the choices are the level the answers give, or not consistent", () => {
+    expect(knowledgeSuggestion(fold(after({ type: "client.profiled", payload: chan }, read("novice"), read("novice"), read("novice"))), "persona-chan")).toBeNull();
+    expect(knowledgeSuggestion(fold(after({ type: "client.profiled", payload: chan }, read("informed"), read("expert"), read("informed"))), "persona-chan")).toBeNull();
+  });
+
+  it("starts counting again once new answers are recorded", () => {
+    const state = fold(after(
+      { type: "client.profiled", payload: chan },
+      read("informed"),
+      read("informed"),
+      read("informed"),
+      { type: "client.profiled", payload: { ...chan, knowledge: "informed" } },
+    ));
+    expect(knowledgeSuggestion(state, "persona-chan")).toBeNull();
   });
 });

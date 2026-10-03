@@ -1,5 +1,5 @@
 import type { Advice, AdviceDecision, SupersedeCause } from "./advice.js";
-import type { ClientProfile } from "./client.js";
+import type { ClientProfile, KnowledgeLevel } from "./client.js";
 import type { DocumentKind, StepName } from "./events.js";
 import type { Disposition, Finding } from "./finding.js";
 
@@ -80,6 +80,8 @@ export type CaseState = {
   // Stage 2: each client's latest profile, in the order first profiled, and every advice ever drafted.
   clients: CaseClient[];
   advice: CaseAdvice[];
+  // Depths clients chose to read at, where they shared it (#38), in order.
+  readings: { clientId: string; adviceId: string; depth: KnowledgeLevel; atSeq: number }[];
   // Highest seq folded so far; 0 means no events.
   lastSeq: number;
 };
@@ -94,6 +96,7 @@ export function emptyCaseState(): CaseState {
     dispositions: [],
     clients: [],
     advice: [],
+    readings: [],
     lastSeq: 0,
   };
 }
@@ -134,4 +137,25 @@ export function adviceToRedraft(state: CaseState): { clientId: string; cause: Su
     const last = theirs.at(-1)!;
     return [{ clientId: client.clientId, cause: last.supersededBecause!, supersededAtSeq: last.supersededAtSeq! }];
   });
+}
+
+// Three choices in a row of the same depth, other than the level the client's answers give, since those
+// answers were last recorded: enough to suggest the adviser asks again. A suggestion only; nothing changes
+// a profile but a new version the adviser records (#38).
+export const READING_THRESHOLD = 3;
+
+export function knowledgeSuggestion(state: CaseState, clientId: string): { depth: KnowledgeLevel; count: number } | null {
+  const client = state.clients.find((c) => c.clientId === clientId);
+  if (!client) return null;
+  const since = state.readings.filter((r) => r.clientId === clientId && r.atSeq > client.profiledAtSeq);
+  const recent = since.slice(-READING_THRESHOLD);
+  const depth = recent[0]?.depth;
+  if (recent.length < READING_THRESHOLD || depth === undefined || depth === client.profile.knowledge) return null;
+  if (!recent.every((r) => r.depth === depth)) return null;
+  let count = 0;
+  for (const r of [...since].reverse()) {
+    if (r.depth !== depth) break;
+    count += 1;
+  }
+  return { depth, count };
 }

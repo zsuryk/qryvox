@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { Advice, AdviceDecision, SupersedeCause } from "./advice.js";
-import { ClientProfile } from "./client.js";
+import { ClientProfile, KnowledgeLevel } from "./client.js";
 import { Disposition, Finding } from "./finding.js";
 
 // Envelope fields carried by every event, named as in ADR-0002.
@@ -179,6 +179,16 @@ export const AdviceDecided = z.object({
   payload: z.object({ advice_id: z.uuid(), decision: AdviceDecision }),
 });
 
+// The depth a client chose to read their advice at (#38). Recorded only once the client has switched on
+// sharing it with their adviser, on their own page; pseudonymous like every client event. It informs a
+// suggestion to the adviser and changes nothing by itself.
+export const ClientRead = z.object({
+  ...envelope,
+  type: z.literal("client.read"),
+  v: z.literal(1),
+  payload: z.object({ client_id: z.string().min(1), advice_id: z.uuid(), depth: KnowledgeLevel }),
+});
+
 // Full events: what the hash covers and what the per-event payload endpoint returns.
 export const Event = z.discriminatedUnion("type", [
   CaseOpened,
@@ -193,6 +203,7 @@ export const Event = z.discriminatedUnion("type", [
   AdviceDrafted,
   AdviceSuperseded,
   AdviceDecided,
+  ClientRead,
 ]);
 export type Event = z.infer<typeof Event>;
 
@@ -211,6 +222,7 @@ export const SlimEvent = z.discriminatedUnion("type", [
   AdviceDrafted,
   AdviceSuperseded,
   AdviceDecided,
+  ClientRead,
 ]);
 export type SlimEvent = z.infer<typeof SlimEvent>;
 
