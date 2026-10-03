@@ -34,7 +34,9 @@ export type ChangeDispositionRequest = z.infer<typeof ChangeDispositionRequest>;
 
 // POST /cases/:caseId/clients — a new version of a client's profile. Advice drafted on the previous
 // version is superseded in the same transaction.
-export const RecordProfileRequest = z.object({ event_id: z.uuid(), profile: ClientProfile });
+// by_client: the client gave these answers themselves, on their own page, rather than an adviser
+// recording them; the event's actor is then the client's pseudonymous id.
+export const RecordProfileRequest = z.object({ event_id: z.uuid(), profile: ClientProfile, by_client: z.boolean().optional() });
 export type RecordProfileRequest = z.infer<typeof RecordProfileRequest>;
 
 // POST /cases/:caseId/clients/:clientId/readings — the depth a client chose, shared by them (#38).
