@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ProfileField } from "./client.js";
+import { KnowledgeLevel, ProfileField } from "./client.js";
 import { Citation } from "./finding.js";
 import { SuitabilityRuleId } from "./rules.js";
 
@@ -76,3 +76,25 @@ export function verdictFor(reasons: readonly Reason[]): Verdict {
   if (reasons.some((r) => r.effect === "conditional")) return "conditional";
   return "suitable";
 }
+
+// --- Explanation (the explain step, #30) ---
+
+// What a passage explains: "r<i>" is reasons[i], "d<i>" is disclosures[i] of the advice.
+export const ExplanationRef = z.string().regex(/^[rd]\d+$/);
+export type ExplanationRef = z.infer<typeof ExplanationRef>;
+
+export const ExplanationPassage = z.object({ ref: ExplanationRef, text: z.string().min(1) });
+export type ExplanationPassage = z.infer<typeof ExplanationPassage>;
+
+// The advice in words at one depth: a summary of the verdict, then one passage per reason and per
+// disclosure. It restates what the advice already holds and nothing else (the explain step checks).
+export const ExplanationDepth = z.object({ summary: z.string().min(1), passages: z.array(ExplanationPassage) });
+export type ExplanationDepth = z.infer<typeof ExplanationDepth>;
+
+// The explain step's output: all three depths in one run, so the client page switches depth without
+// another model call.
+export const Explanation = z.object({
+  advice_id: z.uuid(),
+  depths: z.object({ novice: ExplanationDepth, informed: ExplanationDepth, expert: ExplanationDepth }),
+}) satisfies z.ZodType<{ depths: Record<KnowledgeLevel, ExplanationDepth> }>;
+export type Explanation = z.infer<typeof Explanation>;

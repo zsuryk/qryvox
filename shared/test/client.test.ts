@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   activeAdvice,
   Advice,
+  explanationFor,
   approvedAdviceFor,
   ClientProfile,
   fold,
@@ -162,5 +163,36 @@ describe("fold: clients and advice", () => {
     expect(approvedAdviceFor(superseded, "persona-chan")).toEqual([]);
     // Out of the client's view, still in the log with its decision.
     expect(superseded.advice[0]).toMatchObject({ supersededBecause: "profile_changed", decision: { decision: "approved" } });
+  });
+});
+
+describe("explanationFor", () => {
+  const depth = { summary: "It does not fit.", passages: [{ ref: "r0", text: "Too short a horizon." }] };
+  const explained = (seq: number, runId: string, summary: string) =>
+    SlimEvent.parse({
+      seq,
+      event_id: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
+      case_id: caseId,
+      actor: "demo-analyst",
+      at: "2026-10-03T12:00:00.000Z",
+      step_run_id: runId,
+      type: "step.completed",
+      v: 1,
+      payload: {
+        step: "explain",
+        model: "fake-model",
+        prompt_version: "explain@1",
+        input_run_id: ADVICE_ID,
+        output: { advice_id: ADVICE_ID, depths: { novice: { ...depth, summary }, informed: depth, expert: depth } },
+      },
+    });
+
+  it("is null before any explain run, and the latest run's output after", () => {
+    expect(explanationFor(events, ADVICE_ID)).toBeNull();
+    const n = events.length;
+    const later = [...events, explained(n + 1, "run-1", "First."), explained(n + 2, "run-2", "Second.")];
+
+    expect(explanationFor(later, ADVICE_ID)?.depths.novice.summary).toBe("Second.");
+    expect(explanationFor(later, "00000000-0000-4000-8000-0000000000bb")).toBeNull();
   });
 });

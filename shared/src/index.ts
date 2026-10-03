@@ -3,6 +3,10 @@ export {
   Advice,
   AdviceDecision,
   Disclosure,
+  Explanation,
+  ExplanationDepth,
+  ExplanationPassage,
+  ExplanationRef,
   Reason,
   ReasonEffect,
   SupersedeCause,
@@ -63,6 +67,7 @@ export {
   StepName,
   StepStarted,
 } from "./events.js";
+export { explanationFor } from "./explanation.js";
 export { fold, FoldError } from "./fold.js";
 export { type Assessment, assessSuitability } from "./suitability.js";
 export {
