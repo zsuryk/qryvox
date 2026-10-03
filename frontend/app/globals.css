@@ -1041,3 +1041,24 @@ details[open] > summary::before {
 .verdict-hero--not_suitable {
   border-left-color: var(--negative);
 }
+
+/* --- Eval tiles ----------------------------------------------------------------------------------- */
+
+.tiles {
+  display: grid;
+  gap: 0.875rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.tile__value {
+  font-size: 2.5rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 0.25rem 0;
+}

@@ -7,6 +7,7 @@ import { errorMessage } from "../lib/errors";
 import { type AttemptFailure, type PipelineAction, type PipelineDeps, runAction } from "../lib/pipeline";
 import Board from "./board";
 import DispositionConsole from "./disposition";
+import { FindingsEval } from "./eval-tiles";
 import Pipeline from "./pipeline";
 
 // The case surface, as the client owns it: the run at the top, the board the run fills beneath it, the
@@ -84,6 +85,7 @@ export default function CaseView({ events, caseId, refetch }: CaseViewProps) {
       <Pipeline log={log} running={running} busy={busy} failure={failure} onAction={(action) => void drive(action)} />
       <Board events={log} />
       <DispositionConsole caseId={caseId} events={log} refetch={refetch} />
+      <FindingsEval events={log} />
     </>
   );
 }

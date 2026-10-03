@@ -19,6 +19,7 @@ import {
 import { decideAdvice, draftAdvice, fetchEvents, recordProfile, runStep } from "../lib/api";
 import { errorMessage } from "../lib/errors";
 import CitationSheet from "./citation-sheet";
+import { AdviceEval } from "./eval-tiles";
 import Questionnaire from "./questionnaire";
 
 // The Advice section: the product as read, and each client with the advice the rules drafted for them,
@@ -183,6 +184,8 @@ export default function AdviceSection({ caseId, events, refetch }: { caseId: str
           {busy ? `${busy.label}…` : said?.text}
         </p>
       </section>
+
+      <AdviceEval events={log} />
 
       {asking && (
         <Questionnaire initial={asking.profile} editing={asking.editing} onSave={save} onClose={() => setAsking(null)} />
