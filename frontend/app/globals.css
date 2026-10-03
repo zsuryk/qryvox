@@ -1,0 +1,929 @@
+/*
+ * Qryvox's one stylesheet. The design language, after Apple's: calm and confident, because this is a
+ * regulated review — restraint over flourish, words before colour, motion that is critically damped
+ * (no overshoot) everywhere except the one thing a person flicks, the replay scrubber.
+ *
+ * Everything is a token first, so light, dark, reduced transparency and increased contrast are each a
+ * handful of overrides rather than a second stylesheet. Colour never carries meaning alone: every status
+ * has its word beside it, and the token names say what a colour is for, not what it looks like.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* Surfaces, back to front. */
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-sunken: #f2f2f5;
+  --fill: rgba(120, 120, 128, 0.12);
+  --fill-strong: rgba(120, 120, 128, 0.2);
+  --separator: rgba(60, 60, 67, 0.14);
+
+  /* Text, by emphasis. */
+  --label: #1d1d1f;
+  --label-2: #5e5e64;
+  --label-3: #86868b;
+
+  /* Meaning. Each has its word wherever it appears. */
+  --tint: #0066cc;
+  --tint-fill: rgba(0, 102, 204, 0.1);
+  --positive: #1d7a3a;
+  --positive-fill: rgba(29, 122, 58, 0.1);
+  --caution: #a35200;
+  --caution-fill: rgba(163, 82, 0, 0.1);
+  --negative: #c4122f;
+  --negative-fill: rgba(196, 18, 47, 0.09);
+  --mark: #fde68a;
+
+  /* Materials: the translucent layer that floats over content, and how far things sit off the page. */
+  --material: rgba(245, 245, 247, 0.72);
+  --material-blur: saturate(180%) blur(20px);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.08);
+  --scrim: rgba(0, 0, 0, 0.32);
+
+  /* Shape and rhythm, in rem so the layout grows with the reader's text size. */
+  --radius-s: 0.5rem;
+  --radius-m: 0.875rem;
+  --radius-l: 1.25rem;
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+  --measure: 72rem;
+
+  /* Motion. Critically damped by default: a quick settle, no overshoot. The spring curve is an
+     approximation of damping 1.0 / response 0.35 for transitions that are not gesture-driven. */
+  --ease-settle: cubic-bezier(0.25, 1, 0.5, 1);
+  --dur-press: 100ms;
+  --dur-ui: 320ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #1c1c1e;
+    --surface-sunken: #111113;
+    --fill: rgba(120, 120, 128, 0.24);
+    --fill-strong: rgba(120, 120, 128, 0.36);
+    --separator: rgba(84, 84, 88, 0.6);
+    --label: #f5f5f7;
+    --label-2: #aeaeb2;
+    --label-3: #8e8e93;
+    --tint: #3b9bff;
+    --tint-fill: rgba(59, 155, 255, 0.16);
+    --positive: #32d26a;
+    --positive-fill: rgba(50, 210, 106, 0.14);
+    --caution: #ffa53a;
+    --caution-fill: rgba(255, 165, 58, 0.14);
+    --negative: #ff5a52;
+    --negative-fill: rgba(255, 90, 82, 0.14);
+    --mark: #7a5c00;
+    --material: rgba(22, 22, 24, 0.72);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-2: 0 12px 40px rgba(0, 0, 0, 0.6);
+    --scrim: rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* Frosted surfaces become solid for people who asked for less transparency. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --material: var(--bg);
+    --material-blur: none;
+  }
+}
+
+/* More contrast: near-solid fills, and a defined border on everything that floats. */
+@media (prefers-contrast: more) {
+  :root {
+    --label-2: var(--label);
+    --label-3: var(--label-2);
+    --separator: var(--label-3);
+    --fill: rgba(120, 120, 128, 0.3);
+  }
+  .card,
+  .sheet,
+  .header {
+    outline: 1px solid var(--separator);
+  }
+}
+
+/* --- Base --------------------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  font: 100%/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--bg);
+  color: var(--label);
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  color: var(--tint);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+code,
+kbd,
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
+
+/* One visible focus ring, never removed: keyboard users must always see where they are. */
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--tint) 55%, transparent);
+  outline-offset: 2px;
+  border-radius: var(--radius-s);
+}
+
+/* --- Type: tracking and leading change with size, never one value for all ----------------------- */
+
+.t-large {
+  font-size: clamp(1.75rem, 3.2vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  line-height: 1.1;
+  margin: 0;
+}
+.t-title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.016em;
+  line-height: 1.2;
+  margin: 0;
+}
+.t-headline {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  margin: 0;
+}
+.t-body {
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0;
+}
+.t-callout {
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  margin: 0;
+}
+.t-footnote {
+  font-size: 0.8125rem;
+  letter-spacing: 0.004em;
+  line-height: 1.4;
+  margin: 0;
+}
+.t-caption {
+  font-size: 0.75rem;
+  letter-spacing: 0.012em;
+  line-height: 1.35;
+  margin: 0;
+}
+.t-eyebrow {
+  color: var(--label-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+.muted {
+  color: var(--label-2);
+}
+.faint {
+  color: var(--label-3);
+}
+.strong {
+  font-weight: 600;
+}
+.measure {
+  max-width: 68ch;
+}
+.wrap-anywhere {
+  overflow-wrap: anywhere;
+}
+
+/* --- Layout -------------------------------------------------------------------------------------- */
+
+.page {
+  margin: 0 auto;
+  max-width: var(--measure);
+  padding: 1.5rem var(--gutter) 5rem;
+}
+.page--narrow {
+  max-width: 46rem;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stack-gap, 1rem);
+}
+.row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--row-gap, 0.5rem);
+}
+.row--baseline {
+  align-items: baseline;
+}
+.spread {
+  justify-content: space-between;
+}
+.section {
+  margin-top: 2.75rem;
+}
+.section-head {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.875rem;
+  margin-bottom: 1rem;
+}
+.grid-cards {
+  display: grid;
+  gap: 0.875rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.list-plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.split {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+.split > .split-main {
+  flex: 1 1 26rem;
+  min-width: 0;
+}
+.split > .split-side {
+  flex: 0 1 24rem;
+  min-width: min(100%, 20rem);
+}
+
+/* --- The header: a translucent layer content scrolls under ------------------------------------- */
+
+.header {
+  -webkit-backdrop-filter: var(--material-blur);
+  backdrop-filter: var(--material-blur);
+  background: var(--material);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  /* A scroll-edge shadow rather than a hard divider. */
+  box-shadow: 0 0.5px 0 var(--separator);
+}
+.header-inner {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  margin: 0 auto;
+  max-width: var(--measure);
+  min-height: 3.25rem;
+  padding: 0 var(--gutter);
+}
+.wordmark {
+  color: var(--label);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.wordmark:hover {
+  text-decoration: none;
+}
+.nav {
+  display: flex;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+.nav a {
+  border-radius: 999px;
+  color: var(--label-2);
+  font-size: 0.875rem;
+  padding: 0.375rem 0.75rem;
+}
+.nav a:hover {
+  background: var(--fill);
+  color: var(--label);
+  text-decoration: none;
+}
+.nav a[aria-current="page"] {
+  color: var(--label);
+  font-weight: 600;
+}
+
+/* --- Surfaces ------------------------------------------------------------------------------------ */
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow-1);
+  padding: 1rem 1.125rem;
+}
+.card--quiet {
+  background: var(--surface-sunken);
+  box-shadow: none;
+}
+.card--focused {
+  box-shadow: 0 0 0 2px var(--tint), var(--shadow-1);
+}
+.card--dimmed {
+  opacity: 0.62;
+}
+.inset {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-s);
+  padding: 0.75rem 0.875rem;
+}
+.hairline {
+  border: 0;
+  border-top: 0.5px solid var(--separator);
+  margin: 1rem 0;
+}
+
+/* --- Controls: feedback lives on the press, and it is instant ---------------------------------- */
+
+.btn {
+  -webkit-tap-highlight-color: transparent;
+  align-items: center;
+  background: var(--fill);
+  border: 0;
+  border-radius: 999px;
+  color: var(--label);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  gap: 0.375rem;
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
+  transition:
+    transform var(--dur-press) ease-out,
+    background-color var(--dur-ui) var(--ease-settle),
+    opacity var(--dur-ui) var(--ease-settle);
+  user-select: none;
+}
+.btn:hover {
+  background: var(--fill-strong);
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.btn[aria-busy="true"] {
+  cursor: progress;
+}
+.btn--primary {
+  background: var(--tint);
+  color: #ffffff;
+}
+.btn--primary:hover {
+  background: color-mix(in srgb, var(--tint) 88%, #000);
+}
+.btn--positive[aria-pressed="true"] {
+  background: var(--positive);
+  color: #ffffff;
+}
+.btn--negative[aria-pressed="true"] {
+  background: var(--negative);
+  color: #ffffff;
+}
+.btn--caution[aria-pressed="true"] {
+  background: var(--caution);
+  color: #ffffff;
+}
+.btn--small {
+  font-size: 0.8125rem;
+  min-height: 1.75rem;
+  padding: 0.25rem 0.75rem;
+}
+.btn--plain {
+  background: transparent;
+  color: var(--tint);
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+.btn--plain:hover {
+  background: var(--tint-fill);
+}
+
+/* A toggle that is a filter: pressed reads as on. */
+.chip {
+  -webkit-tap-highlight-color: transparent;
+  background: var(--surface);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--separator);
+  color: var(--label-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  padding: 0.3125rem 0.75rem;
+  transition:
+    transform var(--dur-press) ease-out,
+    background-color var(--dur-ui) var(--ease-settle),
+    color var(--dur-ui) var(--ease-settle);
+}
+.chip:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.chip[aria-pressed="true"],
+.chip[aria-expanded="true"] {
+  background: var(--label);
+  box-shadow: none;
+  color: var(--surface);
+}
+.chip--link {
+  color: var(--tint);
+}
+.chip .count {
+  opacity: 0.7;
+  margin-left: 0.25rem;
+}
+
+/* A label that states a fact: never a control. */
+.badge {
+  align-items: center;
+  background: var(--fill);
+  border-radius: 999px;
+  color: var(--label-2);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 500;
+  gap: 0.3125rem;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  padding: 0.1875rem 0.5rem;
+  white-space: nowrap;
+}
+.badge--strong {
+  font-weight: 600;
+}
+.badge--tint {
+  background: var(--tint-fill);
+  color: var(--tint);
+}
+.badge--positive {
+  background: var(--positive-fill);
+  color: var(--positive);
+}
+.badge--caution {
+  background: var(--caution-fill);
+  color: var(--caution);
+}
+.badge--negative {
+  background: var(--negative-fill);
+  color: var(--negative);
+}
+/* A small dot that repeats the word beside it. */
+.dot {
+  background: currentColor;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+  height: 0.4375rem;
+  width: 0.4375rem;
+}
+
+/* The segmented control: one choice of a few, with a thumb that slides to it. */
+.segmented {
+  background: var(--fill);
+  border-radius: 0.6rem;
+  display: inline-grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  padding: 2px;
+  position: relative;
+}
+.segmented__thumb {
+  background: var(--surface);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  inset: 2px auto 2px 2px;
+  position: absolute;
+  transition: transform var(--dur-ui) var(--ease-settle);
+  width: calc((100% - 4px) / var(--segments));
+}
+@media (prefers-color-scheme: dark) {
+  .segmented__thumb {
+    background: #636366;
+  }
+}
+.segmented button,
+.segmented a {
+  background: none;
+  border: 0;
+  border-radius: 0.5rem;
+  color: var(--label);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.375rem 0.875rem;
+  position: relative;
+  text-align: center;
+  white-space: nowrap;
+  z-index: 1;
+}
+.segmented a:hover {
+  text-decoration: none;
+}
+.segmented [aria-pressed="true"],
+.segmented [aria-current="page"] {
+  font-weight: 600;
+}
+
+/* A switch: on and off, said beside it in words. */
+.switch {
+  align-items: center;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 0.625rem;
+}
+.switch input {
+  appearance: none;
+  background: var(--fill-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  flex: none;
+  height: 1.5rem;
+  margin: 0;
+  position: relative;
+  transition: background-color var(--dur-ui) var(--ease-settle);
+  width: 2.5rem;
+}
+.switch input::after {
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  content: "";
+  height: 1.25rem;
+  left: 0.125rem;
+  position: absolute;
+  top: 0.125rem;
+  transition: transform var(--dur-ui) var(--ease-settle);
+  width: 1.25rem;
+}
+.switch input:checked {
+  background: var(--positive);
+}
+.switch input:checked::after {
+  transform: translateX(1rem);
+}
+
+kbd {
+  background: var(--surface);
+  border-radius: 0.3rem;
+  box-shadow: inset 0 -1px 0 var(--separator), 0 0 0 0.5px var(--separator);
+  padding: 0.0625rem 0.375rem;
+}
+
+/* --- Evidence: the quoted passage, readable wherever it appears -------------------------------- */
+
+.quote {
+  border-left: 3px solid var(--separator);
+  margin: 0.75rem 0 0;
+  padding-left: 0.75rem;
+}
+.quote blockquote {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.quote figcaption {
+  margin-top: 0.375rem;
+}
+.quote--cited {
+  border-left-color: var(--tint);
+}
+mark {
+  background: var(--mark);
+  border-radius: 0.2rem;
+  color: inherit;
+  padding: 0 0.125rem;
+}
+
+details > summary {
+  color: var(--label-2);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  list-style: none;
+  user-select: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+details > summary::before {
+  content: "›";
+  display: inline-block;
+  margin-right: 0.375rem;
+  transition: transform var(--dur-ui) var(--ease-settle);
+}
+details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+/* --- Status rows, notices ------------------------------------------------------------------------ */
+
+.notice {
+  border-radius: var(--radius-m);
+  padding: 0.875rem 1rem;
+}
+.notice--negative {
+  background: var(--negative-fill);
+  color: var(--negative);
+}
+.notice--caution {
+  background: var(--caution-fill);
+  color: var(--caution);
+}
+.notice--positive {
+  background: var(--positive-fill);
+  color: var(--positive);
+}
+.notice--tint {
+  background: var(--tint-fill);
+}
+
+.text-positive {
+  color: var(--positive);
+}
+.text-caution {
+  color: var(--caution);
+}
+.text-negative {
+  color: var(--negative);
+}
+.text-tint {
+  color: var(--tint);
+}
+
+/* Tables for the record: quiet, dense, aligned. */
+.table {
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  width: 100%;
+}
+.table th {
+  color: var(--label-2);
+  font-weight: 600;
+  text-align: left;
+}
+.table th,
+.table td {
+  border-bottom: 0.5px solid var(--separator);
+  padding: 0.5rem 0.625rem;
+  vertical-align: top;
+}
+.table .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.table pre {
+  font-size: 0.75rem;
+  margin: 0;
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+/* --- The sheet: a modal that rises from below, over a dimmed page ------------------------------ */
+
+.scrim {
+  animation: fade-in var(--dur-ui) var(--ease-settle);
+  background: var(--scrim);
+  inset: 0;
+  position: fixed;
+  z-index: 40;
+}
+.sheet {
+  animation: rise var(--dur-ui) var(--ease-settle);
+  background: var(--surface);
+  border-radius: var(--radius-l) var(--radius-l) 0 0;
+  bottom: 0;
+  box-shadow: var(--shadow-2);
+  left: 50%;
+  max-height: 88vh;
+  overflow: auto;
+  padding: 0.75rem 1.25rem 1.5rem;
+  position: fixed;
+  transform: translateX(-50%);
+  width: min(44rem, 100%);
+  z-index: 41;
+}
+.sheet__grabber {
+  background: var(--fill-strong);
+  border-radius: 999px;
+  height: 0.3125rem;
+  margin: 0 auto 0.75rem;
+  width: 2.25rem;
+}
+@keyframes rise {
+  from {
+    transform: translate(-50%, 100%);
+  }
+  to {
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* A surface that arrives: it materialises from where it was asked for, rather than just fading. */
+.materialize {
+  animation: materialize var(--dur-ui) var(--ease-settle);
+  transform-origin: var(--origin, top left);
+}
+@keyframes materialize {
+  from {
+    filter: blur(6px);
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* --- Reduced motion: cross-fades instead of travel, nothing elastic ---------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+  .btn:active:not(:disabled),
+  .chip:active:not(:disabled) {
+    transform: none;
+  }
+  .sheet {
+    animation: fade-in 200ms ease;
+  }
+  .materialize {
+    animation: fade-in 200ms ease;
+  }
+  .segmented__thumb,
+  .switch input::after,
+  details > summary::before {
+    transition: none;
+  }
+}
+
+/* --- Intake ------------------------------------------------------------------------------------- */
+
+.dropzone {
+  align-items: center;
+  background: var(--surface);
+  border-radius: var(--radius-l);
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  transition:
+    box-shadow var(--dur-ui) var(--ease-settle),
+    background-color var(--dur-ui) var(--ease-settle),
+    transform var(--dur-ui) var(--ease-settle);
+  /* A dashed edge drawn as a background so it can follow the radius. */
+  background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='20' ry='20' stroke='%2386868B' stroke-width='2' stroke-dasharray='8%2c 8' stroke-linecap='round'/%3e%3c/svg%3e");
+}
+.dropzone--over {
+  background-color: var(--tint-fill);
+  box-shadow: inset 0 0 0 2px var(--tint);
+  /* Grows a touch toward the file being held over it: the zone answers before the drop. */
+  transform: scale(1.01);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dropzone--over {
+    transform: none;
+  }
+}
+
+/* --- The run: steps in order, each with its state in words ------------------------------------- */
+
+.steps {
+  counter-reset: none;
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.step {
+  align-items: center;
+  border-top: 0.5px solid var(--separator);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.75rem;
+  padding: 0.625rem 0;
+}
+.step:first-child {
+  border-top: 0;
+}
+.step__index {
+  align-items: center;
+  background: var(--fill);
+  border-radius: 50%;
+  color: var(--label-2);
+  display: inline-flex;
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  height: 1.5rem;
+  justify-content: center;
+  transition: background-color var(--dur-ui) var(--ease-settle), color var(--dur-ui) var(--ease-settle);
+  width: 1.5rem;
+}
+.step--completed .step__index {
+  background: var(--positive);
+  color: #ffffff;
+}
+.step--running .step__index {
+  background: var(--tint);
+  color: #ffffff;
+}
+.step--failed .step__index {
+  background: var(--negative);
+  color: #ffffff;
+}
+.step__name {
+  min-width: 13rem;
+}
+.step__error {
+  flex-basis: 100%;
+  padding-left: 2.25rem;
+}
+/* A running step breathes, slowly, so the page never reads as stalled. Not for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .step--running .step__index {
+    animation: breathe 1.6s ease-in-out infinite;
+  }
+}
+@keyframes breathe {
+  50% {
+    box-shadow: 0 0 0 0.375rem var(--tint-fill);
+  }
+}
+
+/* --- The evidence pane -------------------------------------------------------------------------- */
+
+.evidence {
+  position: sticky;
+  top: 4.25rem;
+}
+.evidence__page {
+  background: #f2f2f5;
+  border-radius: var(--radius-s);
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+  color-scheme: light;
+  max-height: 58vh;
+  overflow: auto;
+}
+
+/* --- Decisions ---------------------------------------------------------------------------------- */
+
+.decision {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  transition: box-shadow var(--dur-ui) var(--ease-settle);
+}
+.decision__body {
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+.decision__actions {
+  flex: none;
+}

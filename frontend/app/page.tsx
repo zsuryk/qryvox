@@ -5,16 +5,19 @@ import Intake from "./intake";
 // happens on. Nothing is analysed until the analyst starts it, and nothing is typed at any point.
 export default function Home() {
   return (
-    <main style={{ fontFamily: "system-ui, sans-serif", padding: 32, maxWidth: 900 }}>
-      <h1>Qryvox</h1>
-      <p style={{ color: "#5b6270", margin: "0 0 4px" }}>Drop a product pack, then run the four steps on the case it opens.</p>
-      <p style={{ color: "#5b6270", fontSize: "0.75rem", letterSpacing: "0.04em", margin: "0 0 24px", textTransform: "uppercase" }}>
-        Or read a case already reviewed
-        <br />
-        <Link href="/board" style={{ color: "#1f4f8f", fontWeight: 600, letterSpacing: 0, textTransform: "none" }}>
-          Open the recorded claim board →
-        </Link>
-      </p>
+    <main className="page page--narrow">
+      <div className="stack" style={{ "--stack-gap": "0.75rem", marginBottom: "2rem" } as React.CSSProperties}>
+        <p className="t-eyebrow">New review</p>
+        <h1 className="t-large">Check a product before it reaches the shelf.</h1>
+        <p className="t-body muted measure">
+          Drop the product&apos;s documents. Qryvox reads them in your browser, checks every claim against the others and
+          against the institution&apos;s rules, and cites the page for everything it finds. Nothing is typed, and every
+          step is on the record.
+        </p>
+        <p className="t-footnote muted">
+          Just looking? <Link href="/board">Open a case already reviewed →</Link>
+        </p>
+      </div>
       <Intake />
     </main>
   );

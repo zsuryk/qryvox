@@ -16,11 +16,8 @@ import { EvidencePane } from "./evidence";
 // the pane goes on to show — the evidence is readable from the card alone, which is the whole reason the
 // fallback is a quote panel rather than a blank column (spec decision 33).
 
-const MUTED = "#5b6270";
-const LINE = "#d5d9e0";
-const ACCENT = "#1f4f8f";
-// One colour per outcome, and the word beside it: a high finding must not rely on colour alone.
-const SEVERITY_COLOUR: Record<Severity, string> = { high: "#a02c2c", medium: "#8a6d3b", low: MUTED };
+// One tone per severity, and the word beside it: a high finding must not rely on colour alone.
+const SEVERITY_TONE: Record<Severity, string> = { high: "badge--negative", medium: "badge--caution", low: "" };
 
 // Which passage the pane is showing. A card can carry two — the citation and, where there is one, the
 // counterpart it runs into — so the passage is named rather than the slot it sits in.
@@ -54,7 +51,7 @@ export function Board({ events, selected, onSelect }: BoardProps) {
     view = boardView(events, categories);
   } catch (cause) {
     return (
-      <p style={{ color: "#a02c2c" }}>
+      <p className="notice notice--negative t-callout">
         This board cannot be built from the case&apos;s log: {errorMessage(cause)}
       </p>
     );
@@ -78,57 +75,45 @@ export function Board({ events, selected, onSelect }: BoardProps) {
   const filtered = view.visible !== view.active;
 
   return (
-    <section aria-labelledby="board-heading">
-      <div style={{ alignItems: "baseline", display: "flex", flexWrap: "wrap", gap: 12 }}>
-        <h2 id="board-heading" style={{ margin: 0 }}>
+    <section aria-labelledby="board-heading" className="section">
+      <div className="section-head">
+        <h2 id="board-heading" className="t-title">
           Claim board
         </h2>
-        <p style={{ color: MUTED, margin: 0 }}>
-          Showing <strong>{view.visible}</strong> of <strong>{view.active}</strong> active findings
+        <span className="t-footnote muted">
+          Showing {view.visible} of {view.active} active findings
           {filtered ? ` · ${names(categories)}` : ""}
-        </p>
+        </span>
       </div>
 
-      <div role="group" aria-label="Filter findings by category" style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "12px 0 20px" }}>
-        {CATEGORIES.map((category) => {
-          const on = categories.includes(category);
-          return (
-            <button
-              key={category}
-              type="button"
-              aria-pressed={on}
-              onClick={() => toggle(category)}
-              style={{
-                background: on ? ACCENT : "#ffffff",
-                border: `1px solid ${on ? ACCENT : LINE}`,
-                borderRadius: 999,
-                color: on ? "#ffffff" : MUTED,
-                cursor: "pointer",
-                font: "inherit",
-                fontSize: "0.85rem",
-                padding: "4px 12px",
-              }}
-            >
-              {categoryLabel(category)}
-              <span style={{ opacity: 0.75 }}> {view.counts[category]}</span>
-            </button>
-          );
-        })}
+      <div role="group" aria-label="Filter findings by category" className="row" style={{ marginBottom: "1.25rem" }}>
+        {CATEGORIES.map((category) => (
+          <button
+            key={category}
+            type="button"
+            className="chip"
+            aria-pressed={categories.includes(category)}
+            onClick={() => toggle(category)}
+          >
+            {categoryLabel(category)}
+            <span className="count">{view.counts[category]}</span>
+          </button>
+        ))}
       </div>
 
       {/* The split: findings on the left, the document they cite on the right, wrapping to one column on
           a narrow screen rather than squeezing a page of PDF into nothing. The second column appears when
           a citation is opened and not before: the default view is the board with its filters, not a
           placeholder asking to be filled (spec decision 31). */}
-      <div style={{ alignItems: "flex-start", display: "flex", flexWrap: "wrap", gap: 20 }}>
-        <div style={{ flex: "1 1 420px", minWidth: 0 }}>
+      <div className="split">
+        <div className="split-main">
           {view.cards.length === 0 ? (
-            <div>
-              <p style={{ fontWeight: 600, margin: 0 }}>{view.notice?.headline}</p>
-              <p style={{ color: MUTED, margin: "4px 0 0" }}>{view.notice?.detail}</p>
+            <div className="card card--quiet stack" style={{ "--stack-gap": "0.25rem" } as React.CSSProperties}>
+              <p className="t-headline">{view.notice?.headline}</p>
+              <p className="t-callout muted">{view.notice?.detail}</p>
             </div>
           ) : (
-            <ul style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", listStyle: "none", margin: 0, padding: 0 }}>
+            <ul className="grid-cards">
               {view.cards.map((card) => (
                 <Finding key={card.findingId} card={card} selection={selection} onSelect={select} />
               ))}
@@ -136,9 +121,9 @@ export function Board({ events, selected, onSelect }: BoardProps) {
           )}
 
           {view.scope && (
-            <details style={{ marginTop: 20 }}>
-              <summary style={{ color: MUTED, cursor: "pointer", fontSize: "0.8rem" }}>Run scope</summary>
-              <p style={{ color: MUTED, fontSize: "0.8rem", margin: "6px 0 0" }}>
+            <details style={{ marginTop: "1.25rem" }}>
+              <summary>Run scope</summary>
+              <p className="t-footnote muted" style={{ marginTop: "0.5rem" }}>
                 {[
                   view.scope.step,
                   view.scope.promptVersion,
@@ -156,6 +141,7 @@ export function Board({ events, selected, onSelect }: BoardProps) {
 
         {selection !== null && (
           <EvidenceColumn
+            key={`${selection.findingId}:${selection.citation.documentId}:${selection.citation.page}`}
             selection={selection}
             // The pane is given the document the log recorded, not the one the citation names: the hash it
             // checks the bytes against belongs to the document, and a citation carries no hash at all.
@@ -173,10 +159,7 @@ export default Board;
 // are the same column and were drifting apart as two copies of the same style.
 function Aside({ children }: { children: ReactNode }) {
   return (
-    <aside
-      aria-label="Evidence"
-      style={{ background: "#ffffff", border: `1px solid ${LINE}`, borderRadius: 6, flex: "0 1 380px", padding: "12px 14px" }}
-    >
+    <aside aria-label="Evidence" className="split-side card materialize stack" style={{ "--stack-gap": "0.375rem" } as React.CSSProperties}>
       {children}
     </aside>
   );
@@ -197,8 +180,8 @@ function EvidenceColumn({
   if (source === null) {
     return (
       <Aside>
-        <p style={{ fontWeight: 600, margin: 0 }}>This case&apos;s log names no such document</p>
-        <p style={{ color: MUTED, fontSize: "0.85rem", margin: "4px 0 0" }}>
+        <p className="t-headline">This case&apos;s log names no such document</p>
+        <p className="t-footnote muted">
           No document was ingested with the id <code>{selection.citation.documentId}</code>, so there is
           nothing to open or to check the bytes against. The passage is quoted in full on its card.
         </p>
@@ -232,39 +215,25 @@ function Finding({
   onSelect: (card: BoardCard, citation: BoardCitation) => void;
 }) {
   return (
-    <li
-      style={{
-        background: "#ffffff",
-        border: `1px solid ${LINE}`,
-        borderLeft: `4px solid ${SEVERITY_COLOUR[card.severity]}`,
-        borderRadius: 6,
-        padding: "12px 14px",
-      }}
-    >
-      <p style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: 0 }}>
-        {[
-          { label: card.categoryLabel, colour: MUTED },
-          { label: card.kindLabel, colour: MUTED },
-          { label: `${card.severityLabel} severity`, colour: SEVERITY_COLOUR[card.severity] },
-        ].map((badge) => (
-          <span
-            key={badge.label}
-            style={{ background: "#f6f7f9", borderRadius: 999, color: badge.colour, fontSize: "0.75rem", padding: "2px 8px" }}
-          >
-            {badge.label}
-          </span>
-        ))}
-      </p>
+    <li className="card stack finding" style={{ "--stack-gap": "0.625rem" } as React.CSSProperties}>
+      <div className="row" style={{ "--row-gap": "0.375rem" } as React.CSSProperties}>
+        <span className={`badge badge--strong ${SEVERITY_TONE[card.severity]}`}>
+          <span className="dot" />
+          {card.severityLabel}
+        </span>
+        <span className="badge">{card.categoryLabel}</span>
+        <span className="badge">{card.kindLabel}</span>
+      </div>
 
-      <p style={{ fontWeight: 600, margin: "10px 0 0" }}>{card.claim}</p>
-      <p style={{ color: MUTED, fontSize: "0.85rem", margin: "4px 0 0" }}>{card.rationale}</p>
+      <p className="t-headline">{card.claim}</p>
+      <p className="t-footnote muted">{card.rationale}</p>
 
       {/* The quote, in the card, whatever the pane goes on to do. It is the finding's own evidence:
           readable whether or not a text layer was ever marked. */}
       {card.citation && (
-        <figure style={{ borderLeft: `2px solid ${LINE}`, margin: "10px 0 0", paddingLeft: 10 }}>
-          <blockquote style={{ margin: 0, overflowWrap: "anywhere" }}>{card.citation.quote}</blockquote>
-          <figcaption style={{ marginTop: 4 }}>
+        <figure className="quote quote--cited">
+          <blockquote className="t-callout">{card.citation.quote}</blockquote>
+          <figcaption>
             <CitationChip
               citation={card.citation}
               open={showing(selection, card, card.citation)}
@@ -274,12 +243,12 @@ function Finding({
         </figure>
       )}
 
-      <details style={{ marginTop: 10 }}>
-        <summary style={{ color: MUTED, cursor: "pointer", fontSize: "0.8rem" }}>Evidence and provenance</summary>
+      <details>
+        <summary>Evidence and provenance</summary>
         {card.counterpart ? (
-          <figure style={{ borderLeft: `2px solid ${LINE}`, margin: "8px 0 0", paddingLeft: 10 }}>
-            <blockquote style={{ margin: 0, overflowWrap: "anywhere" }}>{card.counterpart.quote}</blockquote>
-            <figcaption style={{ marginTop: 4 }}>
+          <figure className="quote">
+            <blockquote className="t-callout">{card.counterpart.quote}</blockquote>
+            <figcaption>
               <CitationChip
                 citation={card.counterpart}
                 open={showing(selection, card, card.counterpart)}
@@ -288,13 +257,12 @@ function Finding({
             </figcaption>
           </figure>
         ) : (
-          <p style={{ color: MUTED, fontSize: "0.8rem", margin: "8px 0 0" }}>
+          <p className="t-footnote muted" style={{ marginTop: "0.5rem" }}>
             No other document in the pack speaks to this.
           </p>
         )}
-        <p style={{ color: MUTED, fontSize: "0.75rem", margin: "10px 0 0", overflowWrap: "anywhere" }}>
-          {card.kindLabel} · {card.severityLabel} severity · finding {card.findingId} · run {card.runId} · event{" "}
-          {card.seq}
+        <p className="t-caption faint wrap-anywhere" style={{ marginTop: "0.625rem" }}>
+          {card.kindLabel} · {card.severityLabel} severity · finding {card.findingId} · run {card.runId} · event {card.seq}
         </p>
       </details>
     </li>
@@ -314,25 +282,11 @@ function CitationChip({
   onSelect: () => void;
 }) {
   return (
-    <span style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 8 }}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={onSelect}
-        style={{
-          background: open ? ACCENT : "#ffffff",
-          border: `1px solid ${open ? ACCENT : LINE}`,
-          borderRadius: 999,
-          color: open ? "#ffffff" : ACCENT,
-          cursor: "pointer",
-          font: "inherit",
-          fontSize: "0.75rem",
-          padding: "2px 10px",
-        }}
-      >
+    <span className="row">
+      <button type="button" className="chip chip--link" aria-expanded={open} onClick={onSelect}>
         {citation.documentName} · page {citation.page}
       </button>
-      {open && <span style={{ color: MUTED, fontSize: "0.75rem" }}>open in the pane</span>}
+      {open && <span className="t-caption muted">open in the pane</span>}
     </span>
   );
 }

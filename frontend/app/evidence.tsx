@@ -35,22 +35,19 @@ import { browserPdfAssets, openPdf, type OpenDocument, type RenderedPage } from 
 // read does not re-download the document — which is the criterion's intent (nothing is cached *in the
 // event log*, and no rendering is ever served from a stored copy of the bytes) rather than its letter.
 
-const MUTED = "#5b6270";
-const LINE = "#d5d9e0";
-const ACCENT = "#1f4f8f";
-// One colour per outcome, and the word beside it: a fallback must not be mistaken for a highlight.
-const MODE_COLOUR: Record<EvidenceMode, string> = {
-  reading: MUTED,
-  highlighted: "#1c6b4a",
-  "quote-panel": "#8a6d3b",
-  "document-missing": "#a02c2c",
-  "document-unverified": "#a02c2c",
-  "page-unreadable": "#8a6d3b",
+// One tone per outcome, and the word beside it: a fallback must not be mistaken for a highlight.
+const MODE_TONE: Record<EvidenceMode, string> = {
+  reading: "",
+  highlighted: "badge--positive",
+  "quote-panel": "badge--caution",
+  "document-missing": "badge--negative",
+  "document-unverified": "badge--negative",
+  "page-unreadable": "badge--caution",
 };
 
 // pdf.js writes the text layer's divs itself, so they cannot be styled by React: the rules a text layer
 // needs are its own viewer's, and this is the minimum of them that stands alone. Everything else in this
-// pane is inline styles, as the rest of the product is.
+// pane is styled by app/globals.css, as the rest of the product is.
 const TEXT_LAYER_CSS = `
 .qryvox-evidence .textLayer {
   color-scheme: only light;
@@ -216,86 +213,63 @@ export function EvidencePane({ document: source, citation }: EvidencePaneProps) 
   return (
     <aside
       aria-label={`Evidence from ${source.filename}`}
-      className="qryvox-evidence"
-      style={{
-        background: "#ffffff",
-        border: `1px solid ${LINE}`,
-        borderRadius: 6,
-        flex: "0 1 380px",
-        padding: "12px 14px",
-        position: "sticky",
-        top: 16,
-      }}
+      className="qryvox-evidence split-side card materialize evidence stack"
+      style={{ "--stack-gap": "0.5rem" } as React.CSSProperties}
     >
       <style>{TEXT_LAYER_CSS}</style>
 
-      <p style={{ margin: 0 }}>
-        <span
-          style={{
-            background: "#f6f7f9",
-            borderRadius: 999,
-            color: MODE_COLOUR[view.mode],
-            fontSize: "0.75rem",
-            fontWeight: 600,
-            padding: "2px 8px",
-          }}
-        >
+      <div className="row spread">
+        <span className={`badge badge--strong ${MODE_TONE[view.mode]}`}>
+          <span className="dot" />
           {view.modeLabel}
         </span>
-      </p>
+        <span className="t-caption faint">pdf.js {PDFJS_VERSION}</span>
+      </div>
 
-      <h3 style={{ fontSize: "0.95rem", margin: "8px 0 0", overflowWrap: "anywhere" }}>{source.filename}</h3>
-      <p style={{ color: MUTED, fontSize: "0.8rem", margin: "2px 0 0" }}>
-        Page {view.page} of {view.pageCount} · document {source.documentId} · pdf.js {PDFJS_VERSION}
-        {view.sha256 ? ` · sha-256 ${view.sha256.slice(0, 12)}… verified` : ""}
-      </p>
+      <div>
+        <h3 className="t-headline wrap-anywhere">{source.filename}</h3>
+        <p className="t-footnote muted">
+          Page {view.page} of {view.pageCount} · document {source.documentId}
+          {view.sha256 ? ` · sha-256 ${view.sha256.slice(0, 12)}… verified` : ""}
+        </p>
+      </div>
       {/* Stated rather than signalled: which of the two paths is on screen, and why this one. */}
-      <p aria-live="polite" style={{ color: MUTED, fontSize: "0.8rem", margin: "6px 0 0" }}>
+      <p aria-live="polite" className="t-footnote muted">
         {view.detail}
       </p>
 
       {/* The page, whenever it could be drawn. Before that it is an empty box, and the line above says
-          why the pane is still reading. */}
-      <div
-        ref={host}
-        style={{
-          background: "#f6f7f9",
-          border: `1px solid ${LINE}`,
-          borderRadius: 4,
-          marginTop: 10,
-          maxHeight: "58vh",
-          overflow: "auto",
-        }}
-      />
+          why the pane is still reading. Paper stays light in dark mode: a printed page is printed on white. */}
+      <div ref={host} className="evidence__page" />
 
       {/* The quote, verbatim, on every path. This is the fallback's home and the floor under it: the
           finding's own quote is what makes the evidence readable whether or not a highlight painted. */}
-      <figure style={{ borderLeft: `3px solid ${ACCENT}`, margin: "10px 0 0", paddingLeft: 10 }}>
-        <blockquote style={{ margin: 0, overflowWrap: "anywhere" }}>
-          <mark style={{ background: "#fde68a", color: "inherit", padding: "0 2px" }}>{view.quote}</mark>
+      <figure className="quote quote--cited">
+        <blockquote className="t-callout">
+          <mark>{view.quote}</mark>
         </blockquote>
-        <figcaption style={{ color: MUTED, fontSize: "0.75rem", marginTop: 4 }}>
+        <figcaption className="t-caption muted">
           Cited passage · {citation.documentName} · page {view.citedPage}
         </figcaption>
       </figure>
 
-      <div style={{ alignItems: "center", display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+      <div className="row">
         {/* Gated on canJump, not on showsPage: the fallback is the quote panel *plus a page jump*
             (ADR-0001), so a document that has been read but whose page has not painted yet still owes
             the analyst the way to move within it. canJump outlives a page being drawn for that reason. */}
         {view.canJump ? (
           <>
             <Jump
-              label="‹ Previous page"
+              label="‹ Previous"
               disabled={view.page <= 1}
               onSelect={() => record({ key, event: { type: "page.jumped", page: view.page - 1 } })}
             />
-            <span style={{ color: MUTED, fontSize: "0.8rem" }}>
+            <span className="t-footnote muted">
               Page {view.page} of {view.pageCount}
               {!view.showsPage && " · not drawn yet"}
             </span>
             <Jump
-              label="Next page ›"
+              label="Next ›"
               disabled={view.page >= view.pageCount}
               onSelect={() => record({ key, event: { type: "page.jumped", page: view.page + 1 } })}
             />
@@ -307,7 +281,7 @@ export function EvidencePane({ document: source, citation }: EvidencePaneProps) 
             )}
           </>
         ) : (
-          <p style={{ color: MUTED, fontSize: "0.8rem", margin: 0 }}>
+          <p className="t-footnote muted">
             Nothing to jump between: the citation names page {view.citedPage} and the document holds{" "}
             {view.pageCount === 1 ? "one page" : `${view.pageCount} pages`}, but it has not been read.
           </p>
@@ -337,21 +311,7 @@ function evidence(
 // free text to drive.
 function Jump({ label, disabled, onSelect }: { label: string; disabled?: boolean; onSelect: () => void }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onSelect}
-      style={{
-        background: disabled ? "#f6f7f9" : "#ffffff",
-        border: `1px solid ${disabled ? LINE : ACCENT}`,
-        borderRadius: 6,
-        color: disabled ? MUTED : ACCENT,
-        cursor: disabled ? "not-allowed" : "pointer",
-        font: "inherit",
-        fontSize: "0.8rem",
-        padding: "4px 10px",
-      }}
-    >
+    <button type="button" className="btn btn--small" disabled={disabled} onClick={onSelect}>
       {label}
     </button>
   );

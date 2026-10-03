@@ -25,12 +25,10 @@ import { errorMessage } from "../lib/errors";
 // and hoped for. Nothing here decides anything either: not a timeout, not a filter change, not a re-run,
 // not a step.
 
-const MUTED = "#5b6270";
-const LINE = "#d5d9e0";
-const ACCENT = "#1f4f8f";
-// One colour per decision, and the word beside it: a dismissed finding must not read as dismissed by hue
+// One tone per decision, and the word beside it: a dismissed finding must not read as dismissed by hue
 // alone, and a green tick that is not approved is a lie in a regulated review.
-const DECISION_COLOUR: Record<Disposition, string> = { approved: "#1c6b4a", dismissed: "#8a6d3b" };
+const DECISION_TONE: Record<Disposition, string> = { approved: "badge--positive", dismissed: "badge--caution" };
+const DECISION_BUTTON: Record<Disposition, string> = { approved: "btn--positive", dismissed: "btn--caution" };
 
 export type DispositionConsoleProps = {
   caseId: string;
@@ -127,55 +125,50 @@ export default function DispositionConsole({ caseId, events, refetch, selected =
     view = dispositionConsole(events, focus.focusedFindingId, selected);
   } catch (cause) {
     return (
-      <p style={{ color: "#a02c2c" }}>
+      <p className="notice notice--negative t-callout">
         This console cannot be built from the case&apos;s log: {errorMessage(cause)}
       </p>
     );
   }
 
   return (
-    <section aria-labelledby="disposition-heading">
-      <div style={{ alignItems: "baseline", display: "flex", flexWrap: "wrap", gap: 12 }}>
-        <h2 id="disposition-heading" style={{ margin: 0 }}>
+    <section aria-labelledby="disposition-heading" className="section">
+      <div className="section-head">
+        <h2 id="disposition-heading" className="t-title">
           Disposition
         </h2>
-        <p style={{ color: MUTED, margin: 0 }}>
-          <strong>{view.approved}</strong> approved · <strong>{view.dismissed}</strong> dismissed ·{" "}
-          <strong>{view.undecided}</strong> undecided
+        <span className="t-footnote muted">
+          {view.approved} approved · {view.dismissed} dismissed · {view.undecided} undecided
+        </span>
+      </div>
+
+      <div className="stack" style={{ "--stack-gap": "0.5rem", marginBottom: "1rem" } as React.CSSProperties}>
+        <p className="t-footnote muted measure">
+          Every finding is decided here by {ANALYST_ACTOR}, and nothing decides it for them. Undecided is not dismissed:
+          it is what a finding is until an analyst says otherwise.
+        </p>
+        {/* The shortcuts are on the screen, not in a README: a console nobody can find the keys for is a
+            console with a mouse. Rendered from the same table the reducer reads, so they cannot drift. */}
+        <p className="t-footnote muted row" style={{ "--row-gap": "0.25rem 1rem" } as React.CSSProperties}>
+          <span className="t-eyebrow">Keyboard</span>
+          {KEY_BINDINGS.map((binding) => (
+            <span key={binding.intent}>
+              {binding.keys.map((key) => (
+                <kbd key={key}>{key === "ArrowDown" ? "↓" : key === "ArrowUp" ? "↑" : key.toUpperCase()}</kbd>
+              ))}{" "}
+              {binding.label}
+            </span>
+          ))}
         </p>
       </div>
 
-      <p style={{ color: MUTED, fontSize: "0.8rem", margin: "6px 0 0" }}>
-        Every finding is decided here by {ANALYST_ACTOR}, and nothing decides it for them. Undecided is
-        not dismissed: it is what a finding is until an analyst says otherwise.
-      </p>
-
-      {/* The shortcuts are on the screen, not in a README: a console nobody can find the keys for is a
-          console with a mouse. Rendered from the same table the reducer reads, so they cannot drift. */}
-      <p style={{ color: MUTED, fontSize: "0.8rem", margin: "10px 0 20px" }}>
-        <span style={{ letterSpacing: "0.04em", textTransform: "uppercase" }}>Keyboard</span>{" "}
-        {KEY_BINDINGS.map((binding) => (
-          <span key={binding.intent} style={{ marginRight: 14 }}>
-            {binding.keys.map((key) => (
-              <kbd
-                key={key}
-                style={{ background: "#f6f7f9", border: `1px solid ${LINE}`, borderRadius: 4, font: "inherit", padding: "1px 5px" }}
-              >
-                {key === "ArrowDown" ? "↓" : key === "ArrowUp" ? "↑" : key.toUpperCase()}
-              </kbd>
-            ))}{" "}
-            {binding.label}
-          </span>
-        ))}
-      </p>
-
       {view.rows.length === 0 ? (
-        <div>
-          <p style={{ fontWeight: 600, margin: 0 }}>{view.notice?.headline}</p>
-          <p style={{ color: MUTED, margin: "4px 0 0" }}>{view.notice?.detail}</p>
+        <div className="card card--quiet stack" style={{ "--stack-gap": "0.25rem" } as React.CSSProperties}>
+          <p className="t-headline">{view.notice?.headline}</p>
+          <p className="t-callout muted">{view.notice?.detail}</p>
         </div>
       ) : (
-        <ul style={{ display: "grid", gap: 12, listStyle: "none", margin: 0, padding: 0 }}>
+        <ul className="list-plain stack" style={{ "--stack-gap": "0.625rem" } as React.CSSProperties}>
           {view.rows.map((row, index) => (
             <Decision
               key={row.card.findingId}
@@ -190,7 +183,7 @@ export default function DispositionConsole({ caseId, events, refetch, selected =
       )}
 
       {/* The decision as it is made, for anyone who cannot see the row it happened on. */}
-      <p aria-live="polite" role="status" style={{ color: said?.recorded === false ? "#a02c2c" : MUTED, fontSize: "0.85rem", margin: "16px 0 0" }}>
+      <p aria-live="polite" role="status" className={`t-footnote ${said?.recorded === false ? "text-negative" : "muted"}`} style={{ marginTop: "1rem" }}>
         {said?.text}
       </p>
     </section>
@@ -219,72 +212,47 @@ function Decision({
     <li
       aria-current={focused ? true : undefined}
       onClick={onFocus}
-      style={{
-        background: "#ffffff",
-        // The focused row is marked by a border as well as by the announcement, so where the keyboard is
-        // standing is visible without a pointer.
-        border: `2px solid ${focused ? ACCENT : LINE}`,
-        borderLeft: `4px solid ${decision === null ? MUTED : DECISION_COLOUR[decision]}`,
-        borderRadius: 6,
-        cursor: "pointer",
-        padding: "12px 14px",
-      }}
+      // The focused row is marked by a ring as well as by the announcement, so where the keyboard is
+      // standing is visible without a pointer.
+      className={`card decision${focused ? " card--focused" : ""}`}
     >
-      <p style={{ display: "flex", flexWrap: "wrap", gap: 6, margin: 0 }}>
-        <span style={{ background: "#f6f7f9", borderRadius: 999, color: MUTED, fontSize: "0.75rem", padding: "2px 8px" }}>
-          {card.categoryLabel}
-        </span>
-        <span style={{ background: "#f6f7f9", borderRadius: 999, color: MUTED, fontSize: "0.75rem", padding: "2px 8px" }}>
-          {card.kindLabel}
-        </span>
-        {/* The decision, in words, in the log's colour: the word is what carries it, not the hue. */}
-        <span
-          style={{
-            background: "#f6f7f9",
-            borderRadius: 999,
-            color: decision === null ? MUTED : DECISION_COLOUR[decision],
-            fontSize: "0.75rem",
-            fontWeight: 600,
-            padding: "2px 8px",
-          }}
-        >
-          {decision === null ? "Undecided" : DISPOSITION_LABEL[decision]}
-        </span>
-      </p>
+      <div className="decision__body stack" style={{ "--stack-gap": "0.375rem" } as React.CSSProperties}>
+        <div className="row" style={{ "--row-gap": "0.375rem" } as React.CSSProperties}>
+          {/* The decision, in words: the word is what carries it, not the hue. */}
+          <span className={`badge badge--strong ${decision === null ? "" : DECISION_TONE[decision]}`}>
+            <span className="dot" />
+            {decision === null ? "Undecided" : DISPOSITION_LABEL[decision]}
+          </span>
+          <span className="badge">{card.categoryLabel}</span>
+          <span className="badge">{card.kindLabel}</span>
+        </div>
 
-      <p style={{ fontWeight: 600, margin: "10px 0 0" }}>{card.claim}</p>
+        <p className="t-callout strong">{card.claim}</p>
 
-      {/* Who decided and when, from the event itself: the actor the log recorded, and the seq it is
-          ordered by, which is the same coordinate the replay scrubber reads. */}
-      {decision !== null && (
-        <p style={{ color: MUTED, fontSize: "0.8rem", margin: "6px 0 0" }}>
-          {DISPOSITION_LABEL[decision]} by {decidedBy} · {decidedAt} · event {decidedAtSeq}
-        </p>
-      )}
+        {/* Who decided and when, from the event itself: the actor the log recorded, and the seq it is
+            ordered by, which is the same coordinate the replay scrubber reads. */}
+        {decision !== null && (
+          <p className="t-caption muted">
+            {DISPOSITION_LABEL[decision]} by {decidedBy} · {decidedAt} · event {decidedAtSeq}
+          </p>
+        )}
+      </div>
 
-      <div role="group" aria-label={`Decide on: ${card.claim}`} style={{ display: "flex", gap: 8, marginTop: 12 }}>
+      <div role="group" aria-label={`Decide on: ${card.claim}`} className="row decision__actions">
         {(["approved", "dismissed"] as const).map((disposition) => (
           <button
             key={disposition}
             type="button"
+            className={`btn btn--small ${DECISION_BUTTON[disposition]}`}
             // Not a toggle: the pressed state is the decision the log currently holds, and pressing again
             // is a further decision rather than an undo. Nothing clears a decision but another decision.
             aria-pressed={decision === disposition}
             disabled={busy}
+            aria-busy={busy}
             onClick={(event) => {
               // The row owns the click; the button owns the decision.
               event.stopPropagation();
               onDecide(disposition);
-            }}
-            style={{
-              background: decision === disposition ? DECISION_COLOUR[disposition] : "#ffffff",
-              border: `1px solid ${decision === disposition ? DECISION_COLOUR[disposition] : LINE}`,
-              borderRadius: 6,
-              color: decision === disposition ? "#ffffff" : MUTED,
-              cursor: busy ? "progress" : "pointer",
-              font: "inherit",
-              fontSize: "0.85rem",
-              padding: "6px 14px",
             }}
           >
             {DISPOSITION_LABEL[disposition]}

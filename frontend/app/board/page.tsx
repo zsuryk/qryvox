@@ -8,11 +8,12 @@ const events = SlimEvent.array().parse(recorded);
 
 export default function BoardPage() {
   return (
-    <main style={{ fontFamily: "system-ui, sans-serif", padding: 24, maxWidth: 1100 }}>
-      <h1>Larkspur Global Income Fund</h1>
-      <p style={{ color: "#5b6270", margin: "0 0 20px" }}>
-        A recorded case · {events.length} events · folded in the browser, no model called
-      </p>
+    <main className="page">
+      <div className="stack" style={{ "--stack-gap": "0.5rem", marginBottom: "2rem" } as React.CSSProperties}>
+        <p className="t-eyebrow">Recorded case</p>
+        <h1 className="t-large">Larkspur Global Income Fund</h1>
+        <p className="t-footnote muted">{events.length} events · folded in your browser · no model called</p>
+      </div>
       <Board events={events} />
     </main>
   );

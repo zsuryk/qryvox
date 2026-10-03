@@ -24,21 +24,15 @@ import {
 // Progress is folded out of the case's log here rather than kept, exactly as the board beneath it is: a
 // reload, a shared link or a step that failed somewhere else all read the same (ADR-0002).
 
-const MUTED = "#5b6270";
-const LINE = "#d5d9e0";
-const ACCENT = "#1f4f8f";
-// One colour per state, and the word beside it in every row: a failed step must not rely on colour alone.
-const STATE: Record<StepStatus, { label: string; colour: string }> = {
-  running: { label: "Running", colour: ACCENT },
-  completed: { label: "Done", colour: "#1c6b4a" },
-  failed: { label: "Failed", colour: "#a02c2c" },
-  pending: { label: "Waiting", colour: MUTED },
+// One tone per state, and the word beside it in every row: a failed step must not rely on colour alone.
+// Every control here is a real button, so it is reachable by keyboard and announced as one, and the
+// stylesheet never removes the focus ring.
+const STATE: Record<StepStatus, { label: string; tone: string }> = {
+  running: { label: "Running", tone: "badge--tint" },
+  completed: { label: "Done", tone: "badge--positive" },
+  failed: { label: "Failed", tone: "badge--negative" },
+  pending: { label: "Waiting", tone: "" },
 };
-
-// Every control here is a real button, so it is reachable by keyboard and announced as one. No outline is
-// removed anywhere in this file, which is what keeps the browser's focus ring visible on it.
-const quiet = { background: "#ffffff", border: `1px solid ${LINE}`, borderRadius: 6, color: MUTED, cursor: "pointer", font: "inherit", fontSize: "0.85rem", padding: "6px 12px" } as const;
-const strong = { ...quiet, background: ACCENT, borderColor: ACCENT, color: "#ffffff" } as const;
 
 export type PipelineProps = {
   log: readonly SlimEvent[];
@@ -61,7 +55,7 @@ export default function Pipeline({ log, running, busy, failure, onAction }: Pipe
     state = pipelineState(log);
   } catch (cause) {
     return (
-      <p style={{ color: "#a02c2c" }}>
+      <p className="notice notice--negative t-callout">
         This run cannot be read from the case&apos;s log: {errorMessage(cause)}
       </p>
     );
@@ -84,116 +78,130 @@ export default function Pipeline({ log, running, busy, failure, onAction }: Pipe
   const statusOf = (step: StepProgress): StepStatus => (running === step.step ? "running" : step.status);
 
   return (
-    <section aria-labelledby="run-heading" style={{ marginBottom: 28 }}>
-      <div style={{ alignItems: "baseline", display: "flex", flexWrap: "wrap", gap: 12 }}>
-        <h2 id="run-heading" style={{ margin: 0 }}>
+    <section aria-labelledby="run-heading" className="section">
+      <div className="section-head">
+        <h2 id="run-heading" className="t-title">
           Run
         </h2>
-        <p style={{ color: MUTED, margin: 0 }}>
-          <strong>{done}</strong> of <strong>{PIPELINE_STEPS.length}</strong> steps done · the board below is this run&apos;s
-        </p>
+        <span className="t-footnote muted">
+          {done} of {PIPELINE_STEPS.length} steps done · the board below is this run&apos;s
+        </span>
       </div>
 
-      <p aria-live="polite" role="status" style={{ color: retrying === null ? MUTED : "#a02c2c", margin: "8px 0 0" }}>
-        {summary(state, running, retrying, lost, stoppedError, failure)}
-      </p>
-
-      {retrying === null && lost === null && resume !== null && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onAction({ kind: done === 0 ? "start" : "resume" })}
-          style={{ ...strong, marginTop: 10, opacity: busy ? 0.6 : 1 }}
-        >
-          {done === 0 ? "Run the pipeline" : `Resume from ${STEP_LABELS[resume.step]}`}
-        </button>
-      )}
-
-      <ol style={{ listStyle: "decimal inside", margin: "12px 0 0", maxWidth: "70ch", padding: 0 }}>
-        {state.steps.map((step) => {
-          const status = statusOf(step);
-          const offered = retrying?.step === step.step ? retrying : lost?.step === step.step ? lost : null;
-          const error = offered === null ? null : stoppedError;
-          return (
-            <li key={step.step} style={{ alignItems: "baseline", display: "flex", flexWrap: "wrap", gap: 10, padding: "5px 0" }}>
-              <span style={{ fontWeight: 600, minWidth: "17ch" }}>{STEP_LABELS[step.step]}</span>
-              <span style={{ color: STATE[status].colour, fontSize: "0.85rem", fontWeight: 600 }}>{STATE[status].label}</span>
-              <span style={{ color: MUTED, fontSize: "0.75rem" }}>
-                {step.runId === null ? "not run yet" : `run ${step.runId.slice(0, 8)}…${step.seq === null ? "" : ` · event ${step.seq}`}`}
-              </span>
-              {offered !== null && lost === null && (
-                <button
-                  type="button"
-                  aria-label={`Retry ${STEP_LABELS[step.step]} under run ${step.runId?.slice(0, 8) ?? "—"}`}
-                  disabled={busy}
-                  onClick={() => onAction({ kind: "retry", step: step.step })}
-                  style={{ ...quiet, padding: "2px 10px" }}
-                >
-                  Retry
-                </button>
-              )}
-              {offered !== null && lost !== null && (
-                <button
-                  type="button"
-                  aria-label={`Continue the run from ${resume === null ? "the last step" : STEP_LABELS[resume.step]}`}
-                  disabled={busy || resume === null}
-                  onClick={() => onAction({ kind: "resume" })}
-                  style={{ ...quiet, padding: "2px 10px" }}
-                >
-                  Continue
-                </button>
-              )}
-              {error !== null && (
-                <span style={{ color: "#a02c2c", flexBasis: "100%", fontSize: "0.85rem" }}>
-                  {error}
-                  {/* Two different promises, and the panel must not blur them: retrying a step that failed
-                      calls the model again — there is no stored result to return — while continuing past a
-                      step the log already holds a completed result for spends nothing, because the server
-                      returns that result before it reaches the model (ADR-0002). Both reuse the run id,
-                      which is what keeps a retry inside one run rather than forking a second. */}
-                  {lost === null && step.runId !== null && " — retrying calls the model again, under the same run id."}
-                  {lost !== null && " — the log already holds this run's result, so continuing costs nothing."}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ol>
-
-      <details style={{ marginTop: 14 }}>
-        <summary style={{ color: MUTED, cursor: "pointer", fontSize: "0.8rem" }}>Re-run a scope</summary>
-        <p style={{ color: MUTED, fontSize: "0.8rem", margin: "8px 0", maxWidth: "62ch" }}>
-          A re-run takes new run ids from the step you choose, so a new findings run supersedes the findings the last
-          one put up. Their decisions stay in the log.
-        </p>
-        <div role="group" aria-label="Choose the step a re-run starts from" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {state.steps.map((step) => (
+      <div className="card stack" style={{ "--stack-gap": "0.875rem" } as React.CSSProperties}>
+        <div className="row spread">
+          <p aria-live="polite" role="status" className={`t-callout${retrying === null ? "" : " text-negative"}`}>
+            {summary(state, running, retrying, lost, stoppedError, failure)}
+          </p>
+          {retrying === null && lost === null && resume !== null && (
             <button
-              key={step.step}
               type="button"
-              aria-pressed={scope === step.step}
+              className="btn btn--primary"
               disabled={busy}
-              onClick={() => setScope((current) => (current === step.step ? null : step.step))}
-              style={scope === step.step ? strong : quiet}
+              aria-busy={busy}
+              onClick={() => onAction({ kind: done === 0 ? "start" : "resume" })}
             >
-              {STEP_LABELS[step.step]}
+              {done === 0 ? "Run the pipeline" : `Resume from ${STEP_LABELS[resume.step]}`}
             </button>
-          ))}
+          )}
         </div>
-        <button
-          type="button"
-          aria-label={scope === null ? "Choose a step to re-run" : `Re-run from ${STEP_LABELS[scope]}`}
-          disabled={busy || scope === null}
-          onClick={() => {
-            if (scope === null) return;
-            onAction({ kind: "rerun", step: scope });
-            setScope(null);
-          }}
-          style={{ ...strong, marginTop: 8, opacity: busy || scope === null ? 0.6 : 1 }}
-        >
-          {scope === null ? "Re-run from…" : `Re-run from ${STEP_LABELS[scope]}`}
-        </button>
-      </details>
+
+        <ol className="steps">
+          {state.steps.map((step, index) => {
+            const status = statusOf(step);
+            const offered = retrying?.step === step.step ? retrying : lost?.step === step.step ? lost : null;
+            const error = offered === null ? null : stoppedError;
+            return (
+              <li key={step.step} className={`step step--${status}`}>
+                <span className="step__index" aria-hidden>
+                  {status === "completed" ? "✓" : index + 1}
+                </span>
+                <span className="t-callout strong step__name">{STEP_LABELS[step.step]}</span>
+                <span className={`badge ${STATE[status].tone}`}>
+                  <span className="dot" />
+                  {STATE[status].label}
+                </span>
+                <span className="t-caption faint">
+                  {step.runId === null ? "not run yet" : `run ${step.runId.slice(0, 8)}…${step.seq === null ? "" : ` · event ${step.seq}`}`}
+                </span>
+                {offered !== null && lost === null && (
+                  <button
+                    type="button"
+                    className="btn btn--small"
+                    aria-label={`Retry ${STEP_LABELS[step.step]} under run ${step.runId?.slice(0, 8) ?? "—"}`}
+                    disabled={busy}
+                    onClick={() => onAction({ kind: "retry", step: step.step })}
+                  >
+                    Retry
+                  </button>
+                )}
+                {offered !== null && lost !== null && (
+                  <button
+                    type="button"
+                    className="btn btn--small"
+                    aria-label={`Continue the run from ${resume === null ? "the last step" : STEP_LABELS[resume.step]}`}
+                    disabled={busy || resume === null}
+                    onClick={() => onAction({ kind: "resume" })}
+                  >
+                    Continue
+                  </button>
+                )}
+                {error !== null && (
+                  <span className="t-footnote text-negative step__error">
+                    {error}
+                    {/* Two different promises, and the panel must not blur them: retrying a step that failed
+                        calls the model again — there is no stored result to return — while continuing past a
+                        step the log already holds a completed result for spends nothing, because the server
+                        returns that result before it reaches the model (ADR-0002). Both reuse the run id,
+                        which is what keeps a retry inside one run rather than forking a second. */}
+                    {lost === null && step.runId !== null && " — retrying calls the model again, under the same run id."}
+                    {lost !== null && " — the log already holds this run's result, so continuing costs nothing."}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+
+        <details>
+          <summary>Re-run a scope</summary>
+          <div className="stack" style={{ "--stack-gap": "0.625rem", marginTop: "0.75rem" } as React.CSSProperties}>
+            <p className="t-footnote muted measure">
+              A re-run takes new run ids from the step you choose, so a new findings run supersedes the findings the last
+              one put up. Their decisions stay in the log.
+            </p>
+            <div role="group" aria-label="Choose the step a re-run starts from" className="row">
+              {state.steps.map((step) => (
+                <button
+                  key={step.step}
+                  type="button"
+                  className="chip"
+                  aria-pressed={scope === step.step}
+                  disabled={busy}
+                  onClick={() => setScope((current) => (current === step.step ? null : step.step))}
+                >
+                  {STEP_LABELS[step.step]}
+                </button>
+              ))}
+            </div>
+            <div>
+              <button
+                type="button"
+                className="btn btn--primary"
+                aria-label={scope === null ? "Choose a step to re-run" : `Re-run from ${STEP_LABELS[scope]}`}
+                disabled={busy || scope === null}
+                onClick={() => {
+                  if (scope === null) return;
+                  onAction({ kind: "rerun", step: scope });
+                  setScope(null);
+                }}
+              >
+                {scope === null ? "Re-run from…" : `Re-run from ${STEP_LABELS[scope]}`}
+              </button>
+            </div>
+          </div>
+        </details>
+      </div>
     </section>
   );
 }
