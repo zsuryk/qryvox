@@ -43,6 +43,10 @@ API_VARS=(
   LLM_MODEL
   LLM_TEMPERATURE
   LLM_TIMEOUT_MS
+  # Without it a reasoning model (Kimi K3) can think past Vercel's 300 s limit on one step.
+  LLM_REASONING_EFFORT
+  # Switches the judge-link token on (#19); set it only once the frontend that sends it is live.
+  JUDGE_TOKEN
 )
 
 # The frontend bundle inlines NEXT_PUBLIC_* at build time, so these live on the web project, not
