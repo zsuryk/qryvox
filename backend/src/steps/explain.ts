@@ -11,6 +11,7 @@ import {
   type ProductAttributes,
   ruleById,
   RULES,
+  VERDICT_HEADLINE,
 } from "@qryvox/shared";
 import { z } from "zod";
 import { attributesOf } from "../advice.js";
@@ -22,6 +23,9 @@ import { StepPrecondition, type StepDefinition } from "./step.js";
 // verdict; this step may only restate it. Every passage is checked against the advice it explains:
 // all of it covered, nothing quoted that its citation does not say, no rule or document it does not
 // cite, no number that is neither in its quote nor the client's own answer.
+// explain@2 (#67): the client's page already headlines the verdict right above the summary, so the summary
+// starts from the main reason instead of saying the verdict again, and a summary that opens with the
+// headline is refused.
 
 // One reason or disclosure of the advice, as the model sees it and the checks hold it to.
 type Item = {
@@ -60,7 +64,7 @@ Write the explanation three times, for three readers:
 - expert: concise and precise.
 
 For each reader write:
-- summary: one or two sentences saying what the verdict is and, in general terms, why. No numbers.
+- summary: one or two sentences saying, in general terms, why the verdict is what it is. The client already reads the verdict as a headline right above the summary, so never restate it: start from the main reason, in words. Write no numbers in the summary, not even the client's own; the passages give the figures.
 - passages: exactly one passage for every item you are given (reasons r0, r1, … and disclosures d0, d1, …), with that item's ref.
 
 Each passage explains only its own item:
@@ -93,7 +97,13 @@ export const explain: StepDefinition<ExplainInput, Explanation, ExplainReply> = 
   },
 
   messages({ advice, items, language }) {
-    const lines = [`Verdict: ${advice.verdict.replace("_", " ")}`, "", "Items:", ...items.map((i) => i.brief)];
+    const lines = [
+      `Verdict: ${advice.verdict.replace("_", " ")}`,
+      `Headline the client already sees above the summary, not to be repeated: "${VERDICT_HEADLINE[language][advice.verdict]}"`,
+      "",
+      "Items:",
+      ...items.map((i) => i.brief),
+    ];
     return [
       { role: "system", content: EXPLAIN_SYSTEM_PROMPT + LANGUAGE_NOTE[language] },
       { role: "user", content: lines.join("\n") },
@@ -112,6 +122,7 @@ export const explain: StepDefinition<ExplainInput, Explanation, ExplainReply> = 
         continue;
       }
       problems.push(...check(depth, parsed.data, items, documents));
+      if (repeatsHeadline(parsed.data.summary)) problems.push(`${depth}: the summary opens by repeating the verdict headline`);
       depths[depth] = parsed.data;
     }
     if (problems.length > 0) return { error: `the explanation does not hold to the advice: ${problems.join("; ")}` };
@@ -159,6 +170,22 @@ function check(depth: string, text: ExplanationDepth, items: Item[], documents: 
   }
   return problems;
 }
+
+// Whether a summary's first sentence is a verdict headline, in either language, as the page shows it right
+// above: the client would read it twice (#67). Any verdict's headline counts, since opening with another
+// verdict's would be worse. Compared with whitespace, case and the final punctuation set aside.
+function repeatsHeadline(summary: string): boolean {
+  const headlines = Object.values(VERDICT_HEADLINE).flatMap((byVerdict) => Object.values(byVerdict).map(sentence));
+  return headlines.includes(sentence(firstSentence(summary)));
+}
+
+// Up to the first full stop, question or exclamation mark: an English one only before a space or the end,
+// so "0.85%" does not end a sentence; a Chinese one wherever it stands.
+function firstSentence(text: string): string {
+  return text.trim().match(/^.*?(?:[.!?](?=\s|$)|[。！？])/su)?.[0] ?? text;
+}
+
+const sentence = (text: string) => normalize(text).replace(/[\s.!?。！？]+$/u, "").toLowerCase();
 
 // Spans in double quotes, straight or curly, long enough to be a quotation rather than a word.
 // Punctuation at the very ends is the sentence's, not the source's: a model writes "…of the Fund," with its

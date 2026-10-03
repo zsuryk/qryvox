@@ -96,14 +96,14 @@ async function refused(fn: (passages: Depth["passages"], depth: Depth) => void) 
 }
 
 describe("the explain step", () => {
-  it("stores all three depths for the advice under explain@1", async () => {
+  it("stores all three depths for the advice under explain@2", async () => {
     const { t, caseId, adviceId, advice } = await chanAdvice();
     reply = { depths: faithful(advice) };
 
     const res = await explainCall(t, caseId, adviceId);
     expect(res.status, await res.clone().text()).toBe(200);
     const result = StepResult.parse(await res.json());
-    expect(result.prompt_version).toBe("explain@1");
+    expect(result.prompt_version).toBe("explain@2");
     const explanation = Explanation.parse(result.output);
     expect(explanation.advice_id).toBe(adviceId);
     expect(explanation.depths.novice.passages).toHaveLength(advice.reasons.length + advice.disclosures.length);
@@ -261,6 +261,45 @@ describe("explanations it refuses", () => {
     const res = await explainCall(t, caseId, adviceId);
     expect(res.status).toBe(422);
     expect(StepFailure.parse(await res.json()).error).toMatch(/names deck/);
+  });
+});
+
+describe("a summary that repeats the verdict headline (#67)", () => {
+  it("is refused when it opens with the headline the page already shows", async () => {
+    const error = await refused((_, depth) => (depth.summary = "This product does not suit you.  It asks for five years, and you have two."));
+    expect(error).toMatch(/novice: the summary opens by repeating the verdict headline/);
+  });
+
+  it("is refused whatever the final punctuation or spacing, and in Traditional Chinese", async () => {
+    expect(await refused((_, depth) => (depth.summary = " this product does not suit you! It asks for longer than you have."))).toMatch(
+      /repeating the verdict headline/,
+    );
+    const { t, caseId, adviceId, advice } = await chanAdvice({ profile: { ...chan, language: "zh-Hant" } });
+    reply = bend(advice, (_, depth) => (depth.summary = "這個產品不適合你。這個產品不適合你。"));
+    const res = await explainCall(t, caseId, adviceId);
+    expect(res.status).toBe(422);
+    expect(StepFailure.parse(await res.json()).error).toMatch(/repeating the verdict headline/);
+  });
+
+  it("passes when it starts from the main reason, even if it mentions the verdict later", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    reply = bend(advice, (_, depth) => (depth.summary = "It needs a longer horizon than yours, so this product does not suit you."));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+  });
+
+  it("shows the model the headline, in the client's language, as the one sentence not to repeat", async () => {
+    let sent = "";
+    const { t, caseId, adviceId, advice } = await chanAdvice({ profile: { ...chan, language: "zh-Hant" } });
+    answer = (messages) => {
+      sent = messages.at(-1)!.content;
+      return { depths: faithful(advice) };
+    };
+    try {
+      expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+    } finally {
+      answer = () => reply;
+    }
+    expect(sent).toContain('not to be repeated: "這個產品不適合你。"');
   });
 });
 
