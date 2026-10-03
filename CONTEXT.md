@@ -143,8 +143,17 @@ event records as having acted. In stage 1 every event's actor is one fixed ident
 decide whether a product fits a client. Fabricated institutional policy, never quoted regulation. Every
 event that applies a rule records the rules version.
 
-**Shelf / verified product** — a product whose pack has been through the analysis steps and the `compliance`
-step. Advice is drafted on verified products only.
+**Shelf / verified product** — a product whose pack has been through the analysis steps (and, when the
+pipeline runs it, the `compliance` step) and whose attributes have been read, naming the product. Advice is
+drafted on verified products only. The shelf is every such product, the latest verified case of each.
+
+**Alternative** — another product on the shelf that the same suitability rules find suitable for a client
+whose advice is not suitable, recorded on that advice with its own reasons and citations. An empty list says
+nothing on the shelf fits. *Not* a recommendation the model makes: the rules decide it.
+
+**Document version** — a document ingested again under the same `document_id` (a product update, e.g.
+Larkspur v2) replaces the earlier version for every later step and in the fold; the earlier stays in the
+log. A new attributes run then supersedes advice drafted on the old one.
 
 **Client** — the person advice is for, known to the log only by a pseudonymous id. *Not* the analyst or the
 adviser, and *not* a user of the analysis.

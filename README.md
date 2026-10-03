@@ -117,7 +117,7 @@ Stage 2 is tracked in #20.
 | **Layer 3 — match the client** | ✅ Contracts, suitability function, three personas with expected verdicts, `attributes` and `explain` steps, client-layer API | #27 #28 #29 #30 #31 |
 | | ⬜ Questionnaire, adviser console, client advice page (the backend for all three is done) | #32 #33 #34 |
 | Data ecosystem document | ✅ [docs/data-ecosystem.md](docs/data-ecosystem.md) | #36 |
-| Bonus | ⬜ Product update re-verification, learned knowledge level, second product | #37 #38 #39 |
+| Bonus | ✅ Second product on the shelf (Wrenfield), with alternatives on advice · ✅ backend for product updates (Larkspur v2) · ⬜ loading v2 in the browser, the redraft list, learned knowledge level | #39 · #37 · #38 |
 
 The `attributes` and `explain` steps are tested against the real pack text with a scripted model; a run against a real model is still to do (#29).
 
@@ -127,7 +127,7 @@ The `attributes` and `explain` steps are tested against the real pack text with 
 - **Event-sourced:** one append-only, hash-chained `events` table is the only source of truth; state is a fold over it, and the browser runs the same fold to replay ([ADR-0002](docs/adr/0002-event-sourced-audit-log.md)).
 - **Model-agnostic:** each step is one call to any OpenAI-compatible endpoint; every quote is checked against its page before it is kept ([ADR-0003](docs/adr/0003-openai-compatible-model-endpoint.md)).
 - **Rules, not the model, decide suitability:** `shared/src/suitability.ts` is a pure function of the profile, the cited attributes and the open findings.
-- **Fabricated data only:** the Larkspur pack, its ground truth and the personas are invented; the answer keys live in `frontend/public/eval/` and are never an input to any step.
+- **Fabricated data only:** two invented products — Larkspur (and its revision, Larkspur v2) and Wrenfield — with their ground truth and the personas' expected verdicts; the answer keys live in `frontend/public/eval/` and are never an input to any step.
 - Words mean one thing each: see [CONTEXT.md](CONTEXT.md).
 
 ## Running it locally
