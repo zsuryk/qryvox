@@ -42,6 +42,7 @@ describe("the OpenAI-compatible client", () => {
     const [call] = endpoint.captured;
     expect(new Headers(call?.init.headers).has("authorization")).toBe(false);
     expect(JSON.parse(String(call?.init.body))).not.toHaveProperty("temperature");
+    expect(JSON.parse(String(call?.init.body))).not.toHaveProperty("reasoning_effort");
   });
 
   it("raises LlmError carrying the body when the endpoint answers an error status", async () => {
@@ -53,6 +54,24 @@ describe("the OpenAI-compatible client", () => {
     expect(err).toBeInstanceOf(LlmError);
     expect((err as LlmError).message).toBe("model endpoint returned 401");
     expect((err as LlmError).raw).toEqual({ error: { message: "bad key" } });
+  });
+});
+
+describe("reasoning effort", () => {
+  it("is sent as reasoning_effort when configured, so a reasoning model thinks only as long as a step needs", async () => {
+    const calls: RequestInit[] = [];
+    const llm = createLlm({
+      baseUrl: "https://api.example.test/v1",
+      model: "m-1",
+      reasoningEffort: "low",
+      timeoutMs: 1000,
+      fetch: async (_url: string | URL | Request, init?: RequestInit) => {
+        calls.push(init!);
+        return new Response(JSON.stringify({ choices: [{ message: { content: "{}" } }] }));
+      },
+    });
+    await llm.complete([{ role: "user", content: "hi" }]);
+    expect(JSON.parse(String(calls[0]!.body))).toMatchObject({ reasoning_effort: "low" });
   });
 });
 

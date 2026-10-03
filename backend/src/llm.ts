@@ -33,6 +33,9 @@ export type LlmConfig = {
   model: string;
   // Omitted from the request when undefined, for models that reject a temperature.
   temperature?: number | undefined;
+  // How hard a reasoning model thinks before it answers ("low", "medium", "high"), sent as the standard
+  // reasoning_effort field; omitted when undefined, so models that know nothing of it are unaffected.
+  reasoningEffort?: string | undefined;
   timeoutMs: number;
   fetch?: typeof fetch;
 };
@@ -56,6 +59,7 @@ export function createLlm(config: LlmConfig): Llm {
             model: config.model,
             messages,
             ...(config.temperature === undefined ? {} : { temperature: config.temperature }),
+            ...(config.reasoningEffort === undefined ? {} : { reasoning_effort: config.reasoningEffort }),
             stream: false,
           }),
           signal: AbortSignal.timeout(config.timeoutMs),

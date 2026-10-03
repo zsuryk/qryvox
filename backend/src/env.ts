@@ -41,6 +41,9 @@ function llmConfig() {
     apiKey: process.env.LLM_API_KEY || undefined,
     // "none" omits it, for models that reject a temperature.
     temperature: temperature === "none" ? undefined : Number(temperature),
+    // Unset omits it. Reasoning models can think for minutes on a step that needs seconds of it: Kimi K3
+    // spent 15,000 reasoning tokens (over 300 s) on Larkspur's compliance step, and 1,600 (55 s) at "low".
+    reasoningEffort: process.env.LLM_REASONING_EFFORT || undefined,
     // Under Vercel's 300 s function limit; local models are slow.
     timeoutMs: Number(process.env.LLM_TIMEOUT_MS ?? 240_000),
   };
