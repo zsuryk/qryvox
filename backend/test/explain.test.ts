@@ -144,6 +144,37 @@ describe("the explain step", () => {
   });
 });
 
+describe("an explanation in the client's language (#43)", () => {
+  it("is asked for in Traditional Chinese for a client who reads it, with quotes kept as the document has them", async () => {
+    let system = "";
+    const { t, caseId, adviceId, advice } = await chanAdvice({ profile: { ...chan, language: "zh-Hant" } });
+    answer = (messages) => {
+      system = messages[0]!.content;
+      return { depths: faithful(advice) };
+    };
+    try {
+      reply = bend(advice, (p) => (p[0]!.text = '文件寫明 "' + advice.reasons[0]!.citation!.quote + '"，你的投資期只有 2 年。'));
+      answer = (messages) => {
+        system = messages[0]!.content;
+        return reply;
+      };
+      const res = await explainCall(t, caseId, adviceId);
+      expect(res.status, await res.clone().text()).toBe(200);
+      expect(Explanation.parse(StepResult.parse(await res.json()).output).language).toBe("zh-Hant");
+    } finally {
+      answer = () => reply;
+    }
+    expect(system).toContain("Traditional Chinese");
+    expect(system).toContain("exactly as the document has it");
+  });
+
+  it("still refuses a quote the document does not say, whatever the language around it", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice({ profile: { ...chan, language: "zh-Hant" } });
+    reply = bend(advice, (p) => (p[0]!.text = '文件寫明 "The Fund guarantees your capital forever"。'));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(422);
+  });
+});
+
 describe("explanations it refuses", () => {
   it("one that leaves a reason unexplained", async () => {
     expect(await refused((p) => p.splice(2, 1))).toMatch(/novice: r2 is explained 0 times, not once/);

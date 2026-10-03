@@ -122,7 +122,8 @@ const PROMPTS: [string, StepName][] = [
 // An explanation depends on the advice it explains, so a test that runs explain says how to answer.
 export function larkspurLlm(explain: (messages: ChatMessage[]) => unknown = () => ({})) {
   return new FakeLlm((messages) => {
-    const step = PROMPTS.find(([prompt]) => messages[0]?.content === prompt)?.[1];
+    // By its start: a step's system prompt may carry a note after it (the client's language, #43).
+    const step = PROMPTS.find(([prompt]) => messages[0]?.content.startsWith(prompt))?.[1];
     if (!step) throw new Error("unknown prompt");
     return JSON.stringify(step === "explain" ? explain(messages) : PIPELINE[step]);
   });

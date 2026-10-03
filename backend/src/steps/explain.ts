@@ -3,6 +3,7 @@ import {
   type CaseClient,
   type CaseDocument,
   type CaseFinding,
+  type ClientLanguage,
   Explanation,
   type ExplanationDepth,
   KnowledgeLevel,
@@ -38,7 +39,15 @@ type Item = {
   brief: string;
 };
 
-type ExplainInput = { adviceId: string; advice: CaseAdvice; items: Item[]; documents: CaseDocument[] };
+type ExplainInput = { adviceId: string; advice: CaseAdvice; items: Item[]; documents: CaseDocument[]; language: ClientLanguage };
+
+// The language the explanation is written in (#43). Quoted document text stays as the document has it, in
+// straight double quotes, so every grounding check below holds whatever the language around it.
+const LANGUAGE_NOTE: Record<ClientLanguage, string> = {
+  en: "",
+  "zh-Hant":
+    "\n\nWrite every summary and passage in Traditional Chinese, as used in Hong Kong (繁體中文). Keep any text you quote from a document exactly as the document has it, in English, inside straight double quotes \"…\". Rule ids (S1, P3) and numbers stay as they are.",
+};
 
 const ExplainReply = z.object({ depths: z.record(z.string(), z.unknown()) });
 type ExplainReply = z.infer<typeof ExplainReply>;
@@ -74,20 +83,26 @@ export const explain: StepDefinition<ExplainInput, Explanation, ExplainReply> = 
     if (advice.supersededAtSeq !== null) throw new StepPrecondition(`advice ${inputRunId} has been superseded`);
     const client = state.clients.find((c) => c.clientId === advice.client_id)!;
     const attributes = await attributesOf(db, caseId, advice.attributes_run_id);
-    return { adviceId: inputRunId, advice, items: items(advice, client, attributes, state.findings), documents: state.documents };
+    return {
+      adviceId: inputRunId,
+      advice,
+      items: items(advice, client, attributes, state.findings),
+      documents: state.documents,
+      language: client.profile.language ?? "en",
+    };
   },
 
-  messages({ advice, items }) {
+  messages({ advice, items, language }) {
     const lines = [`Verdict: ${advice.verdict.replace("_", " ")}`, "", "Items:", ...items.map((i) => i.brief)];
     return [
-      { role: "system", content: EXPLAIN_SYSTEM_PROMPT },
+      { role: "system", content: EXPLAIN_SYSTEM_PROMPT + LANGUAGE_NOTE[language] },
       { role: "user", content: lines.join("\n") },
     ];
   },
 
   output: ExplainReply,
 
-  ground(reply, { adviceId, items, documents }) {
+  ground(reply, { adviceId, items, documents, language }) {
     const problems: string[] = [];
     const depths: Partial<Record<KnowledgeLevel, ExplanationDepth>> = {};
     for (const depth of KnowledgeLevel.options) {
@@ -100,7 +115,7 @@ export const explain: StepDefinition<ExplainInput, Explanation, ExplainReply> = 
       depths[depth] = parsed.data;
     }
     if (problems.length > 0) return { error: `the explanation does not hold to the advice: ${problems.join("; ")}` };
-    return { output: Explanation.parse({ advice_id: adviceId, depths }) };
+    return { output: Explanation.parse({ advice_id: adviceId, language, depths }) };
   },
 };
 
