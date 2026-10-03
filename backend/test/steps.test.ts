@@ -234,6 +234,24 @@ describe("a step that cannot run", () => {
     expect((await runExtract(t, caseId)).status).toBe(503);
   });
 
+  it("is 400 for parse, whose contract exists and whose runner does not yet, with nothing appended", async () => {
+    const llm = new FakeLlm(() => EXTRACT_REPLY);
+    const t = await setup({ llm });
+    const caseId = await caseWithDocument(t);
+
+    const res = await t.request("POST", `/cases/${caseId}/steps`, {
+      step_run_id: randomUUID(),
+      step: "parse",
+      input_run_id: null,
+      intent: "fee problems in the PPM",
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "the parse step is not implemented yet" });
+    expect(llm.calls).toHaveLength(0);
+    expect(await eventTypes(t, caseId)).toEqual(["case.opened", "document.ingested"]);
+  });
+
   it("is 404 for an unknown case", async () => {
     const t = await setup({ llm: new FakeLlm(() => EXTRACT_REPLY) });
     expect((await runExtract(t, randomUUID())).status).toBe(404);

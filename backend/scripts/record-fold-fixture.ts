@@ -92,7 +92,7 @@ const findings = [
 
 // A scripted model answering call by call, so the run is told exactly which step each reply belongs to.
 // Call 1 fails as if the endpoint were down; the retry reuses the same run id and spends no tokens.
-const script: [step: StepName, reply: unknown][] = [
+const script: [step: Exclude<StepName, "parse">, reply: unknown][] = [
   ["extract", { statements: claims.map(({ document_id, page, quote }) => ({ document_id, page, quote })) }],
   ["decompose", { claims }],
   ["contradictions", { issues: [firstIssue] }],
@@ -100,7 +100,7 @@ const script: [step: StepName, reply: unknown][] = [
   ["contradictions", { issues }],
   ["findings", { findings }],
 ];
-const PROMPTS: Record<StepName, string> = {
+const PROMPTS: Record<Exclude<StepName, "parse">, string> = {
   extract: EXTRACT_SYSTEM_PROMPT,
   decompose: DECOMPOSE_SYSTEM_PROMPT,
   contradictions: CONTRADICTIONS_SYSTEM_PROMPT,

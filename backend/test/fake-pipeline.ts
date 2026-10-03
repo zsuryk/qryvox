@@ -50,6 +50,8 @@ export const REPLIES = {
   compliance: { gaps: [] },
   attributes: {},
   explain: {},
+  // No runner yet (#51): the server refuses parse before any model call.
+  parse: { chips: [] },
 } satisfies Record<StepName, unknown>;
 
 const PROMPTS: [string, StepName][] = [

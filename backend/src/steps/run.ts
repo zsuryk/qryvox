@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ANALYST_ACTOR, PROMPT_VERSIONS, type RunStepRequest, type StepFailure, type StepResult } from "@qryvox/shared";
+import { ANALYST_ACTOR, PROMPT_VERSIONS, type RunStepRequest, type StepFailure, type StepName, type StepResult } from "@qryvox/shared";
 import type { Db } from "../db/client.js";
 import type { EventRow } from "../db/schema.js";
 import { checkRateLimit, type RateLimits } from "../guards.js";
@@ -14,7 +14,13 @@ import { extract } from "./extract.js";
 import { findings } from "./findings.js";
 import type { AnyStep } from "./step.js";
 
-const STEPS: Record<RunStepRequest["step"], AnyStep> = { extract, decompose, contradictions, compliance, findings, attributes, explain };
+// parse (#51) has a contract in shared and no runner yet: no prompt, no step definition.
+const STEPS: Record<Exclude<StepName, "parse">, AnyStep> = { extract, decompose, contradictions, compliance, findings, attributes, explain };
+
+// A step the contract names that this server cannot run yet. Refused before anything is read or appended.
+export class StepNotRunnable extends Error {
+  override name = "StepNotRunnable";
+}
 
 export class LlmNotConfigured extends Error {
   override name = "LlmNotConfigured";
@@ -40,6 +46,7 @@ export async function runStep(
   req: RunStepRequest,
   caller: StepCaller,
 ): Promise<StepOutcome> {
+  if (req.step === "parse") throw new StepNotRunnable("the parse step is not implemented yet");
   const done = await findCompletedRun(db, caseId, req.step_run_id);
   if (done) return completedOutcome(done, req);
 

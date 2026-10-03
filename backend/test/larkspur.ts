@@ -107,9 +107,9 @@ const PIPELINE = {
     ],
   },
   attributes: ATTRIBUTES_REPLY,
-} satisfies Record<Exclude<StepName, "explain">, unknown>;
+} satisfies Record<Exclude<StepName, "explain" | "parse">, unknown>;
 
-const PROMPTS: [string, StepName][] = [
+const PROMPTS: [string, Exclude<StepName, "parse">][] = [
   [EXTRACT_SYSTEM_PROMPT, "extract"],
   [DECOMPOSE_SYSTEM_PROMPT, "decompose"],
   [CONTRADICTIONS_SYSTEM_PROMPT, "contradictions"],
