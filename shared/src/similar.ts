@@ -44,7 +44,8 @@ export function nearestStatements(events: readonly SlimEvent[], citation: Citati
 
 // The statements of the latest completed extract run that was not a find-similar run, once each. A seeded
 // run answers one passage, not the pack, so its statements are candidates rather than the case's corpus.
-function latestStatements(events: readonly SlimEvent[]): Citation[] {
+// Every one is a passage the case may show as a card (caseCards, canvas.ts).
+export function latestStatements(events: readonly SlimEvent[]): Citation[] {
   const latest = [...events]
     .sort((a, b) => b.seq - a.seq)
     .find((e) => e.type === "step.completed" && e.payload.step === "extract" && e.payload.seed === undefined);

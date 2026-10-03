@@ -9,8 +9,12 @@ import {
   findingCardId,
   FIND_SIMILAR_STEP,
   fold,
+  latestStatements,
+  nearestStatements,
   seededPassages,
+  similarNeighbours,
   SlimEvent,
+  type CaseCard,
 } from "../src";
 import recorded from "../fixtures/case-recorded.json";
 
@@ -38,6 +42,50 @@ function withSeededExtract(log: readonly SlimEvent[], seed: object, statements: 
     }),
   )];
 }
+
+// A card event after the log, as the backend appends one.
+function withCardEvent(log: readonly SlimEvent[], type: string, payload: object): SlimEvent[] {
+  const seq = log.at(-1)!.seq + 1;
+  return [
+    ...log,
+    SlimEvent.parse({
+      seq,
+      event_id: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
+      case_id: log[0]!.case_id,
+      actor: "demo-analyst",
+      at: log.at(-1)!.at,
+      step_run_id: null,
+      type,
+      v: 1,
+      payload,
+    }),
+  ];
+}
+
+// A later unseeded extract run: the case's statements are now these. The recorded run's eleven are all
+// cited by a finding, so a run with passages no finding cites is what gives a press something new.
+const waiver = { document_id: "factsheet", page: 1, quote: "The management fee is waived for the first year" };
+function withExtract(log: readonly SlimEvent[], statements: object[], runId = "0d9c8b7a-6f5e-4d3c-8b2a-1f0e9d8c7b6a"): SlimEvent[] {
+  const run = { step: "extract", model: "fake", prompt_version: "extract@1", input_run_id: null };
+  const last = log.at(-1)!;
+  return [
+    ...log,
+    ...(["step.started", "step.completed"] as const).map((type, i) =>
+      SlimEvent.parse({
+        ...last,
+        seq: last.seq + 1 + i,
+        event_id: `00000000-0000-4000-9000-${String(last.seq + 1 + i).padStart(12, "0")}`,
+        step_run_id: runId,
+        type,
+        payload: type === "step.started" ? run : { ...run, output: { statements } },
+      }),
+    ),
+  ];
+}
+const extracted = withExtract(events, [...latestStatements(events), waiver, minimum]);
+
+// The cards the canvas draws before anything names a latent one: all but the extract run's other statements.
+const drawn = (cards: CaseCard[]) => cards.filter((c) => !(c.kind === "excerpt" && c.latent));
 
 describe("the card operation request", () => {
   const id = "0b8e6a8c-2f7d-4c1e-9a3b-5d6f7e8a9b0c";
@@ -80,8 +128,8 @@ describe("the card operation request", () => {
 
 describe("the cards a case has", () => {
   it("is each active finding then its passages, then a seeded run's new passages as candidates", () => {
-    const base = caseCards(events);
-    const cards = caseCards(withSeededExtract(events, feeSeed, [feeSeed, minimum]));
+    const base = drawn(caseCards(events));
+    const cards = drawn(caseCards(withSeededExtract(events, feeSeed, [feeSeed, minimum])));
 
     expect(base[0]).toMatchObject({ cardId: findingCardId(fees!.finding_id), kind: "finding" });
     expect(base[1]).toEqual({ cardId: excerptCardId(feeSeed), kind: "excerpt", citation: feeSeed });
@@ -120,6 +168,81 @@ describe("where a card may dock", () => {
     const log = withSeededExtract(events, stray, [minimum]);
     const state = fold(log);
     const cards = caseCards(log, state);
-    expect(cardCategories(cards.at(-1)!, state, cards)).toEqual([]);
+    const candidate = cards.find((c) => c.cardId === excerptCardId(minimum))!;
+    expect(candidate).toMatchObject({ candidateOf: RUN });
+    expect(cardCategories(candidate, state, cards)).toEqual([]);
+  });
+
+  it("is nowhere for a latent statement, and under the pressed card's category for its instant neighbour", () => {
+    const state = fold(extracted);
+    const cards = caseCards(extracted, state);
+    const latent = cards.find((c) => c.cardId === excerptCardId(waiver))!;
+    expect(latent).toMatchObject({ latent: true });
+    expect(cardCategories(latent, state, cards)).toEqual([]);
+
+    const pressed = withCardEvent(extracted, "card.similar_requested", { card_id: excerptCardId(feeSeed), step_kind: FIND_SIMILAR_STEP });
+    const after = caseCards(pressed);
+    const neighbour = after.find((c) => c.cardId === excerptCardId(waiver))!;
+    expect(neighbour).toMatchObject({ neighbourOf: { cardId: excerptCardId(feeSeed) } });
+    expect(cardCategories(neighbour, fold(pressed), after)).toEqual([fees!.category]);
+  });
+});
+
+describe("the statements a case has as cards (#60)", () => {
+  it("is every statement of the latest unseeded extract run, latent unless something brought it", () => {
+    // On the recorded case every statement is cited by a finding, so none is latent.
+    expect(caseCards(events).some((c) => c.kind === "excerpt" && c.latent)).toBe(false);
+    const cards = caseCards(extracted);
+    const latent = cards.filter((c) => c.kind === "excerpt" && c.latent);
+    const ids = new Set(cards.map((c) => c.cardId));
+    expect(latestStatements(extracted).every((s) => ids.has(excerptCardId(s)))).toBe(true);
+    // A statement a finding cites already has its card, and is not latent.
+    expect(latent.map((c) => c.cardId)).toEqual([excerptCardId(waiver), excerptCardId(minimum)]);
+    // Last, after every card that is drawn.
+    expect(cards.slice(cards.length - latent.length)).toEqual(latent);
+  });
+
+  it("does not count a seeded run's statements as the case's", () => {
+    const stray = { document_id: "deck", page: 1, quote: "Only a seeded run returned this" };
+    const cards = caseCards(withSeededExtract(events, feeSeed, [stray]));
+    expect(cards.find((c) => c.cardId === excerptCardId(stray))).toMatchObject({ candidateOf: RUN });
+    expect(cards.find((c) => c.cardId === excerptCardId(stray))).not.toHaveProperty("latent");
+  });
+});
+
+describe("a press of find similar (#60)", () => {
+  const finding = findingCardId(fees!.finding_id);
+  const pressed = withCardEvent(extracted, "card.similar_requested", { card_id: finding, step_kind: FIND_SIMILAR_STEP });
+
+  it("brings the seed's nearest statements at once, as neighbours of the card pressed, with no run", () => {
+    const before = drawn(caseCards(extracted));
+    const after = drawn(caseCards(pressed));
+    const atSeq = pressed.at(-1)!.seq;
+    const expected = nearestStatements(extracted, feeSeed, 5).map((n) => n.citation);
+    expect(expected).toContainEqual(waiver);
+    expect(similarNeighbours(pressed, feeSeed, atSeq)).toEqual(expected);
+
+    const added = after.slice(before.length);
+    const had = new Set(before.map((c) => c.cardId));
+    // Every neighbour is on the canvas once: those that already had a card keep it.
+    expect(added.map((c) => c.cardId)).toEqual(expected.map(excerptCardId).filter((id) => !had.has(id)));
+    expect(added.length).toBeGreaterThan(0);
+    for (const card of added) expect(card).toMatchObject({ kind: "excerpt", neighbourOf: { cardId: finding, seed: feeSeed, atSeq } });
+  });
+
+  it("finds an excerpt card's passage from its card id, and keeps what a press found when a later extract run replaces the corpus", () => {
+    const fromExcerpt = withCardEvent(extracted, "card.similar_requested", { card_id: excerptCardId(feeSeed), step_kind: FIND_SIMILAR_STEP });
+    const neighbours = drawn(caseCards(fromExcerpt)).filter((c) => c.kind === "excerpt" && c.neighbourOf);
+    expect(neighbours.length).toBeGreaterThan(0);
+
+    const pinned = withCardEvent(fromExcerpt, "card.pinned", { card_id: neighbours[0]!.cardId, world_pos: { x: 0, y: 0 } });
+    const later = withExtract(pinned, [minimum], "1e2d3c4b-5a69-4788-9a0b-c1d2e3f4a5b6");
+    const kept = caseCards(later).filter((c) => c.kind === "excerpt" && c.neighbourOf);
+    expect(kept.map((c) => c.cardId)).toEqual(neighbours.map((c) => c.cardId));
+  });
+
+  it("brings neighbours for a press recorded before #60, which named contradictions", () => {
+    const old = withCardEvent(extracted, "card.similar_requested", { card_id: finding, step_kind: "contradictions" });
+    expect(drawn(caseCards(old)).map((c) => c.cardId)).toEqual(drawn(caseCards(pressed)).map((c) => c.cardId));
   });
 });

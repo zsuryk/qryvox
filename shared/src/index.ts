@@ -26,7 +26,7 @@ export {
   PlanSlot,
   WorldPos,
 } from "./card.js";
-export { type CaseCard, caseCards, cardCategories, citingFindings, seededPassages } from "./canvas.js";
+export { type CaseCard, caseCards, cardCategories, citingFindings, INSTANT_NEIGHBOURS, seededPassages, similarNeighbours } from "./canvas.js";
 export {
   ClientGoal,
   ClientLanguage,
@@ -101,7 +101,7 @@ export {
 } from "./events.js";
 export { explanationFor } from "./explanation.js";
 export { Rationale, RATIONALE_MAX_LENGTH, rationaleFor, RationaleOutput } from "./rationale.js";
-export { type Neighbour, nearestStatements } from "./similar.js";
+export { latestStatements, type Neighbour, nearestStatements } from "./similar.js";
 export { ChipStep, IntentChip, ParseInput, ParseOutput, type ResolvedIntent, resolveIntent } from "./intent.js";
 export { fold, FoldError } from "./fold.js";
 export { type Assessment, assessSuitability } from "./suitability.js";
