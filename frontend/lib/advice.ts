@@ -13,6 +13,7 @@ import {
   productRiskLevel,
   type ProfileField,
   type ReasonEffect,
+  type RejectionReason,
   type SlimEvent,
   type SupersedeCause,
   type Verdict,
@@ -63,6 +64,8 @@ export function answerText(profile: ClientProfile, field: ProfileField): string 
       return profile.may_need_cash_at_short_notice ? "May need the money at short notice" : "Will not need the money at short notice";
     case "exclusions":
       return profile.exclusions.length === 0 ? "No exclusions" : `Excludes ${profile.exclusions.map((e) => EXCLUSION[e].toLowerCase()).join(", ")}`;
+    case "aged_65_or_over":
+      return profile.aged_65_or_over ? "65 or over" : "Under 65";
   }
 }
 
@@ -76,8 +79,18 @@ export function profileSummary(profile: ClientProfile): string[] {
     ...(profile.relies_on_income ? ["Relies on the income"] : []),
     ...(profile.may_need_cash_at_short_notice ? ["May need cash quickly"] : []),
     ...profile.exclusions.map((e) => `No ${EXCLUSION[e].toLowerCase()}`),
+    ...(profile.aged_65_or_over ? ["65 or over"] : []),
   ];
 }
+
+// Why a draft was rejected, in the adviser's words (#42).
+export const REJECTION: Record<RejectionReason, string> = {
+  circumstances_not_captured: "Answers miss the client's circumstances",
+  product_facts_wrong: "A product fact is wrong",
+  explanation_not_adequate: "The explanation is not adequate",
+  client_prefers_another_product: "The client prefers another product",
+  needs_discussion_first: "Needs a conversation first",
+};
 
 // --- The risk questionnaire ----------------------------------------------------------------------
 

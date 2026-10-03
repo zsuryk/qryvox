@@ -2,7 +2,20 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { type AdviceDecision, type Citation, type ClientProfile, fold, knowledgeSuggestion, READING_THRESHOLD, ruleById, type SlimEvent } from "@qryvox/shared";
+import {
+  type AdviceDecision,
+  type Citation,
+  type ClientProfile,
+  type DecisionConfirmation,
+  fold,
+  knowledgeSuggestion,
+  READING_THRESHOLD,
+  type RejectionReason,
+  RejectionReason as Reasons,
+  ruleById,
+  type SlimEvent,
+  vulnerability,
+} from "@qryvox/shared";
 import {
   type AdviceView,
   adviceView,
@@ -15,6 +28,7 @@ import {
   KNOWLEDGE,
   newClientId,
   profileSummary,
+  REJECTION,
   VERDICT,
 } from "../lib/advice";
 import { decideAdvice, draftAdvice, fetchEvents, recordProfile, runStep } from "../lib/api";
@@ -193,12 +207,12 @@ export default function AdviceSection({ caseId, events, refetch }: { caseId: str
                     runStep(caseId, { step_run_id: crypto.randomUUID(), step: "explain", input_run_id: adviceId }),
                   )
                 }
-                onDecide={(adviceId, decision) =>
+                onDecide={(adviceId, decision, extra) =>
                   void act(
                     `decide:${adviceId}`,
                     decision === "approved" ? "Approving" : "Rejecting",
                     decision === "approved" ? "Approved. The client can now see this advice." : "Rejected. The client will not see it.",
-                    () => decideAdvice(caseId, adviceId, crypto.randomUUID(), decision),
+                    () => decideAdvice(caseId, adviceId, crypto.randomUUID(), decision, extra),
                   )
                 }
               />
@@ -244,10 +258,14 @@ function ClientCard({
   onCite: (citation: Citation, label: string) => void;
   onDraft: () => void;
   onExplain: (adviceId: string) => void;
-  onDecide: (adviceId: string, decision: AdviceDecision) => void;
+  onDecide: (adviceId: string, decision: AdviceDecision, extra: { reason?: RejectionReason; confirmations?: DecisionConfirmation[] }) => void;
 }) {
   const { client, advice, redraft, explanation } = row;
   const profile = client.profile;
+  // A client who calls for extra care, and why (#42): approving needs the adviser's confirmation.
+  const vulnerable = vulnerability(profile);
+  const [explained, setExplained] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
 
   return (
     <li className="card stack" style={{ "--stack-gap": "1rem" } as React.CSSProperties}>
@@ -271,6 +289,22 @@ function ClientCard({
           New answers
         </button>
       </div>
+
+      {vulnerable.length > 0 && (
+        <div className="notice notice--caution stack" style={{ "--stack-gap": "0.375rem" } as React.CSSProperties}>
+          <p className="t-footnote strong" style={{ color: "var(--label)" }}>
+            This client needs extra care: {vulnerable.join("; ")}.
+          </p>
+          {advice !== null && advice.decision === null && (
+            <label className="switch">
+              <input type="checkbox" checked={explained} onChange={(e) => setExplained(e.target.checked)} />
+              <span className="t-footnote" style={{ color: "var(--label)" }}>
+                I have explained this advice to the client directly. Approving records this confirmation.
+              </span>
+            </label>
+          )}
+        </div>
+      )}
 
       {suggestion && (
         <div className="notice notice--tint row spread">
@@ -314,6 +348,8 @@ function ClientCard({
               <span className={`badge badge--strong ${advice.decision.decision === "approved" ? "badge--positive" : "badge--negative"}`}>
                 <span className="dot" />
                 {advice.decision.decision === "approved" ? "Approved" : "Rejected"} by {advice.decision.actor}
+                {advice.decision.reason ? ` · ${REJECTION[advice.decision.reason]}` : ""}
+                {advice.decision.confirmations.includes("explained_directly") ? " · explained directly" : ""}
               </span>
             ) : (
               <span className="badge badge--strong badge--caution">
@@ -395,18 +431,26 @@ function ClientCard({
               )}
             </div>
             <div className="row" role="group" aria-label="The adviser's decision">
-              {(["approved", "rejected"] as const).map((decision) => (
-                <button
-                  key={decision}
-                  type="button"
-                  className={`btn btn--small ${decision === "approved" ? "btn--positive" : "btn--negative"}`}
-                  aria-pressed={advice.decision?.decision === decision}
-                  disabled={busy !== null}
-                  onClick={() => onDecide(advice.adviceId, decision)}
-                >
-                  {decision === "approved" ? "Approve" : "Reject"}
-                </button>
-              ))}
+              <button
+                type="button"
+                className="btn btn--small btn--positive"
+                aria-pressed={advice.decision?.decision === "approved"}
+                disabled={busy !== null || (vulnerable.length > 0 && !explained)}
+                title={vulnerable.length > 0 && !explained ? "Confirm you have explained it to the client first" : undefined}
+                onClick={() => onDecide(advice.adviceId, "approved", vulnerable.length > 0 ? { confirmations: ["explained_directly"] } : {})}
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                className="btn btn--small btn--negative"
+                aria-pressed={advice.decision?.decision === "rejected" || rejecting}
+                aria-expanded={rejecting}
+                disabled={busy !== null}
+                onClick={() => setRejecting((r) => !r)}
+              >
+                Reject…
+              </button>
               {advice.decision?.decision === "approved" && (
                 <Link className="btn btn--small btn--plain" href={`/clients/${caseId}/${client.clientId}`}>
                   Client&apos;s view →
@@ -415,6 +459,28 @@ function ClientCard({
             </div>
           </div>
         </>
+      )}
+
+      {advice !== null && rejecting && (
+        <div className="inset stack materialize" style={{ "--stack-gap": "0.5rem" } as React.CSSProperties}>
+          <p className="t-footnote strong">Why is this draft rejected? The reason goes on the record.</p>
+          <div className="choices" role="group" aria-label="Reason for rejecting">
+            {Reasons.options.map((reason) => (
+              <button
+                key={reason}
+                type="button"
+                className="chip"
+                disabled={busy !== null}
+                onClick={() => {
+                  setRejecting(false);
+                  onDecide(advice.adviceId, "rejected", { reason });
+                }}
+              >
+                {REJECTION[reason]}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {row.earlier > 0 && (

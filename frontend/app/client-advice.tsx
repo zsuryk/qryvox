@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ANALYST_ACTOR, type Citation, type ClientProfile, type KnowledgeLevel, ruleById, type SlimEvent } from "@qryvox/shared";
+import { ANALYST_ACTOR, type Citation, type ClientProfile, type KnowledgeLevel, ruleById, type SlimEvent, vulnerability } from "@qryvox/shared";
 import { answerText, EFFECT } from "../lib/advice";
 import { when } from "../lib/case";
 import { recordReading } from "../lib/api";
@@ -37,6 +37,9 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
         </h1>
         <div className="card stack" style={{ "--stack-gap": "0.5rem", marginTop: "2rem" } as React.CSSProperties}>
           <p className="t-body">{message}</p>
+          {view.status === "reviewing" && view.profile && vulnerability(view.profile).length > 0 && (
+            <p className="t-callout">Your adviser will speak with you before confirming it, to make sure it is explained properly.</p>
+          )}
           {view.status === "reviewing" && <Waiting />}
         </div>
         {view.profile && <YourAnswers profile={view.profile} open />}
@@ -196,7 +199,7 @@ function Waiting() {
 // What the client told us, in their words back to them: the advice rests on these answers, so they can
 // check them.
 function YourAnswers({ profile, open = false }: { profile: ClientProfile; open?: boolean }) {
-  const fields = ["goal", "horizon_years", "risk_level", "knowledge", "relies_on_income", "may_need_cash_at_short_notice", "exclusions"] as const;
+  const fields = ["goal", "horizon_years", "risk_level", "knowledge", "relies_on_income", "may_need_cash_at_short_notice", "aged_65_or_over", "exclusions"] as const;
   return (
     <details className="card" open={open} style={{ marginTop: "1.5rem" }}>
       <summary>What you told us</summary>
@@ -223,4 +226,5 @@ const FIELD = {
   relies_on_income: "Income",
   may_need_cash_at_short_notice: "Access to your money",
   exclusions: "You will not invest in",
+  aged_65_or_over: "Your age",
 } as const;

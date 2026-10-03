@@ -3,7 +3,9 @@ import {
   AppendResponse,
   ChangeDispositionRequest,
   type ClientProfile,
+  type DecisionConfirmation,
   type KnowledgeLevel,
+  type RejectionReason,
   EventPage,
   type IngestedDocument,
   JUDGE_TOKEN_HEADER,
@@ -161,8 +163,15 @@ export async function draftAdvice(caseId: string, eventId: string, clientId: str
 }
 
 // The adviser's sign-off. Nothing reaches a client without it.
-export async function decideAdvice(caseId: string, adviceId: string, eventId: string, decision: AdviceDecision): Promise<AppendResponse> {
-  return AppendResponse.parse(await post(`/cases/${caseId}/advice/${adviceId}/decision`, { event_id: eventId, decision }));
+// With its reason when it rejects, and what the adviser confirmed when it approves (#42).
+export async function decideAdvice(
+  caseId: string,
+  adviceId: string,
+  eventId: string,
+  decision: AdviceDecision,
+  extra: { reason?: RejectionReason; confirmations?: DecisionConfirmation[] } = {},
+): Promise<AppendResponse> {
+  return AppendResponse.parse(await post(`/cases/${caseId}/advice/${adviceId}/decision`, { event_id: eventId, decision, ...extra }));
 }
 
 // The depth a client chose, shared by them (#38). Called only once they have switched sharing on.

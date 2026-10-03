@@ -22,6 +22,7 @@ const WORDS = {
     circumstances: "Circumstances",
     income: "Relies on the income it pays",
     cash: "May need the money at short notice",
+    age: "Aged 65 or over",
     exclusions: "Will not invest in",
   },
   client: {
@@ -34,6 +35,7 @@ const WORDS = {
     circumstances: "Your situation",
     income: "I rely on the income it pays",
     cash: "I may need the money at short notice",
+    age: "I am 65 or over",
     exclusions: "I will not invest in",
   },
 } as const;
@@ -157,6 +159,10 @@ export default function ProfileForm({
           <label className="switch">
             <input type="checkbox" checked={profile.may_need_cash_at_short_notice} onChange={(e) => set("may_need_cash_at_short_notice", e.target.checked)} />
             <span className="t-callout">{w.cash}</span>
+          </label>
+          <label className="switch">
+            <input type="checkbox" checked={profile.aged_65_or_over ?? false} onChange={(e) => set("aged_65_or_over", e.target.checked)} />
+            <span className="t-callout">{w.age}</span>
           </label>
         </div>
       </Field>
