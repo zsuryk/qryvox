@@ -184,7 +184,9 @@ the card. *Dock* puts a card in the plan region;
 *pin* holds it at a world position that auto-tiling flows around, and *unpin* lets it back into the flow;
 *discard* rejects it to the **discard bin** (the corner of the canvas a card is thrown to, and restored from),
 and takes it out of the plan region; *restore*, or docking it again, brings it back; *find similar* asks
-for a seeded re-run of the step that produced it.
+for a seeded re-run of **extract** over the documents, seeded with the passage the card shows — a finding
+card's own citation included (#66). *Not* contradictions, which a finding card used to re-run: it returned
+the issue the finding was already made of, whose passage already had a card (#57).
 *Discard* is not *dismissed*: discarding a finding card neither dismisses nor supersedes the finding.
 
 **Status panel** — the canvas's view of the case's own log (`frontend/lib/canvas-status.ts`): one line per
