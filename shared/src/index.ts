@@ -18,6 +18,7 @@ export {
 } from "./advice.js";
 export {
   ClientGoal,
+  ClientLanguage,
   ClientProfile,
   DealingFrequency,
   DerivativesUse,

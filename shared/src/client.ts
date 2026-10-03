@@ -15,6 +15,10 @@ export const KnowledgeLevel = z.enum(["novice", "informed", "expert"]);
 export type KnowledgeLevel = z.infer<typeof KnowledgeLevel>;
 
 export const Exclusion = z.enum(["fossil_fuels", "tobacco", "weapons"]);
+
+// The language a client reads in (#43): their pages, and the explanation the explain step writes for them.
+export const ClientLanguage = z.enum(["en", "zh-Hant"]);
+export type ClientLanguage = z.infer<typeof ClientLanguage>;
 export type Exclusion = z.infer<typeof Exclusion>;
 
 // A client's answers, every one chosen with a control: no free text anywhere (README: zero text boxes).
@@ -35,6 +39,8 @@ export const ClientProfile = z.object({
   // A coarse band, not a birth date (data minimisation): whether the client is 65 or over, one of the
   // signs of a vulnerable client (#42). Optional, so answers recorded before it still parse.
   aged_65_or_over: z.boolean().optional(),
+  // English unless the client chose otherwise; optional, so answers recorded before it still parse.
+  language: ClientLanguage.optional(),
 });
 export type ClientProfile = z.infer<typeof ClientProfile>;
 

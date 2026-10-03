@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { KnowledgeLevel, ProfileField } from "./client.js";
+import { ClientLanguage, KnowledgeLevel, ProfileField } from "./client.js";
 import { Citation } from "./finding.js";
 import { SuitabilityRuleId } from "./rules.js";
 
@@ -131,6 +131,8 @@ export type ExplanationDepth = z.infer<typeof ExplanationDepth>;
 // another model call.
 export const Explanation = z.object({
   advice_id: z.uuid(),
+  // The language it is written in (#43); quoted document text stays in the document's own language.
+  language: ClientLanguage.optional(),
   depths: z.object({ novice: ExplanationDepth, informed: ExplanationDepth, expert: ExplanationDepth }),
 }) satisfies z.ZodType<{ depths: Record<KnowledgeLevel, ExplanationDepth> }>;
 export type Explanation = z.infer<typeof Explanation>;
