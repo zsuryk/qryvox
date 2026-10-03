@@ -43,8 +43,10 @@ const supersede = (adviceId: string, cause: "profile_changed" | "product_changed
 });
 
 // A new version of a client's profile. Advice drafted on the old version is superseded with it.
-export function recordProfile(db: Db, caseId: string, eventId: string, profile: ClientProfile): Promise<EventRow> {
-  return appendOnceWith(db, caseId, head(eventId, "client.profiled"), async (tx) => {
+// Recorded by the adviser by default; given by the client on their own page, the client is its actor.
+export function recordProfile(db: Db, caseId: string, eventId: string, profile: ClientProfile, byClient = false): Promise<EventRow> {
+  const event = { ...head(eventId, "client.profiled"), ...(byClient ? { actor: profile.client_id } : {}) };
+  return appendOnceWith(db, caseId, event, async (tx) => {
     const state = await foldCase(tx, caseId);
     return { payload: profile, companions: inPlay(state, profile.client_id).map((a) => supersede(a.adviceId, "profile_changed")) };
   });

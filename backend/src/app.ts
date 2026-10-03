@@ -165,7 +165,7 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
     if (!body.success) return badRequest(c, body.error);
     if (!(await caseExists(db, caseId))) return notFound(c, caseId);
 
-    const row = await recordProfile(db, caseId, body.data.event_id, body.data.profile);
+    const row = await recordProfile(db, caseId, body.data.event_id, body.data.profile, body.data.by_client ?? false);
     return c.json({ seq: row.seq } satisfies AppendResponse, 201);
   });
 

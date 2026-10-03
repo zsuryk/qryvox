@@ -238,3 +238,14 @@ describe("a client's readings (#38)", () => {
     expect((await reading("persona-nobody")).status).toBe(404);
   });
 });
+
+describe("answers a client gives themselves", () => {
+  it("are recorded with the client as their actor, and the adviser's as before", async () => {
+    const { t, caseId } = await larkspurCase({ verified: false, attributes: false });
+    await t.request("POST", `/cases/${caseId}/clients`, { event_id: randomUUID(), profile: chan, by_client: true });
+    await t.request("POST", `/cases/${caseId}/clients`, { event_id: randomUUID(), profile: lee });
+
+    const profiled = (await state(t, caseId)).events.filter((e) => e.type === "client.profiled");
+    expect(profiled.map((e) => e.actor)).toEqual(["persona-chan", "demo-analyst"]);
+  });
+});
