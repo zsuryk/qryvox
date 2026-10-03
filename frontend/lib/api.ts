@@ -3,6 +3,7 @@ import {
   AppendResponse,
   ChangeDispositionRequest,
   type ClientProfile,
+  type KnowledgeLevel,
   EventPage,
   type IngestedDocument,
   JUDGE_TOKEN_HEADER,
@@ -161,4 +162,9 @@ export async function draftAdvice(caseId: string, eventId: string, clientId: str
 // The adviser's sign-off. Nothing reaches a client without it.
 export async function decideAdvice(caseId: string, adviceId: string, eventId: string, decision: AdviceDecision): Promise<AppendResponse> {
   return AppendResponse.parse(await post(`/cases/${caseId}/advice/${adviceId}/decision`, { event_id: eventId, decision }));
+}
+
+// The depth a client chose, shared by them (#38). Called only once they have switched sharing on.
+export async function recordReading(caseId: string, clientId: string, adviceId: string, depth: KnowledgeLevel): Promise<AppendResponse> {
+  return AppendResponse.parse(await post(`/cases/${caseId}/clients/${clientId}/readings`, { event_id: crypto.randomUUID(), advice_id: adviceId, depth }));
 }

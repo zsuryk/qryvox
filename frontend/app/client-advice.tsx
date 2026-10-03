@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ANALYST_ACTOR, type Citation, type KnowledgeLevel, ruleById, type SlimEvent } from "@qryvox/shared";
 import { EFFECT } from "../lib/advice";
+import { recordReading } from "../lib/api";
 import { clientView, DEPTH, HEADLINE } from "../lib/client-view";
 import CitationSheet from "./citation-sheet";
 import { Segmented } from "./ui";
@@ -11,10 +12,14 @@ import { Segmented } from "./ui";
 // at the depth the client reads at (they can change it), what they must know as prominently as the
 // verdict, and where every statement comes from one tap away. Only advice an adviser approved is shown.
 
-export default function ClientAdvice({ events, clientId }: { events: readonly SlimEvent[]; clientId: string }) {
+export default function ClientAdvice({ caseId, events, clientId }: { caseId: string; events: readonly SlimEvent[]; clientId: string }) {
   const view = clientView(events, clientId);
   const [depth, setDepth] = useState<KnowledgeLevel>(view.profile?.knowledge ?? "novice");
   const [citing, setCiting] = useState<{ citation: Citation; label: string } | null>(null);
+  // Whether the client lets their adviser see which depth they choose (#38). Off until they turn it on,
+  // and said on the page: nothing about how they read is recorded otherwise.
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(0);
 
   if (view.status !== "approved") {
     const message = {
@@ -62,7 +67,10 @@ export default function ClientAdvice({ events, clientId }: { events: readonly Sl
             label="How much detail"
             value={depth}
             options={(["novice", "informed", "expert"] as const).map((d) => ({ value: d, label: DEPTH[d] }))}
-            onChange={setDepth}
+            onChange={(next) => {
+              setDepth(next);
+              if (sharing) void recordReading(caseId, clientId, advice.adviceId, next).then(() => setShared((n) => n + 1)).catch(() => {});
+            }}
           />
         )}
       </div>
@@ -135,6 +143,16 @@ export default function ClientAdvice({ events, clientId }: { events: readonly Sl
         <p className="t-callout muted" style={{ marginTop: "1.5rem" }}>
           Nothing else your adviser has checked fits you either. They will talk you through what to do next.
         </p>
+      )}
+
+      {explanation && (
+        <label className="switch" style={{ marginTop: "2rem" }}>
+          <input type="checkbox" checked={sharing} onChange={(e) => setSharing(e.target.checked)} />
+          <span className="t-footnote">
+            Let my adviser see which level of detail I choose, so they can explain things my way.
+            {sharing && <span className="muted"> {shared > 0 ? `Shared ${shared} ${shared === 1 ? "choice" : "choices"}.` : "Nothing shared yet."}</span>}
+          </span>
+        </label>
       )}
 
       <footer className="t-footnote muted stack" style={{ "--stack-gap": "0.25rem", marginTop: "2.5rem" } as React.CSSProperties}>

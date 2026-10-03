@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { type AdviceDecision, type Citation, type ClientProfile, ruleById, type SlimEvent } from "@qryvox/shared";
+import { type AdviceDecision, type Citation, type ClientProfile, fold, knowledgeSuggestion, READING_THRESHOLD, ruleById, type SlimEvent } from "@qryvox/shared";
 import {
   type AdviceView,
   adviceView,
@@ -12,6 +12,7 @@ import {
   type ClientRow,
   EFFECT,
   factLines,
+  KNOWLEDGE,
   newClientId,
   profileSummary,
   VERDICT,
@@ -27,6 +28,9 @@ import Questionnaire from "./questionnaire";
 // every action is an event appended to the case's log and read back from it before it is shown.
 
 type Busy = { key: string; label: string } | null;
+
+// How the client page names each depth, so the suggestion speaks of what the client actually pressed.
+const KNOWLEDGE_DEPTH = { novice: "simple", informed: "detailed", expert: "in-full" } as const;
 
 export default function AdviceSection({ caseId, events, refetch }: { caseId: string; events: readonly SlimEvent[]; refetch: () => Promise<void> }) {
   // The log as most recently read: the server's copy until an action reads a newer one (as CaseView does).
@@ -155,6 +159,12 @@ export default function AdviceSection({ caseId, events, refetch }: { caseId: str
                 row={row}
                 blocked={view.blocked}
                 busy={busy}
+                suggestion={knowledgeSuggestion(fold(log), row.client.clientId)}
+                onAcceptSuggestion={(knowledge) =>
+                  void act(`suggest:${row.client.clientId}`, "Recording new answers", "New answers recorded. Advice on the old ones is set aside.", () =>
+                    recordProfile(caseId, crypto.randomUUID(), { ...row.client.profile, knowledge }),
+                  )
+                }
                 onEdit={() => setAsking({ profile: row.client.profile, editing: true })}
                 onCite={(citation, label) => setCiting({ citation, label })}
                 onDraft={() =>
@@ -200,6 +210,8 @@ function ClientCard({
   row,
   blocked,
   busy,
+  suggestion,
+  onAcceptSuggestion,
   onEdit,
   onCite,
   onDraft,
@@ -210,6 +222,8 @@ function ClientCard({
   row: ClientRow;
   blocked: string | null;
   busy: Busy;
+  suggestion: { depth: ClientProfile["knowledge"]; count: number } | null;
+  onAcceptSuggestion: (knowledge: ClientProfile["knowledge"]) => void;
   onEdit: () => void;
   onCite: (citation: Citation, label: string) => void;
   onDraft: () => void;
@@ -241,6 +255,19 @@ function ClientCard({
           New answers
         </button>
       </div>
+
+      {suggestion && (
+        <div className="notice notice--tint row spread">
+          <p className="t-footnote" style={{ color: "var(--label)" }}>
+            The client read the {KNOWLEDGE_DEPTH[suggestion.depth]} explanation {suggestion.count} times in a row — they chose to share
+            this — but their answers say {KNOWLEDGE[profile.knowledge].toLowerCase()}. Worth asking again
+            {suggestion.count > READING_THRESHOLD ? "" : ` (suggested after ${READING_THRESHOLD})`}.
+          </p>
+          <button type="button" className="btn btn--small" disabled={busy !== null} onClick={() => onAcceptSuggestion(suggestion.depth)}>
+            Change to {KNOWLEDGE[suggestion.depth].toLowerCase()}
+          </button>
+        </div>
+      )}
 
       {advice === null ? (
         <div className="inset stack" style={{ "--stack-gap": "0.625rem" } as React.CSSProperties}>

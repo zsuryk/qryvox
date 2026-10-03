@@ -77,6 +77,8 @@ export function describe(event: SlimEvent): string {
       return "Advice set aside";
     case "advice.decided":
       return `Adviser ${event.payload.decision} advice`;
+    case "client.read":
+      return `Client chose the ${event.payload.depth} explanation`;
   }
 }
 

@@ -190,6 +190,11 @@ profile or the product changes (`advice.superseded`). A client sees approved adv
 **Adviser** — the licensed human who approves or rejects advice. In stage 2, like the analyst, the fixed
 `demo-analyst` actor (ADR-0004).
 
+**Reading** — the depth a client chose to read their advice at, recorded as `client.read` only once they
+switched on sharing it on their own page (#38). Its actor is the client's pseudonymous id — the one event a
+client, not the analyst, is recorded as making. Three in a row of another depth suggest the adviser asks
+again; a reading never changes a profile.
+
 ## The log
 
 **Event** — one immutable record of something that happened in a case, appended to the single `events`

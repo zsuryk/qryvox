@@ -9,5 +9,5 @@ export default async function ClientPage({ params }: { params: Promise<{ caseId:
     if (err instanceof NotFound) notFound();
     throw err;
   });
-  return <ClientAdvice events={events} clientId={clientId} />;
+  return <ClientAdvice caseId={caseId} events={events} clientId={clientId} />;
 }
