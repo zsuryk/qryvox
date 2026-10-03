@@ -79,6 +79,19 @@ export function describe(event: SlimEvent): string {
       return `Adviser ${event.payload.decision} advice`;
     case "client.read":
       return `Client chose the ${event.payload.depth} explanation`;
+    // The canvas's card operations (#48).
+    case "card.docked":
+      return "Card docked to the plan";
+    case "card.undocked":
+      return "Card taken out of the plan";
+    case "card.pinned":
+      return "Card pinned";
+    case "card.discarded":
+      return "Card discarded";
+    case "card.restored":
+      return "Card restored from the discard bin";
+    case "card.similar_requested":
+      return `Asked for cards like one, by ${STEP_LABELS[event.payload.step_kind].toLowerCase()}`;
   }
 }
 
