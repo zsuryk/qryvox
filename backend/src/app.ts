@@ -208,6 +208,10 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
     const caseId = c.req.param("caseId");
     const body = DecideAdviceRequest.safeParse(await readJson(c));
     if (!body.success) return badRequest(c, body.error);
+    // A rejection says why (#42), in a reason chosen from the list.
+    if (body.data.decision === "rejected" && !body.data.reason) {
+      return c.json({ error: "a rejection needs its reason: choose why the draft is rejected" }, 400);
+    }
     if (!(await caseExists(db, caseId))) return notFound(c, caseId);
 
     const row = await decideAdvice(db, caseId, c.req.param("adviceId"), body.data);

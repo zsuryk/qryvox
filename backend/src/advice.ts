@@ -8,6 +8,7 @@ import {
   ProductAttributes,
   RULES_VERSION,
   undismissedFindings,
+  vulnerability,
 } from "@qryvox/shared";
 import { randomUUID } from "node:crypto";
 import type { Db } from "./db/client.js";
@@ -95,11 +96,30 @@ export async function decideAdvice(db: Db, caseId: string, adviceId: string, req
     if (!advice) throw new AdviceNotFound(`advice ${adviceId} not found in case ${caseId}`);
   }
   return appendOnceWith(db, caseId, head(req.event_id, "advice.decided"), async (tx) => {
-    const advice = (await foldCase(tx, caseId)).advice.find((a) => a.adviceId === adviceId);
+    const state = await foldCase(tx, caseId);
+    const advice = state.advice.find((a) => a.adviceId === adviceId);
     if (!advice || advice.supersededAtSeq !== null) {
       throw new AdviceConflict(`advice ${adviceId} was superseded by a newer profile or attributes run`);
     }
-    return { payload: { advice_id: adviceId, decision: req.decision }, companions: [] };
+    // A vulnerable client's advice is approved only once the adviser confirms they explained it to the
+    // client directly (#42). The confirmation is recorded with the decision.
+    const client = state.clients.find((c) => c.clientId === advice.client_id);
+    const why = client ? vulnerability(client.profile) : [];
+    const confirmations = req.confirmations ?? [];
+    if (req.decision === "approved" && why.length > 0 && !confirmations.includes("explained_directly")) {
+      throw new AdviceConflict(
+        `this client needs extra care (${why.join("; ")}): confirm you have explained the advice to them directly before approving`,
+      );
+    }
+    return {
+      payload: {
+        advice_id: adviceId,
+        decision: req.decision,
+        ...(req.reason ? { reason: req.reason } : {}),
+        ...(confirmations.length > 0 ? { confirmations } : {}),
+      },
+      companions: [],
+    };
   });
 }
 

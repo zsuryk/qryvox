@@ -58,8 +58,15 @@ const profile = (t: TestApp, caseId: string, p: ClientProfile, eventId = randomU
   t.request("POST", `/cases/${caseId}/clients`, { event_id: eventId, profile: p });
 const draft = (t: TestApp, caseId: string, clientId: string, eventId = randomUUID()) =>
   t.request("POST", `/cases/${caseId}/advice`, { event_id: eventId, client_id: clientId });
+// As the console sends it: a rejection with its reason, an approval with the direct-explanation
+// confirmation (Mrs Chan is a vulnerable client). The controls themselves are tested on their own below.
 const decide = (t: TestApp, caseId: string, adviceId: string, decision: string, eventId = randomUUID()) =>
-  t.request("POST", `/cases/${caseId}/advice/${adviceId}/decision`, { event_id: eventId, decision });
+  t.request("POST", `/cases/${caseId}/advice/${adviceId}/decision`, {
+    event_id: eventId,
+    decision,
+    ...(decision === "rejected" ? { reason: "needs_discussion_first" } : {}),
+    ...(decision === "approved" ? { confirmations: ["explained_directly"] } : {}),
+  });
 
 async function state(t: TestApp, caseId: string) {
   const { events } = EventPage.parse(await (await t.request("GET", `/cases/${caseId}/events`)).json());
@@ -247,5 +254,42 @@ describe("answers a client gives themselves", () => {
 
     const profiled = (await state(t, caseId)).events.filter((e) => e.type === "client.profiled");
     expect(profiled.map((e) => e.actor)).toEqual(["persona-chan", "demo-analyst"]);
+  });
+});
+
+describe("the adviser's accountable decision (#42)", () => {
+  async function drafted(p: ClientProfile) {
+    const { t, caseId } = await larkspurCase();
+    await profile(t, caseId, p);
+    const adviceId = randomUUID();
+    await draft(t, caseId, p.client_id, adviceId);
+    const raw = (body: Record<string, unknown>) =>
+      t.request("POST", `/cases/${caseId}/advice/${adviceId}/decision`, { event_id: randomUUID(), ...body });
+    return { t, caseId, raw };
+  }
+
+  it("refuses a rejection without its reason, and records the reason when given", async () => {
+    const { t, caseId, raw } = await drafted(lee);
+    const bare = await raw({ decision: "rejected" });
+    expect(bare.status).toBe(400);
+    expect(ErrorResponse.parse(await bare.json()).error).toMatch(/needs its reason/);
+
+    expect((await raw({ decision: "rejected", reason: "client_prefers_another_product" })).status).toBe(201);
+    expect((await state(t, caseId)).state.advice[0]!.decision).toMatchObject({ decision: "rejected", reason: "client_prefers_another_product" });
+  });
+
+  it("approves a vulnerable client's advice only with the adviser's confirmation, and says why", async () => {
+    const { t, caseId, raw } = await drafted({ ...chan, aged_65_or_over: true });
+    const unconfirmed = await raw({ decision: "approved" });
+    expect(unconfirmed.status).toBe(409);
+    expect(ErrorResponse.parse(await unconfirmed.json()).error).toMatch(/65 or over; new to investing and relies on the income/);
+
+    expect((await raw({ decision: "approved", confirmations: ["explained_directly"] })).status).toBe(201);
+    expect((await state(t, caseId)).state.advice[0]!.decision).toMatchObject({ confirmations: ["explained_directly"] });
+  });
+
+  it("asks nothing extra for a client who is not vulnerable", async () => {
+    const { raw } = await drafted(lee);
+    expect((await raw({ decision: "approved" })).status).toBe(201);
   });
 });
