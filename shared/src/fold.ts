@@ -186,6 +186,8 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
       const pin = { cardId: card_id, worldPos: world_pos, actor: event.actor, pinnedAtSeq: event.seq };
       return { ...next, board: { ...state.board, pinned: upsert(state.board.pinned, pin) } };
     }
+    case "card.unpinned":
+      return { ...next, board: { ...state.board, pinned: without(state.board.pinned, event.payload.card_id) } };
     case "card.discarded": {
       // Discarding again keeps the first discard: the card was already in the bin.
       const board = state.board;

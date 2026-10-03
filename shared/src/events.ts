@@ -235,6 +235,15 @@ export const CardPinned = z.object({
   payload: z.object({ card_id: CardId, world_pos: WorldPos }),
 });
 
+// The card is let go of: it rejoins the auto-tiled flow wherever the flow puts it. Pinning it again holds
+// it again; the latest of the two wins.
+export const CardUnpinned = z.object({
+  ...envelope,
+  type: z.literal("card.unpinned"),
+  v: z.literal(1),
+  payload: z.object({ card_id: CardId }),
+});
+
 // The card goes to the discard bin: rejected from the board, never deleted. A discarded card leaves the
 // plan region if it was docked; card.restored or a later card.docked brings it back.
 export const CardDiscarded = z.object({
@@ -279,6 +288,7 @@ export const Event = z.discriminatedUnion("type", [
   CardDocked,
   CardUndocked,
   CardPinned,
+  CardUnpinned,
   CardDiscarded,
   CardRestored,
   CardSimilarRequested,
@@ -304,6 +314,7 @@ export const SlimEvent = z.discriminatedUnion("type", [
   CardDocked,
   CardUndocked,
   CardPinned,
+  CardUnpinned,
   CardDiscarded,
   CardRestored,
   CardSimilarRequested,

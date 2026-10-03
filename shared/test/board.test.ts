@@ -24,7 +24,7 @@ const [fees, , third] = recordedBoard.map((f) => findingCardId(f.finding_id));
 
 type CardOp =
   | { type: "card.docked"; payload: { card_id: string; plan_slot: { category: string; authority: string } } }
-  | { type: "card.undocked" | "card.discarded" | "card.restored"; payload: { card_id: string } }
+  | { type: "card.undocked" | "card.discarded" | "card.restored" | "card.unpinned"; payload: { card_id: string } }
   | { type: "card.pinned"; payload: { card_id: string; world_pos: { x: number; y: number } } }
   | { type: "card.similar_requested"; payload: { card_id: string; step_kind: string } };
 
@@ -52,7 +52,7 @@ const dock = (card_id: string, category: string, authority: string): CardOp => (
   type: "card.docked",
   payload: { card_id, plan_slot: { category, authority } },
 });
-const op = (type: "card.undocked" | "card.discarded" | "card.restored", card_id: string): CardOp => ({ type, payload: { card_id } });
+const op = (type: "card.undocked" | "card.discarded" | "card.restored" | "card.unpinned", card_id: string): CardOp => ({ type, payload: { card_id } });
 const pin = (card_id: string, x: number, y: number): CardOp => ({ type: "card.pinned", payload: { card_id, world_pos: { x, y } } });
 
 describe("card ids", () => {
@@ -120,6 +120,18 @@ describe("fold: card operations", () => {
       [fees, 30],
       [third, 29],
     ]);
+  });
+
+  it("unpins a card back into the flow, and the latest of pin and unpin wins", () => {
+    const released = fold(withOps(pin(fees!, 0, 0), pin(third!, 24, 24), op("card.unpinned", fees!)));
+    expect(pinOf(released, fees!)).toBeNull();
+    expect(pinOf(released, third!)).toEqual({ x: 24, y: 24 });
+
+    const repinned = fold(withOps(pin(fees!, 0, 0), op("card.unpinned", fees!), pin(fees!, 48, 0)));
+    expect(pinOf(repinned, fees!)).toEqual({ x: 48, y: 0 });
+    // Unpinning a card that was never pinned changes nothing but the seq.
+    expect(fold(withOps(op("card.unpinned", fees!))).board).toEqual(fold(events).board);
+    expect(EVENT_TYPES).toContain("card.unpinned");
   });
 
   it("discard rejects the card and never touches the finding it shows", () => {
