@@ -1,0 +1,454 @@
+[
+  {
+    "step": "contradictions",
+    "seed": {
+      "document_id": "factsheet",
+      "page": 1,
+      "quote": "Annual management fee: 0.85% per annum"
+    },
+    "input_run_id": "36420df8-f52b-4942-b7d3-7062a3921c73",
+    "model": "kimi-k3",
+    "prompt_version": "contradictions@1",
+    "output": {
+      "issues": [
+        {
+          "kind": "contradiction",
+          "category": "fees",
+          "claim_id": "c1",
+          "counterpart_claim_id": "c2",
+          "explanation": "The factsheet states the annual management fee is 0.85% per annum while the more authoritative fee table states it is 1.25% of net asset value."
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "factsheet",
+      "page": 1,
+      "quote": "Annual management fee: 0.85% per annum"
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "factsheet",
+          "page": 1,
+          "quote": "Annual management fee: 0.85% per annum"
+        },
+        {
+          "document_id": "ppm",
+          "page": 3,
+          "quote": "7.1 The annual management fee is 1.25% of the net asset value of the Fund."
+        },
+        {
+          "document_id": "fee-table",
+          "page": 1,
+          "quote": "Annual management fee: 1.25% of net asset value"
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "fee-table",
+      "page": 1,
+      "quote": "Annual management fee: 1.25% of net asset value"
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "fee-table",
+          "page": 1,
+          "quote": "Annual management fee: 1.25% of net asset value"
+        },
+        {
+          "document_id": "factsheet",
+          "page": 1,
+          "quote": "Annual management fee: 0.85% per annum"
+        },
+        {
+          "document_id": "ppm",
+          "page": 3,
+          "quote": "7.1 The annual management fee is 1.25% of the net asset value of the Fund."
+        }
+      ]
+    }
+  },
+  {
+    "step": "contradictions",
+    "seed": {
+      "document_id": "deck",
+      "page": 2,
+      "quote": "No entry or exit charges."
+    },
+    "input_run_id": "36420df8-f52b-4942-b7d3-7062a3921c73",
+    "model": "kimi-k3",
+    "prompt_version": "contradictions@1",
+    "output": {
+      "issues": [
+        {
+          "kind": "contradiction",
+          "category": "fees",
+          "claim_id": "c3",
+          "counterpart_claim_id": "c4",
+          "explanation": "The deck states there are no entry or exit charges, while the fee table states a redemption charge of 2.00% on units redeemed within 24 months of purchase."
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "deck",
+      "page": 2,
+      "quote": "No entry or exit charges."
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "deck",
+          "page": 2,
+          "quote": "No entry or exit charges."
+        },
+        {
+          "document_id": "ppm",
+          "page": 3,
+          "quote": "7.2 A redemption charge of 2.00% applies to units redeemed within 24 months of purchase."
+        },
+        {
+          "document_id": "fee-table",
+          "page": 1,
+          "quote": "Entry charge: none"
+        },
+        {
+          "document_id": "fee-table",
+          "page": 1,
+          "quote": "Redemption charge: 2.00% on units redeemed within 24 months of purchase"
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "fee-table",
+      "page": 1,
+      "quote": "Redemption charge: 2.00% on units redeemed within 24 months of purchase"
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "fee-table",
+          "page": 1,
+          "quote": "Redemption charge: 2.00% on units redeemed within 24 months of purchase"
+        },
+        {
+          "document_id": "ppm",
+          "page": 3,
+          "quote": "7.2 A redemption charge of 2.00% applies to units redeemed within 24 months of purchase."
+        },
+        {
+          "document_id": "deck",
+          "page": 2,
+          "quote": "No entry or exit charges."
+        }
+      ]
+    }
+  },
+  {
+    "step": "contradictions",
+    "seed": {
+      "document_id": "factsheet",
+      "page": 1,
+      "quote": "The Fund invests only in investment-grade bonds."
+    },
+    "input_run_id": "36420df8-f52b-4942-b7d3-7062a3921c73",
+    "model": "kimi-k3",
+    "prompt_version": "contradictions@1",
+    "output": {
+      "issues": [
+        {
+          "kind": "contradiction",
+          "category": "strategy",
+          "claim_id": "c5",
+          "counterpart_claim_id": "c6",
+          "explanation": "The factsheet says the Fund invests only in investment-grade bonds, while the PPM allows up to 40% of net assets in sub-investment-grade bonds."
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "factsheet",
+      "page": 1,
+      "quote": "The Fund invests only in investment-grade bonds."
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "factsheet",
+          "page": 1,
+          "quote": "The Fund invests only in investment-grade bonds."
+        },
+        {
+          "document_id": "ppm",
+          "page": 1,
+          "quote": "3.3 The Fund may invest up to 40% of its net assets in sub-investment-grade bonds."
+        },
+        {
+          "document_id": "ppm",
+          "page": 2,
+          "quote": "5.3 Sub-investment-grade bonds carry a higher risk of default than investment-grade bonds."
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "ppm",
+      "page": 1,
+      "quote": "3.3 The Fund may invest up to 40% of its net assets in sub-investment-grade bonds."
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "ppm",
+          "page": 1,
+          "quote": "3.3 The Fund may invest up to 40% of its net assets in sub-investment-grade bonds."
+        },
+        {
+          "document_id": "factsheet",
+          "page": 1,
+          "quote": "The Fund invests only in investment-grade bonds."
+        },
+        {
+          "document_id": "ppm",
+          "page": 2,
+          "quote": "5.3 Sub-investment-grade bonds carry a higher risk of default than investment-grade bonds."
+        }
+      ]
+    }
+  },
+  {
+    "step": "contradictions",
+    "seed": {
+      "document_id": "deck",
+      "page": 1,
+      "quote": "Every holding is screened to exclude fossil fuel companies."
+    },
+    "input_run_id": "36420df8-f52b-4942-b7d3-7062a3921c73",
+    "model": "kimi-k3",
+    "prompt_version": "contradictions@1",
+    "output": {
+      "issues": [
+        {
+          "kind": "unsupported_claim",
+          "category": "strategy",
+          "claim_id": "c7",
+          "counterpart_claim_id": null,
+          "explanation": "The deck claims every holding is screened to exclude fossil fuel companies, but no claim in the PPM supports this screening strategy."
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "deck",
+      "page": 1,
+      "quote": "Every holding is screened to exclude fossil fuel companies."
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "deck",
+          "page": 1,
+          "quote": "Every holding is screened to exclude fossil fuel companies."
+        }
+      ]
+    }
+  },
+  {
+    "step": "contradictions",
+    "seed": {
+      "document_id": "deck",
+      "page": 2,
+      "quote": "Target income of 6% a year, paid every month."
+    },
+    "input_run_id": "36420df8-f52b-4942-b7d3-7062a3921c73",
+    "model": "kimi-k3",
+    "prompt_version": "contradictions@1",
+    "output": {
+      "issues": [
+        {
+          "kind": "disclosure_gap",
+          "category": "risk",
+          "claim_id": "c8",
+          "counterpart_claim_id": "c9",
+          "explanation": "The deck promises target income of 6% a year paid every month without the PPM warning that distributions are not guaranteed and may be paid out of capital."
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "deck",
+      "page": 2,
+      "quote": "Target income of 6% a year, paid every month."
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "deck",
+          "page": 2,
+          "quote": "Target income of 6% a year, paid every month."
+        },
+        {
+          "document_id": "ppm",
+          "page": 2,
+          "quote": "5.2 Distributions are not guaranteed and may be paid out of capital."
+        },
+        {
+          "document_id": "factsheet",
+          "page": 1,
+          "quote": "The Fund aims to provide a regular income with the potential for modest capital growth over a period of\nat least five years."
+        },
+        {
+          "document_id": "ppm",
+          "page": 1,
+          "quote": "3.1 The Fund aims to provide a regular income with the potential for modest capital growth over at least\nfive years."
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "ppm",
+      "page": 2,
+      "quote": "5.2 Distributions are not guaranteed and may be paid out of capital."
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "ppm",
+          "page": 2,
+          "quote": "5.2 Distributions are not guaranteed and may be paid out of capital."
+        },
+        {
+          "document_id": "deck",
+          "page": 2,
+          "quote": "Target income of 6% a year, paid every month."
+        }
+      ]
+    }
+  },
+  {
+    "step": "contradictions",
+    "seed": {
+      "document_id": "factsheet",
+      "page": 1,
+      "quote": "Dealing: daily, on any business day"
+    },
+    "input_run_id": "36420df8-f52b-4942-b7d3-7062a3921c73",
+    "model": "kimi-k3",
+    "prompt_version": "contradictions@1",
+    "output": {
+      "issues": [
+        {
+          "kind": "contradiction",
+          "category": "terms",
+          "claim_id": "c10",
+          "counterpart_claim_id": "c11",
+          "explanation": "The factsheet states dealing is daily, on any business day, while the PPM states redemptions are processed monthly, on the last business day of each month."
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "factsheet",
+      "page": 1,
+      "quote": "Dealing: daily, on any business day"
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "factsheet",
+          "page": 1,
+          "quote": "Dealing: daily, on any business day"
+        },
+        {
+          "document_id": "ppm",
+          "page": 3,
+          "quote": "7.3 Redemptions are processed monthly, on the last business day of each month."
+        },
+        {
+          "document_id": "ppm",
+          "page": 3,
+          "quote": "7.4 Redemption requests must be received at least 30 calendar days before the dealing day."
+        }
+      ]
+    }
+  },
+  {
+    "step": "extract",
+    "seed": {
+      "document_id": "ppm",
+      "page": 3,
+      "quote": "7.3 Redemptions are processed monthly, on the last business day of each month."
+    },
+    "input_run_id": null,
+    "model": "kimi-k3",
+    "prompt_version": "extract@1",
+    "output": {
+      "statements": [
+        {
+          "document_id": "ppm",
+          "page": 3,
+          "quote": "7.3 Redemptions are processed monthly, on the last business day of each month."
+        },
+        {
+          "document_id": "factsheet",
+          "page": 1,
+          "quote": "Dealing: daily, on any business day"
+        }
+      ]
+    }
+  }
+]

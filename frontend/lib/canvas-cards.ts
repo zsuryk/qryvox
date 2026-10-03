@@ -55,6 +55,8 @@ export type ExcerptCardModel = {
   linked: { cardId: CardId; label: string }[];
   // Set when the passage came from a find-similar run rather than from a finding (#57, #64).
   candidate: boolean;
+  // For a candidate, what it was found from, in words: "Similar to “…”, factsheet page 1".
+  similarTo: string | null;
 };
 
 export type CardModel = FindingCardModel | ExcerptCardModel;
@@ -92,6 +94,7 @@ export function cardModel(card: CanvasCard, state: CaseState): CardModel {
       label: `${categoryLabel(f.category)} · ${KIND_LABELS[f.kind].toLowerCase()}`,
     })),
     candidate: card.candidateOf !== undefined,
+    similarTo: card.candidateOf === undefined ? null : similarTo(card.candidateOf, state),
   };
 }
 
@@ -109,6 +112,13 @@ export function naturalSlot(card: CanvasCard, view: CanvasView): PlanSlot | null
 // The categories a card may be docked under: the same rule the backend refuses a dock by (#55, #65).
 export function dockableCategories(card: CanvasCard, view: CanvasView): PlanSlot["category"][] {
   return cardCategories(card, view.state, view.cards);
+}
+
+// The passage a find-similar run was seeded with, as a line on the candidates it found.
+function similarTo(runId: string, state: CaseState): string | null {
+  const seed = state.seededRuns.find((r) => r.stepRunId === runId)?.seed;
+  if (!seed) return null;
+  return `Similar to “${seed.quote}”, ${cardCitation(seed, state).documentName} page ${seed.page}`;
 }
 
 function documentKind(documentId: string, state: CaseState): DocumentKind | null {

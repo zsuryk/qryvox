@@ -20,6 +20,7 @@ export type CardActions = {
   unpin: (cardId: CardId) => void;
   discard: (cardId: CardId) => void;
   restore: (cardId: CardId) => void;
+  similar: (cardId: CardId) => void;
   openCitation: (citation: CardCitation, label: string) => void;
   reveal: (cardId: CardId) => void;
 };
@@ -32,17 +33,21 @@ export type CardProps = {
   discarded: boolean;
   // Why this card cannot be docked by its button, or null when it can.
   undockable: string | null;
+  // A find-similar run from this card is under way.
+  searching: boolean;
+  // Why find similar cannot run from this card, or null when it can.
+  similarOff: string | null;
   actions: CardActions;
 };
 
-export const Card = memo(function Card({ model, docked, pinned, discarded, undockable, actions }: CardProps) {
+export const Card = memo(function Card({ model, docked, pinned, discarded, undockable, searching, similarOff, actions }: CardProps) {
   const state = { docked, pinned, discarded };
   const what = model.kind === "finding" ? `Finding: ${model.title}` : `Excerpt from ${model.documentName}, page ${model.page}`;
   const label = `${what}${docked ? " (in the plan)" : pinned ? " (pinned)" : ""}`;
   return (
     <article className={`card canvas-card${state.pinned ? " canvas-card--pinned" : ""}`} aria-label={label}>
       {model.kind === "finding" ? <FindingBody model={model} actions={actions} /> : <ExcerptBody model={model} actions={actions} />}
-      <ActionRow cardId={model.cardId} state={state} undockable={undockable} actions={actions} />
+      <ActionRow cardId={model.cardId} state={state} undockable={undockable} searching={searching} similarOff={similarOff} actions={actions} />
     </article>
   );
 });
@@ -82,6 +87,11 @@ function ExcerptBody({ model, actions }: { model: Extract<CardModel, { kind: "ex
   return (
     <>
       <div className="row canvas-card__badges">
+        {model.similarTo && (
+          <span className="badge badge--tint" title={model.similarTo}>
+            Similar
+          </span>
+        )}
         {model.documentKind && <span className="badge badge--strong badge--tint">{model.documentKind}</span>}
         <button type="button" className="chip chip--link canvas-card__chip" title="Open this page" onClick={() => actions.openCitation(model.citation, page)}>
           {page}
@@ -90,7 +100,9 @@ function ExcerptBody({ model, actions }: { model: Extract<CardModel, { kind: "ex
       <blockquote className="t-callout canvas-card__quote">{model.quote}</blockquote>
       <div className="canvas-card__chips" role="group" aria-label="Findings citing this passage">
         {model.linked.length === 0 ? (
-          <span className="t-caption faint">{model.candidate ? "Found by find similar · no finding cites it" : "No finding cites it"}</span>
+          <span className="t-caption faint canvas-card__line" title={model.similarTo ?? undefined}>
+            {model.similarTo ?? "No finding cites it"}
+          </span>
         ) : (
           model.linked.map((link) => (
             <button key={link.cardId} type="button" className="chip canvas-card__chip" title="Show this finding's card" onClick={() => actions.reveal(link.cardId)}>
@@ -107,11 +119,15 @@ function ActionRow({
   cardId,
   state,
   undockable,
+  searching,
+  similarOff,
   actions,
 }: {
   cardId: CardId;
   state: { docked: boolean; pinned: boolean; discarded: boolean };
   undockable: string | null;
+  searching: boolean;
+  similarOff: string | null;
   actions: CardActions;
 }) {
   return (
@@ -149,8 +165,15 @@ function ActionRow({
           Discard
         </button>
       )}
-      <button type="button" className="btn btn--small" disabled title="Find similar is coming with #57">
-        Similar
+      <button
+        type="button"
+        className="btn btn--small"
+        disabled={searching || similarOff !== null}
+        aria-busy={searching}
+        title={similarOff ?? (searching ? "Looking for more like this" : "Find more passages like this one; they arrive as cards marked Similar")}
+        onClick={() => actions.similar(cardId)}
+      >
+        {searching ? "Finding…" : "Similar"}
       </button>
     </div>
   );

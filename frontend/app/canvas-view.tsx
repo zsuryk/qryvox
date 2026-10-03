@@ -8,8 +8,9 @@ import { type DropTarget, resolveDrop } from "../lib/canvas-drop";
 import { canvasLayout } from "../lib/canvas-layout";
 import { type PlanLayout, planHit } from "../lib/plan-region";
 import { type CanvasMode, type CanvasView as View, canvasView } from "../lib/canvas-source";
+import { candidatesOf, hasRecording, planSimilar, playback, similarFailure, similarRequest } from "../lib/canvas-similar";
 import { appendOp, type CanvasLog, canvasLog, type CardOp, reread, rolledBack, sent, settled, shownLog } from "../lib/canvas-store";
-import { fetchEvents, recordCardOperation } from "../lib/api";
+import { fetchEvents, recordCardOperation, runStep } from "../lib/api";
 import { errorMessage } from "../lib/errors";
 import {
   centreOn,
@@ -62,7 +63,8 @@ export default function CanvasView({ events, mode }: CanvasViewProps) {
     if (quiet.current !== null) window.clearTimeout(quiet.current);
   }, []);
 
-  const { log, dispatch } = useCanvasStore(events, mode, say);
+  const store = useCanvasStore(events, mode, say);
+  const { log } = store;
 
   // A gap in the log is a hard error, not a half-built canvas (ADR-0002), so it is said, not drawn.
   const folded = useMemo((): { view: View } | { error: string } => {
@@ -75,7 +77,7 @@ export default function CanvasView({ events, mode }: CanvasViewProps) {
   if ("error" in folded) {
     return <p className="notice notice--negative t-callout">This canvas cannot be built from the case&apos;s log: {folded.error}</p>;
   }
-  return <Canvas view={folded.view} log={log} mode={mode} dispatch={dispatch} said={said} say={say} />;
+  return <Canvas view={folded.view} log={log} mode={mode} store={store} said={said} say={say} />;
 }
 
 // The store (lib/canvas-store.ts) as React state: the log, and card operations appended to it. On the
@@ -103,42 +105,113 @@ function useCanvasStore(events: readonly SlimEvent[], mode: CanvasMode, say: (wo
     update((log) => reread(log, events));
   }, [caseId, update]);
 
+  // Resolves true once the operation is recorded (at once, on the fixture), false if it was refused.
   const dispatch = useCallback(
-    (op: CardOp) => {
+    (op: CardOp): Promise<boolean> => {
       const envelope = { eventId: crypto.randomUUID(), at: new Date().toISOString() };
       if (caseId === null) {
         update((log) => ({ ...log, confirmed: appendOp(log.confirmed, op, envelope) }));
-        return;
+        return Promise.resolve(true);
       }
       update((log) => sent(log, { op, envelope }));
-      queue.current = queue.current.then(async () => {
+      const recorded = queue.current.then(async () => {
         try {
           const event = await recordCardOperation(caseId, CardOperationRequest.parse({ event_id: envelope.eventId, ...op }));
           const next = settled(current.current, event);
           if (next === "stale") await refresh();
           else update(() => next);
+          return true;
         } catch (cause) {
           update((log) => rolledBack(log, envelope.eventId));
           say(`Not recorded: ${errorMessage(cause)}`);
+          return false;
         }
       });
+      queue.current = recorded.then(() => undefined);
+      return recorded;
     },
     [caseId, refresh, say, update],
   );
 
-  return { log, dispatch, refresh };
+  // update and current go out too, for the fixture's recorded find-similar runs (lib/canvas-similar.ts),
+  // which this tab appends itself, and for reading the log as it now stands once a run has settled.
+  return { log, dispatch, refresh, update, current };
+}
+
+type Store = ReturnType<typeof useCanvasStore>;
+
+// Find similar (#57), as the canvas runs it: the request recorded as a card event first, then the seeded run
+// (lib/canvas-similar.ts) once the request is on the log, so the log reads request then run. On a live case
+// the run is one awaited call to the steps endpoint, judge-link token and all, and the log is read again
+// every couple of seconds while it runs, so the status panel shows it running; on the fixture a recorded run
+// is played back. Either way the candidates arrive through the fold like everything else. A failure leaves
+// the canvas as the log has it, with the reason said; a failed run is on the log as a failed run.
+function useFindSimilar(view: View, mode: CanvasMode, store: Store, say: (words: string) => void) {
+  const [searching, setSearching] = useState<ReadonlySet<CardId>>(new Set());
+  // The run whose candidates the canvas should bring into view once they are laid out.
+  const [arrived, setArrived] = useState<string | null>(null);
+  const latest = useRef(view);
+  useEffect(() => {
+    latest.current = view;
+  }, [view]);
+  const { dispatch, refresh, update, current } = store;
+
+  const similar = useCallback(
+    async (cardId: CardId) => {
+      const planned = planSimilar(latest.current, cardId);
+      if ("refused" in planned) return say(planned.refused);
+      const { plan } = planned;
+      const done = () => setSearching((s) => new Set([...s].filter((id) => id !== cardId)));
+      setSearching((s) => new Set(s).add(cardId));
+      say("Looking for more like this…");
+      if (!(await dispatch({ type: "card.similar_requested", payload: { card_id: cardId, step_kind: plan.step } }))) return done();
+
+      const stepRunId = crypto.randomUUID();
+      const found = () => {
+        const count = candidatesOf(canvasView(current.current.confirmed), stepRunId).length;
+        setArrived(stepRunId);
+        say(count === 0 ? "Nothing new turned up: every passage it found already has a card." : `${count} similar passage${count === 1 ? "" : "s"} added to the canvas, marked Similar.`);
+      };
+      if (mode.kind === "fixture") {
+        const played = playback(current.current.confirmed, plan, stepRunId, new Date().toISOString());
+        if (played) update((log) => ({ ...log, confirmed: [...log.confirmed, ...played] }));
+        else say("The recorded case has no find-similar run recorded for this card.");
+        if (played) found();
+        return done();
+      }
+      const poll = window.setInterval(() => void refresh().catch(() => undefined), 2000);
+      try {
+        await runStep(mode.caseId, similarRequest(plan, stepRunId));
+        window.clearInterval(poll);
+        await refresh();
+        found();
+      } catch (cause) {
+        window.clearInterval(poll);
+        await refresh().catch(() => undefined);
+        say(`Find similar did not finish: ${similarFailure(cause)}`);
+      } finally {
+        window.clearInterval(poll);
+        done();
+      }
+    },
+    [current, dispatch, mode, refresh, say, update],
+  );
+
+  return { similar, searching, arrived };
 }
 
 type CanvasProps = {
   view: View;
   log: readonly SlimEvent[];
   mode: CanvasMode;
-  dispatch: (op: CardOp) => void;
+  store: Store;
   said: string | null;
   say: (words: string) => void;
 };
 
-function Canvas({ view, log, mode, dispatch, said, say }: CanvasProps) {
+function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
+  const dispatch = store.dispatch;
+  const { similar, searching, arrived } = useFindSimilar(view, mode, store, say);
   const layout = useMemo(() => canvasLayout(view), [view]);
   const frame = useRef<HTMLDivElement | null>(null);
   const bin = useRef<HTMLButtonElement | null>(null);
@@ -186,13 +259,33 @@ function Canvas({ view, log, mode, dispatch, said, say }: CanvasProps) {
         dispatch({ type: "card.restored", payload: { card_id: id } });
         say("Restored to the canvas.");
       },
+      similar: (id) => void similar(id),
       openCitation: (citation, label) => setSheet({ citation, label }),
       reveal(id) {
         const rect = rectOf(id);
         if (rect) reveal(rect);
       },
     };
-  }, [dispatch, reveal, say]);
+  }, [dispatch, reveal, say, similar]);
+
+  // A find-similar run's candidates, once laid out, are brought into view: the first of them, centred if
+  // it landed off screen, so the analyst sees what the press came to.
+  useEffect(() => {
+    if (arrived === null) return;
+    const placed = layout.flow.find((p) => p.card.kind === "excerpt" && p.card.candidateOf === arrived);
+    if (placed) reveal(placed.rect);
+  }, [arrived, layout, reveal]);
+
+  // Why Similar cannot run from a card, per card, or null where it can (lib/canvas-similar.ts).
+  const similarOff = useMemo(() => {
+    const off = new Map<CardId, string>();
+    for (const card of view.cards) {
+      const planned = planSimilar(view, card.cardId);
+      if ("refused" in planned) off.set(card.cardId, planned.refused);
+      else if (mode.kind === "fixture" && !hasRecording(view, card.cardId)) off.set(card.cardId, NO_RECORDING);
+    }
+    return off;
+  }, [view, mode.kind]);
 
   // Dragging a card. It follows the pointer 1:1 from where it was grabbed, in world units, lifted above
   // the rest; let go, and the drop is decided by lib/canvas-drop.ts: the bin discards it, open canvas pins
@@ -314,6 +407,8 @@ function Canvas({ view, log, mode, dispatch, said, say }: CanvasProps) {
                         pinned={pinned}
                         discarded={false}
                         undockable={naturalSlot(card, view) ? null : NO_SLOT}
+                        searching={searching.has(card.cardId)}
+                        similarOff={similarOff.get(card.cardId) ?? null}
                         actions={actions}
                       />
                     </div>
@@ -452,6 +547,8 @@ function PlanRegion({ plan, drag }: { plan: PlanLayout; drag: { target: DropTarg
 }
 
 const NO_SLOT = "No finding cites this passage, so it has no place in the plan";
+const NO_RECORDING =
+  "The recorded case has no model behind it, and no find-similar run was recorded from this card. On a live case it runs the model.";
 
 // Where a card is on screen right now, in world units: its slot's transform as the browser is drawing it,
 // which differs from the slot while it is still settling into it.

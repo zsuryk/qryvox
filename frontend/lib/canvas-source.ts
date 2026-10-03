@@ -9,7 +9,8 @@ import { fetchEvents } from "./api";
 //
 //   fixture — the recorded Larkspur case (the log the fold tests fold, whose documents are the static
 //             pack's by hash), followed by a few card operations so the plan region, a pin and the
-//             discard bin have something in them. No network, no model, no API running.
+//             discard bin have something in them. No network, no model, no API running: find similar
+//             plays back runs recorded on a model against this same log (lib/canvas-similar.ts).
 //   live    — the case's events from the backend, read the way every other page reads them.
 
 export type CanvasMode = { kind: "fixture" } | { kind: "live"; caseId: string };
