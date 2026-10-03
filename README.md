@@ -104,22 +104,21 @@ Stage 2 is tracked in #20.
 
 ## Status (2026-10-03)
 
-**Works end to end, locally:** drop the Larkspur pack → four analysis steps → findings on the board with citations → open the cited passage in the PDF → approve / dismiss each finding (buttons or keyboard) → every step logged in a hash-chained event log. Not yet deployed to production.
+**Works end to end, locally, on a real model** (Kimi K3 via its OpenAI-compatible API): drop a pack → five analysis steps → findings with citations, checked against the institution's rules → the analyst's decisions → the product's facts read → clients' answers → advice drafted by the rules → explained at three depths → approved by the adviser → the client's own page. Every step is in a hash-chained log that can be replayed to any event. **Not yet deployed to production** (#17, owner only).
 
 | Area | State | Tickets |
 |---|---|---|
-| **Layer 1 — verify documents** | ✅ Drop zone, pipeline, claim board, citation split-pane, disposition console | #7 #9 #10, #11–#13 (built, tickets still open) |
-| Replay scrubber | ⬜ Not started (the fold it needs is done) | #14 |
-| Eval dashboard | ⬜ Not started | #15, #35 |
-| Spend protection | ✅ Origin allow-list, rate limit, judge-link token on the backend · 🚧 frontend must send the token | #16, #19 |
-| Production deploy | 🚧 Preview deploys verified; production and smoke script pending | #6, #17 |
-| **Layer 2 — check policy** | ✅ Rules `rules@1` (P1–P4), the `policy_gap` kind, the `compliance` step, four planted policy gaps · ⬜ five-step browser pipeline and the board cards | #23 #24 #25 · #26 |
-| **Layer 3 — match the client** | ✅ Contracts, suitability function, three personas with expected verdicts, `attributes` and `explain` steps, client-layer API | #27 #28 #29 #30 #31 |
-| | ⬜ Questionnaire, adviser console, client advice page (the backend for all three is done) | #32 #33 #34 |
-| Data ecosystem document | ✅ [docs/data-ecosystem.md](docs/data-ecosystem.md) | #36 |
-| Bonus | ✅ Second product on the shelf (Wrenfield), with alternatives on advice · ✅ backend for product updates (Larkspur v2) · ⬜ loading v2 in the browser, the redraft list, learned knowledge level | #39 · #37 · #38 |
+| **Layer 1 — verify documents** | ✅ Drop zone, five-step pipeline, claim board, citation pane, disposition console | #7 #9–#13 |
+| **Layer 2 — check policy** | ✅ `rules@1` P1–P4, the `compliance` step, policy-gap cards naming their rule | #23–#26 |
+| **Layer 3 — match the client** | ✅ Questionnaire, rule-based suitability, adviser console, explanations, the client's page | #27–#34 |
+| Measurement | ✅ Recall / precision and advice-accuracy tiles, live from the log | #15 #35 |
+| Replay | ✅ A scrubber that rebuilds the case at any event | #14 |
+| Bonus | ✅ Product updates (Larkspur v2), a second product with alternatives (Wrenfield), learned reading depth | #37 #38 #39 |
+| Data ecosystem | ✅ [docs/data-ecosystem.md](docs/data-ecosystem.md) | #36 |
+| Spend protection | ✅ Origin allow-list, rate limit, judge-link token end to end · 🚧 switch it on in production | #16 #19 |
+| Production deploy | 🚧 Owner only | #17 |
 
-The `attributes` and `explain` steps are tested against the real pack text with a scripted model; a run against a real model is still to do (#29).
+**Measured on Kimi K3** (`LLM_REASONING_EFFORT=low`; real pdf.js text): Larkspur recall 9/10, precision 10/10, all five steps in about 2½ minutes; Wrenfield recall 2/2, precision 2/4; every product attribute read correctly on both; all three personas got their expected verdict, and Mrs Chan's advice points her to Wrenfield. Without `low`, a reasoning model can think for over 300 s on one step — past Vercel's limit.
 
 ## How it's built
 
