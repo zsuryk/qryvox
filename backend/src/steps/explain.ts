@@ -115,7 +115,7 @@ function check(depth: string, text: ExplanationDepth, items: Item[], documents: 
   // The summary may state a number only if some item of the advice may: a quote, a page, a client's answer.
   const grounded = new Set(items.flatMap((i) => [...i.numbers]));
   for (const n of text.summary.replace(/\b[PS]\d+\b/g, "").match(/\d+(?:\.\d+)?/g) ?? []) {
-    if (!grounded.has(n)) problems.push(`${depth}: the summary states ${n}, which nothing in the advice holds`);
+    if (!grounded.has(value(n))) problems.push(`${depth}: the summary states ${n}, which nothing in the advice holds`);
   }
 
   const cited = new Set(items.flatMap((i) => i.documents));
@@ -139,7 +139,7 @@ function check(depth: string, text: ExplanationDepth, items: Item[], documents: 
     }
     // Rule ids (S1, P4) are names, not stated numbers.
     for (const n of passage.text.replace(/\b[PS]\d+\b/g, "").match(/\d+(?:\.\d+)?/g) ?? []) {
-      if (!item.numbers.has(n)) problems.push(`${where} states ${n}, which is neither in its quote nor the client's answer`);
+      if (!item.numbers.has(value(n))) problems.push(`${where} states ${n}, which is neither in its quote nor the client's answer`);
     }
   }
   return problems;
@@ -153,8 +153,11 @@ function quotations(text: string): string[] {
   return [...text.matchAll(/["“]([^"”]{8,})["”]/g)].map((m) => m[1]!.replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g, ""));
 }
 
+// Numbers by value, not by spelling: "2.00%" in the source and "2%" in an explanation are the same charge.
+const value = (n: string) => String(Number(n));
+
 function numbersIn(...texts: (string | number | null)[]): Set<string> {
-  return new Set(texts.flatMap((t) => (t === null ? [] : String(t).match(/\d+(?:\.\d+)?/g) ?? [])));
+  return new Set(texts.flatMap((t) => (t === null ? [] : (String(t).match(/\d+(?:\.\d+)?/g) ?? []).map(value))));
 }
 
 function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttributes, findings: readonly CaseFinding[]): Item[] {
@@ -166,8 +169,13 @@ function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttrib
       ref: `r${i}`,
       rules: [reason.rule],
       documents: reason.citation ? [reason.citation.document_id] : [],
-      // The client's own answer may be quoted back to them as well as the document.
-      quotes: [...(reason.citation ? [reason.citation.quote] : []), ...(Array.isArray(answer) ? answer.map(String) : [String(answer)])],
+      // The client's own answer, and the rule it was shown, may be quoted as well as the document.
+      quotes: [
+        ...(reason.citation ? [reason.citation.quote] : []),
+        ...(Array.isArray(answer) ? answer.map(String) : [String(answer)]),
+        rule.title,
+        rule.text,
+      ],
       numbers: numbersIn(
         reason.citation?.quote ?? null,
         reason.citation?.page ?? null,
@@ -195,7 +203,7 @@ function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttrib
       ref: `d${i}`,
       rules: [d.rule, ...(finding?.rule ? [finding.rule] : [])],
       documents: unique.map((c) => c.document_id),
-      quotes: unique.map((c) => c.quote),
+      quotes: [...unique.map((c) => c.quote), ruleById(d.rule).title, ruleById(d.rule).text, ...(finding?.rule ? [ruleById(finding.rule).title, ruleById(finding.rule).text] : [])],
       numbers: numbersIn(...unique.flatMap((c) => [c.quote, c.page])),
       brief: [
         `- d${i}: disclosure under rule ${d.rule}: ${finding?.claim ?? d.finding_id}`,

@@ -188,6 +188,20 @@ describe("explanations it refuses", () => {
     expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
   });
 
+  it("lets a passage quote the rule it rests on, by title or text", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    reply = bend(advice, (p) => (p[0]!.text = 'The check "Long enough horizon" fails for you.'));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+  });
+
+  it("compares numbers by value: the source's 2.00% may be written 2%", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    const exit = advice.reasons.findIndex((r) => r.citation?.quote.includes("2.00%"));
+    expect(exit).toBeGreaterThanOrEqual(0);
+    reply = bend(advice, (p) => (p[exit]!.text = "Leaving within 24 months costs 2% of what you take out."));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+  });
+
   it("accepts the page a passage cites, written as a number", async () => {
     const { t, caseId, adviceId, advice } = await chanAdvice();
     reply = bend(advice, (p) => (p[0]!.text = `The PPM, p.${advice.reasons[0]!.citation!.page}, sets the minimum.`));
