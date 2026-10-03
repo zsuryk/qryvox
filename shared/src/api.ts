@@ -1,5 +1,19 @@
 import { z } from "zod";
-import { IngestedDocument, Sha256, SlimEvent, StepName } from "./events.js";
+import { CardId, findingIdOfCard } from "./card.js";
+import {
+  CardDiscarded,
+  CardDocked,
+  CardEvent,
+  CardPinned,
+  CardRestored,
+  CardSimilarRequested,
+  CardUndocked,
+  CardUnpinned,
+  IngestedDocument,
+  Sha256,
+  SlimEvent,
+  StepName,
+} from "./events.js";
 import { AdviceDecision, DecisionConfirmation, RejectionReason } from "./advice.js";
 import { ClientProfile, KnowledgeLevel } from "./client.js";
 import { Citation, Disposition } from "./finding.js";
@@ -121,6 +135,38 @@ export type SeedableStep = (typeof SEEDABLE_STEPS)[number];
 export function isSeedable(step: StepName): step is SeedableStep {
   return (SEEDABLE_STEPS as readonly StepName[]).includes(step);
 }
+
+// POST /cases/:caseId/cards — one card operation on a live case's canvas (#65): a card event as the
+// browser makes it, without the envelope, which the server supplies (the analyst as actor, the next seq).
+// event_id is the browser's, so a retry appends nothing. The server answers with the event it appended.
+// Find similar names the step it re-runs, which follows from the card: a finding card's issue came from
+// contradictions, an excerpt card's passage from extract (#57).
+export const CardOperationRequest = z
+  .discriminatedUnion("type", [
+    CardDocked.pick({ event_id: true, type: true, payload: true }),
+    CardUndocked.pick({ event_id: true, type: true, payload: true }),
+    CardPinned.pick({ event_id: true, type: true, payload: true }),
+    CardUnpinned.pick({ event_id: true, type: true, payload: true }),
+    CardDiscarded.pick({ event_id: true, type: true, payload: true }),
+    CardRestored.pick({ event_id: true, type: true, payload: true }),
+    CardSimilarRequested.pick({ event_id: true, type: true }).extend({
+      payload: z.object({ card_id: CardId, step_kind: z.enum(SEEDABLE_STEPS) }),
+    }),
+  ])
+  .refine((r) => r.type !== "card.similar_requested" || r.payload.step_kind === similarStep(r.payload.card_id), {
+    message: "find similar re-runs contradictions for a finding card and extract for an excerpt card",
+    path: ["payload", "step_kind"],
+  });
+export type CardOperationRequest = z.infer<typeof CardOperationRequest>;
+
+// The step find-similar re-runs for a card: the one that produced what the card shows.
+export function similarStep(cardId: CardId): SeedableStep {
+  return findingIdOfCard(cardId) === null ? "extract" : "contradictions";
+}
+
+// 201: the card event as appended (or, for a retried event_id, as appended the first time).
+export const CardOperationResponse = CardEvent;
+export type CardOperationResponse = z.infer<typeof CardOperationResponse>;
 
 // 200: the run completed (now, or earlier — a retry gets the identical body).
 export const StepResult = z.object({

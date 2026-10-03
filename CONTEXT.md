@@ -165,7 +165,8 @@ moves cards whenever the flow changes; a pin never moves.
 authority (PPM, fee table, factsheet, deck — the order of `AUTHORITY_ORDER`). Each docked card names its
 group (`plan_slot`) on the event that docked it (`planGroups`). On the canvas it is a column left of the
 flow with one slot per category × authority (`frontend/lib/plan-region.ts`); a card may be dropped on any
-slot of its own category (an excerpt card: of a finding that cites it), and anywhere else in it is refused.
+slot of its own category (an excerpt card: of a finding that cites it; a find-similar candidate no finding
+cites: of the card it was found from), and anywhere else in it is refused (`cardCategories`, `canvas.ts`).
 
 **Canvas state** — what the analyst has done to cards, folded from the card events into `CaseState.board`
 (the field keeps its name): the docked set, pinned positions, the discard bin and the find-similar history.

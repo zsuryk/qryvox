@@ -270,6 +270,19 @@ export const CardSimilarRequested = z.object({
   payload: z.object({ card_id: CardId, step_kind: StepName }),
 });
 
+// The card events alone: what POST /cases/:caseId/cards appends and returns (#65). None carries a heavy
+// field, so the full event and the slim one are the same.
+export const CardEvent = z.discriminatedUnion("type", [
+  CardDocked,
+  CardUndocked,
+  CardPinned,
+  CardUnpinned,
+  CardDiscarded,
+  CardRestored,
+  CardSimilarRequested,
+]);
+export type CardEvent = z.infer<typeof CardEvent>;
+
 // Full events: what the hash covers and what the per-event payload endpoint returns.
 export const Event = z.discriminatedUnion("type", [
   CaseOpened,

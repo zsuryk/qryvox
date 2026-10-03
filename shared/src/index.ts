@@ -25,6 +25,7 @@ export {
   PlanSlot,
   WorldPos,
 } from "./card.js";
+export { type CaseCard, caseCards, cardCategories, citingFindings, seededPassages } from "./canvas.js";
 export {
   ClientGoal,
   ClientLanguage,
@@ -40,6 +41,8 @@ export {
 } from "./client.js";
 export {
   AppendResponse,
+  CardOperationRequest,
+  CardOperationResponse,
   ChangeDispositionRequest,
   DecideAdviceRequest,
   DraftAdviceRequest,
@@ -58,6 +61,7 @@ export {
   RunStepRequest,
   SEEDABLE_STEPS,
   type SeedableStep,
+  similarStep,
   StepFailure,
   StepResult,
   VerifyResponse,
@@ -68,10 +72,12 @@ export {
   AdviceSuperseded,
   CardDiscarded,
   CardDocked,
+  CardEvent,
   CardPinned,
   CardRestored,
   CardSimilarRequested,
   CardUndocked,
+  CardUnpinned,
   CaseOpened,
   ClientProfiled,
   ClientRead,
