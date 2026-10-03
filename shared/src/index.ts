@@ -49,6 +49,15 @@ export {
 } from "./state.js";
 export { Citation, Disposition, Finding, FindingCategory, FindingKind, Severity } from "./finding.js";
 export {
+  ProductRuleId,
+  type Rule,
+  RuleGroup,
+  ruleById,
+  RULES,
+  RULES_VERSION,
+  SuitabilityRuleId,
+} from "./rules.js";
+export {
   GroundTruth,
   GroundTruthEntry,
   PackCitation,

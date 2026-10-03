@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ProductRuleId } from "./rules.js";
 
 export const FindingCategory = z.enum(["fees", "strategy", "risk", "terms"]);
 export type FindingCategory = z.infer<typeof FindingCategory>;
@@ -10,6 +11,9 @@ export const FindingKind = z.enum([
   "unsupported_claim",
   // A promise made without the risk disclosure that should accompany it.
   "disclosure_gap",
+  // A document falls short of an institutional product rule, whatever the other documents say (stage 2).
+  // The finding names the rule.
+  "policy_gap",
 ]);
 export type FindingKind = z.infer<typeof FindingKind>;
 
@@ -37,6 +41,9 @@ export const Finding = z.object({
   claim: z.string().min(1),
   citation: Citation,
   counterpart: Citation.nullable(),
+  // The product rule a policy_gap breaks (rules.ts). Absent on every other kind, and on events written
+  // before stage 2.
+  rule: ProductRuleId.optional(),
 });
 export type Finding = z.infer<typeof Finding>;
 
