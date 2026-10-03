@@ -102,6 +102,51 @@ Every step below is a distinct UI surface. Watch the cursor: it never types a se
 
 Stage 2 is tracked in #20.
 
+## Status (2026-10-03)
+
+**Works end to end, locally:** drop the Larkspur pack → four analysis steps → findings on the board with citations → open the cited passage in the PDF → approve / dismiss each finding (buttons or keyboard) → every step logged in a hash-chained event log. Not yet deployed to production.
+
+| Area | State | Tickets |
+|---|---|---|
+| **Layer 1 — verify documents** | ✅ Drop zone, pipeline, claim board, citation split-pane, disposition console | #7 #9 #10, #11–#13 (built, tickets still open) |
+| Replay scrubber | ⬜ Not started (the fold it needs is done) | #14 |
+| Eval dashboard | ⬜ Not started | #15, #35 |
+| Spend protection | ✅ Origin allow-list, rate limit, judge-link token on the backend · 🚧 frontend must send the token | #16, #19 |
+| Production deploy | 🚧 Preview deploys verified; production and smoke script pending | #6, #17 |
+| **Layer 2 — check policy** | ✅ Rules `rules@1` (P1–P4) and the `policy_gap` kind · ⬜ the `compliance` step, its ground truth, the board cards | #23 · #24 #25 #26 |
+| **Layer 3 — match the client** | ✅ Contracts, suitability function, three personas with expected verdicts, `attributes` step, client-layer API | #27 #28 #29 #31 |
+| | ⬜ `explain` step, questionnaire, adviser console, client advice page | #30 · #32 #33 #34 |
+| Data ecosystem document | ⬜ Not started | #36 |
+| Bonus | ⬜ Product update re-verification, learned knowledge level, second product | #37 #38 #39 |
+
+The `attributes` step is tested against the real pack text with a scripted model; a run against a real model is still to do (#29).
+
+## How it's built
+
+- **TypeScript monorepo** (pnpm): `frontend/` (Next.js), `backend/` (Hono), `shared/` (zod contracts and the fold), deployed as two Vercel projects ([ADR-0001](docs/adr/0001-typescript-monorepo-on-vercel.md)).
+- **Event-sourced:** one append-only, hash-chained `events` table is the only source of truth; state is a fold over it, and the browser runs the same fold to replay ([ADR-0002](docs/adr/0002-event-sourced-audit-log.md)).
+- **Model-agnostic:** each step is one call to any OpenAI-compatible endpoint; every quote is checked against its page before it is kept ([ADR-0003](docs/adr/0003-openai-compatible-model-endpoint.md)).
+- **Rules, not the model, decide suitability:** `shared/src/suitability.ts` is a pure function of the profile, the cited attributes and the open findings.
+- **Fabricated data only:** the Larkspur pack, its ground truth and the personas are invented; the answer keys live in `frontend/public/eval/` and are never an input to any step.
+- Words mean one thing each: see [CONTEXT.md](CONTEXT.md).
+
+## Running it locally
+
+Needs Node 22+ and pnpm 12.8.1 (`npm i -g pnpm@12.8.1`).
+
+```bash
+pnpm install
+cp .env.example .env              # a local file database works as is
+pnpm --filter @qryvox/backend dev     # API on http://localhost:8787
+pnpm --filter @qryvox/frontend dev    # app on http://localhost:3000 (builds shared first)
+```
+
+- **No model needed to look around:** `/board` shows a recorded case with no model key and no API running. Running new analysis steps needs `LLM_BASE_URL` and `LLM_MODEL` in `.env` (a local Ollama works; see `.env.example`).
+- **API explorer:** `pnpm --filter @qryvox/backend api:docs` → http://localhost:8788/docs (English / 中文).
+- **Checks:** `pnpm typecheck`, `pnpm lint`, `pnpm test`.
+- **Regenerate the pack and answer keys** after editing `shared/pack/`: `pnpm --filter @qryvox/shared pack:generate`.
+- **Deploying** is owner-only; read [docs/deploying.md](docs/deploying.md) first.
+
 ## Scope (weekend-feasible)
 
 - **MVP:** fabricated product pack (factsheet, PPM excerpt, marketing deck, fee table), 6 planted contradictions → drop-zone intake, claim board, citation split-pane, disposition console, eval dashboard, audit replay
