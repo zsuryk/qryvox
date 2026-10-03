@@ -121,6 +121,8 @@ documents; it is not stored in the log.
 
 **Board** — the findings currently in play for a case: every finding not superseded
 (`activeFindings`). Filtered by category; a dismissed finding stays on the board, marked dismissed.
+*Not* the canvas: the board is *which* findings are in play, wherever they are shown; the canvas is one way
+of showing them.
 
 **Supersede** — what a findings re-run does to the findings already on the board: one
 `finding.superseded` each, in the same transaction as the new run's findings. A superseded finding
@@ -138,6 +140,17 @@ event records as having acted. In stage 1 every event's actor is one fixed ident
 
 ## The canvas (#48)
 
+**Canvas** — the case's findings and the passages they cite, laid out as cards on an open, infinite view
+that pans and zooms. A fourth case section beside Review, Advice and Record (`/cases/<id>/canvas`), and,
+with no case, the recorded Larkspur case at `/canvas` (the fixture, `canvas-source.ts`). It is a fold of
+the log like everything else: nothing on it is stored anywhere but in events.
+*Not* the board (the findings in play, which the canvas shows), and not a replacement for Review in v1.
+
+**World coordinates** — where things are on the canvas: cards, the plan region and pinned positions are all
+world positions (`WorldPos`), and only the viewport (`frontend/lib/viewport.ts`) maps them to the screen,
+through one pan and one clamped zoom. *Not* pixels: a pinned card stays where it is in the world whatever
+the zoom or the window.
+
 **Card** — one thing laid out on the canvas: a *finding card* (one finding) or an *excerpt card* (one cited
 passage). Its id says which and is derived from what it shows (`card.ts`): `finding:<finding_id>`, or
 `excerpt:<document_id>:<page>:<hash of the quote>`, so the same finding or passage is the same card on every
@@ -147,9 +160,9 @@ replay. *Not* the finding: what happens to a card never changes the finding it s
 authority (PPM, fee table, factsheet, deck — the order of `AUTHORITY_ORDER`). Each docked card names its
 group (`plan_slot`) on the event that docked it (`planGroups`).
 
-**Board state** — what the analyst has done to cards, folded from the card events into `CaseState.board`:
-the docked set, pinned positions, the discard bin and the find-similar history. Latest decision per card
-wins; the log keeps every one.
+**Canvas state** — what the analyst has done to cards, folded from the card events into `CaseState.board`
+(the field keeps its name): the docked set, pinned positions, the discard bin and the find-similar history.
+Latest decision per card wins; the log keeps every one.
 
 **Dock / pin / discard / restore / find similar** — the card operations, each an event the analyst makes
 (`card.docked`, `card.undocked`, `card.pinned`, `card.discarded`, `card.restored`,
@@ -294,6 +307,7 @@ its category and its quote match a planted finding.
 | disclosure_gap / policy_gap | a document lacks what another document has / a document lacks what our rules require |
 | finding / advice | a problem in the pack / a verdict for one client on one product |
 | discarded / dismissed | a card rejected from the canvas / the analyst's decision on a finding |
+| board / canvas | the findings in play / the open view that shows them as cards |
 | verdict / disposition | the rules' outcome for a client / the analyst's decision on a finding |
 | product rule / suitability rule | must hold for the product to go on the shelf / decides whether it fits a client |
 | analyst / adviser / client | reviews the pack / signs off advice / receives advice |

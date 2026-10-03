@@ -1140,3 +1140,81 @@ details[open] > summary::before {
     animation: breathe 1.6s ease-in-out infinite;
   }
 }
+
+/* --- The canvas (#48) ------------------------------------------------------------------------------ */
+
+/* The frame the world is seen through. Its dotted grid is the world's: lib/viewport.ts sets its pitch and
+   offset with every pan and zoom, so the grid moves with the cards rather than sliding under them. */
+.canvas {
+  background-color: var(--surface-sunken);
+  background-image: radial-gradient(circle, var(--fill-strong) 1px, transparent 1.25px);
+  border-radius: var(--radius-l);
+  box-shadow: inset 0 0 0 0.5px var(--separator);
+  cursor: grab;
+  height: clamp(28rem, 74vh, 60rem);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  position: relative;
+  touch-action: none;
+  user-select: none;
+}
+.canvas[data-panning="true"] {
+  cursor: grabbing;
+}
+.canvas:focus-visible {
+  outline-offset: 3px;
+  border-radius: var(--radius-l);
+}
+/* One transform for the whole world; everything inside is placed in world units from world (0, 0). */
+.canvas__world {
+  left: 0;
+  position: absolute;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.canvas-item {
+  left: 0;
+  position: absolute;
+  top: 0;
+}
+.canvas-stub {
+  height: 100%;
+  overflow: hidden;
+}
+/* The floating controls: a light material over the board, never stacked on another one. */
+.canvas__toolbar {
+  -webkit-backdrop-filter: var(--material-blur);
+  backdrop-filter: var(--material-blur);
+  align-items: center;
+  background: var(--material);
+  border-radius: 999px;
+  bottom: 0.75rem;
+  box-shadow: var(--shadow-2), inset 0 0 0 0.5px var(--separator);
+  cursor: default;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  position: absolute;
+  right: 0.75rem;
+  z-index: 5;
+}
+.canvas__toolbar .btn {
+  background: transparent;
+  min-width: 2rem;
+}
+.canvas__toolbar .btn:hover {
+  background: var(--fill);
+}
+.canvas__zoom {
+  font-variant-numeric: tabular-nums;
+  min-width: 3.25rem;
+}
+.canvas-hint {
+  margin-top: 0.625rem;
+}
+@media (prefers-contrast: more) {
+  .canvas__toolbar {
+    outline: 1px solid var(--separator);
+  }
+}

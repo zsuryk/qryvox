@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 const PLACES = [
   { href: "/", label: "New review" },
   { href: "/board", label: "Recorded case" },
+  { href: "/canvas", label: "Canvas" },
 ] as const;
 
 export default function SiteNav() {

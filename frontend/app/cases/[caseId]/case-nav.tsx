@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// The case's three places, as a segmented control: one choice of three, a thumb that slides to it. Each
-// is a link, so a section is a URL that can be shared, reloaded and gone back to.
+// The case's four places, as a segmented control: one choice of four, a thumb that slides to it. Each
+// is a link, so a section is a URL that can be shared, reloaded and gone back to. Canvas sits beside
+// Review as another way to see the same findings (#48), not in its place.
 const SECTIONS = [
   { suffix: "", label: "Review" },
+  { suffix: "/canvas", label: "Canvas" },
   { suffix: "/advice", label: "Advice" },
   { suffix: "/record", label: "Record" },
 ] as const;
