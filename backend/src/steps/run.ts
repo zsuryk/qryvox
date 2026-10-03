@@ -5,13 +5,14 @@ import type { EventRow } from "../db/schema.js";
 import { checkRateLimit, type RateLimits } from "../guards.js";
 import { extractJson, LlmError, type Llm } from "../llm.js";
 import { append, EventIdConflict, type EventDraft, findCompletedRun, isUniqueViolation, listEventsOfType, type Tx } from "../log.js";
+import { attributes } from "./attributes.js";
 import { contradictions } from "./contradictions.js";
 import { decompose } from "./decompose.js";
 import { extract } from "./extract.js";
 import { findings } from "./findings.js";
 import type { AnyStep } from "./step.js";
 
-const STEPS: Record<RunStepRequest["step"], AnyStep> = { extract, decompose, contradictions, findings };
+const STEPS: Record<RunStepRequest["step"], AnyStep> = { extract, decompose, contradictions, findings, attributes };
 
 export class LlmNotConfigured extends Error {
   override name = "LlmNotConfigured";
