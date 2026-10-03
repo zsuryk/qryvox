@@ -4,10 +4,17 @@ import type { Db } from "../db/client.js";
 import { findCompletedRun, listEventsOfType } from "../log.js";
 import { StepPrecondition } from "./step.js";
 
+// The case's documents, the latest version of each: a document ingested again under the same id (a
+// product update, #37) replaces the earlier one for every step that runs after it, as it does in the fold.
 export async function loadDocuments(db: Db, caseId: string): Promise<IngestedDocument[]> {
   const rows = await listEventsOfType(db, caseId, "document.ingested");
   if (rows.length === 0) throw new StepPrecondition("no documents have been ingested into this case");
-  return rows.map((r) => IngestedDocument.parse(r.payload));
+  const latest = new Map<string, IngestedDocument>();
+  for (const row of rows) {
+    const document = IngestedDocument.parse(row.payload);
+    latest.set(document.document_id, document);
+  }
+  return [...latest.values()];
 }
 
 // A step consumes the stored output of a completed run of the step before it, never a model's memory.

@@ -91,6 +91,7 @@ export async function runStep(
       // Read inside the transaction, so two findings runs completing together cannot both stay on the board.
       ...(step.toFindings ? await supersededBy(tx, caseId, draft) : []),
       ...created.map((finding): EventDraft => ({ ...draft, eventId: randomUUID(), type: "finding.created", payload: finding })),
+      ...((await step.alsoAppend?.(tx, caseId, req.step_run_id)) ?? []).map((e) => ({ ...e, ipHash: caller.ipHash })),
     ]);
     return completedOutcome(row!, req);
   } catch (err) {

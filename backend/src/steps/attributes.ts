@@ -1,5 +1,7 @@
-import { Citation, Exclusion, type IngestedDocument, ProductAttributes } from "@qryvox/shared";
+import { randomUUID } from "node:crypto";
+import { ANALYST_ACTOR, Citation, Exclusion, type IngestedDocument, ProductAttributes } from "@qryvox/shared";
 import { z } from "zod";
+import { foldCase } from "../log.js";
 import { documentsAsText, groundCitation, loadDocuments, normalize } from "./inputs.js";
 import { StepPrecondition, type StepDefinition } from "./step.js";
 
@@ -94,6 +96,21 @@ export const attributes: StepDefinition<AttributesInput, ProductAttributes, Attr
     return {
       output: ProductAttributes.parse({ ...found, exclusion_screens: screens(reply.exclusion_screens, documents) }),
     };
+  },
+
+  // The product as read has changed: advice still in play on an older attributes run no longer rests on
+  // it, so it is superseded with this run, and the adviser sees whose advice needs a new draft (#37).
+  async alsoAppend(tx, caseId, stepRunId) {
+    const state = await foldCase(tx, caseId);
+    return state.advice
+      .filter((a) => a.supersededAtSeq === null && a.attributes_run_id !== stepRunId)
+      .map((a) => ({
+        eventId: randomUUID(),
+        type: "advice.superseded",
+        v: 1,
+        actor: ANALYST_ACTOR,
+        payload: { advice_id: a.adviceId, cause: "product_changed" },
+      }));
   },
 };
 

@@ -1,6 +1,7 @@
 import type { Finding, StepName } from "@qryvox/shared";
 import type { z } from "zod";
 import type { Db } from "../db/client.js";
+import type { EventDraft, Tx } from "../log.js";
 import type { ChatMessage } from "../llm.js";
 
 // A step cannot run yet: no documents, or its input run is missing. Nothing is appended, no tokens spent.
@@ -21,6 +22,9 @@ export type StepDefinition<Input, Output extends Record<string, unknown>, Reply 
   ground(reply: Reply, input: Input): { output: Output } | { error: string };
   // The findings this run puts on the board, appended with its step.completed in one transaction.
   toFindings?(output: Output): Finding[];
+  // Other events that follow from this run completing, built inside the same write transaction from what
+  // the log holds then (e.g. a new attributes run superseding advice drafted on an older one).
+  alsoAppend?(tx: Tx, caseId: string, stepRunId: string): Promise<EventDraft[]>;
 };
 
 // Erases the type parameters so steps can share one registry.
