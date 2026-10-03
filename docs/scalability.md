@@ -19,6 +19,11 @@ rules need.
 | findings | 1,147 / 471 · 12.9 s | 1,056 / 515 · 11.9 s | 607 / 265 · 6.7 s |
 | attributes | 1,838 / 469 · 11.5 s | 1,860 / 511 · 12.7 s | 1,639 / 424 · 10.7 s |
 | **Total** | **9,959 / 6,395 · 2 min 37 s** | **10,003 / 6,986 · 2 min 49 s** | **8,385 / 4,921 · 2 min 2 s** |
+| rationale (optional, #62; not in the total) | — | 1,385 / 333 · 12.5 s (9 findings) | — |
+
+The optional rationale step (#62) writes a line on why each finding matters, for all of a findings run's
+findings in one call. It was measured on 2026-10-03 on the Larkspur v2 run, with nine findings: about 1.7
+thousand tokens and 13 s. It runs once per findings run, not per card or per client, and no card waits for it.
 
 **Verifying a product costs about 15–17 thousand tokens and under three minutes.** Then a person
 reviews the findings. A new document version (the Larkspur v2 update) costs the same again, and only that

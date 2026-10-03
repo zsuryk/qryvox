@@ -115,7 +115,10 @@ fails.
 
 **Rationale** — the one line on a board card saying why the finding counts as one (e.g. "Two documents
 state the same fact differently: factsheet and ppm"). Derived by the board from the finding's kind and
-documents; it is not stored in the log.
+documents; it is not stored in the log. When the optional `rationale` step (#62) has run on the finding's
+findings run, the card instead shows its one plain-language sentence on why the finding matters to an
+investor, which is in the log (`rationaleFor`), grounded like an explanation: quotes verbatim from the
+finding's citation or counterpart, numbers only from them. The derived line stays the fallback.
 
 ## The board and decisions
 
@@ -374,4 +377,5 @@ settle each one before it spreads further.
    yet says what high, medium and low must mean to the analyst.
 8. **Rationale is not in the log.** It is derived on screen, so a replayed board shows today's wording,
    not the wording the analyst saw. That is harmless while it is purely derived; it matters if the
-   wording ever changes.
+   wording ever changes. A model-written rationale (#62) is in the log, so this applies only to the derived
+   fallback.
