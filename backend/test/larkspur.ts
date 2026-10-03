@@ -3,6 +3,7 @@
 import type { IngestedDocument, StepName } from "@qryvox/shared";
 import { DOCUMENTS } from "@qryvox/shared/pack-source";
 import { ATTRIBUTES_SYSTEM_PROMPT } from "../src/steps/attributes";
+import { COMPLIANCE_SYSTEM_PROMPT } from "../src/steps/compliance";
 import { EXPLAIN_SYSTEM_PROMPT } from "../src/steps/explain";
 import { CONTRADICTIONS_SYSTEM_PROMPT } from "../src/steps/contradictions";
 import { DECOMPOSE_SYSTEM_PROMPT } from "../src/steps/decompose";
@@ -46,15 +47,36 @@ const redemptionCharge = {
   quote: "Redemption charge: 2.00% on units redeemed within 24 months of purchase",
 };
 
+// The passages the policy gaps rest on (#25): where the factsheet falls short, and what the PPM says.
+const ratesRisk = { document_id: "factsheet", page: 2, quote: "Bond prices generally fall when interest rates rise." };
+const ppmRisks = { document_id: "ppm", page: 2, quote: "5.4 The Fund is exposed to interest rate, credit and currency risk." };
+const minimum = { document_id: "factsheet", page: 1, quote: "Minimum initial investment: USD 1,000" };
+const ppmExit = { document_id: "ppm", page: 3, quote: "7.2 A redemption charge of 2.00% applies to units redeemed within 24 months of purchase." };
+const canFall = { document_id: "factsheet", page: 2, quote: "The value of investments and the income from them can fall as well as rise." };
+const ppmNotProtected = {
+  document_id: "ppm",
+  page: 2,
+  quote: "5.1 The Fund is not capital protected. Investors may lose some or all of the amount invested.",
+};
+
 // Two fees findings on the board: the management fee stated two ways, and the exit charge the deck denies.
+// A compliance run adds three policy gaps on the factsheet (P1, P2, P3).
 const PIPELINE = {
-  extract: { statements: [managementFee, feeTableFee, noExitCharge, redemptionCharge] },
+  extract: {
+    statements: [managementFee, feeTableFee, noExitCharge, redemptionCharge, ratesRisk, ppmRisks, minimum, ppmExit, canFall, ppmNotProtected],
+  },
   decompose: {
     claims: [
       { id: "c1", ...managementFee, category: "fees", topic: "management fee", assertion: "management fee is 0.85% a year" },
       { id: "c2", ...feeTableFee, category: "fees", topic: "management fee", assertion: "management fee is 1.25% of NAV" },
       { id: "c3", ...noExitCharge, category: "fees", topic: "exit charge", assertion: "there is no exit charge" },
       { id: "c4", ...redemptionCharge, category: "fees", topic: "exit charge", assertion: "2.00% within 24 months" },
+      { id: "c5", ...ratesRisk, category: "risk", topic: "interest rate risk", assertion: "bond prices fall when rates rise" },
+      { id: "c6", ...ppmRisks, category: "risk", topic: "risk factors", assertion: "exposed to interest rate, credit and currency risk" },
+      { id: "c7", ...minimum, category: "terms", topic: "minimum investment", assertion: "minimum USD 1,000" },
+      { id: "c8", ...ppmExit, category: "fees", topic: "exit charge", assertion: "2.00% within 24 months" },
+      { id: "c9", ...canFall, category: "risk", topic: "capital", assertion: "value can fall as well as rise" },
+      { id: "c10", ...ppmNotProtected, category: "risk", topic: "capital protection", assertion: "not capital protected" },
     ],
   },
   contradictions: {
@@ -69,6 +91,13 @@ const PIPELINE = {
       { issue: 2, severity: "high", claim: "The deck promises no exit charges; the fee table charges 2.00% within 24 months." },
     ],
   },
+  compliance: {
+    gaps: [
+      { rule: "P1", claim_id: "c5", counterpart_claim_id: "c6", explanation: "The factsheet omits the credit risk the PPM lists." },
+      { rule: "P2", claim_id: "c9", counterpart_claim_id: "c10", explanation: "The factsheet does not say the fund is not capital protected." },
+      { rule: "P3", claim_id: "c7", counterpart_claim_id: "c8", explanation: "The factsheet's key facts omit the 2.00% exit charge." },
+    ],
+  },
   attributes: ATTRIBUTES_REPLY,
 } satisfies Record<Exclude<StepName, "explain">, unknown>;
 
@@ -77,6 +106,7 @@ const PROMPTS: [string, StepName][] = [
   [DECOMPOSE_SYSTEM_PROMPT, "decompose"],
   [CONTRADICTIONS_SYSTEM_PROMPT, "contradictions"],
   [FINDINGS_SYSTEM_PROMPT, "findings"],
+  [COMPLIANCE_SYSTEM_PROMPT, "compliance"],
   [ATTRIBUTES_SYSTEM_PROMPT, "attributes"],
   [EXPLAIN_SYSTEM_PROMPT, "explain"],
 ];

@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { EventPage, fold, type IngestedDocument, type StepName, StepResult } from "@qryvox/shared";
 import { expect } from "vitest";
 import { ATTRIBUTES_SYSTEM_PROMPT } from "../src/steps/attributes";
+import { COMPLIANCE_SYSTEM_PROMPT } from "../src/steps/compliance";
 import { EXPLAIN_SYSTEM_PROMPT } from "../src/steps/explain";
 import { CONTRADICTIONS_SYSTEM_PROMPT } from "../src/steps/contradictions";
 import { DECOMPOSE_SYSTEM_PROMPT } from "../src/steps/decompose";
@@ -46,6 +47,7 @@ export const REPLIES = {
     findings: [{ issue: 1, severity: "high", claim: "The factsheet states a 0.85% management fee; the fee table states 1.25%." }],
   },
   // These two documents state no product attributes; the attributes step has its own tests on the real pack.
+  compliance: { gaps: [] },
   attributes: {},
   explain: {},
 } satisfies Record<StepName, unknown>;
@@ -55,6 +57,7 @@ const PROMPTS: [string, StepName][] = [
   [DECOMPOSE_SYSTEM_PROMPT, "decompose"],
   [CONTRADICTIONS_SYSTEM_PROMPT, "contradictions"],
   [FINDINGS_SYSTEM_PROMPT, "findings"],
+  [COMPLIANCE_SYSTEM_PROMPT, "compliance"],
   [ATTRIBUTES_SYSTEM_PROMPT, "attributes"],
   [EXPLAIN_SYSTEM_PROMPT, "explain"],
 ];

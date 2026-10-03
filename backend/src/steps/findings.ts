@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type Citation, Finding, Severity } from "@qryvox/shared";
+import { type Citation, Finding, ruleById, Severity } from "@qryvox/shared";
 import { z } from "zod";
 import { ContradictionsOutput, type Issue } from "./contradictions.js";
 import { type Claim, DecomposeOutput } from "./decompose.js";
@@ -30,7 +30,7 @@ export const FINDINGS_SYSTEM_PROMPT = `You write the findings an investment anal
 For each issue give:
 - issue: its number.
 - severity: high if an investor could be misled about cost, risk or access to their money; medium if a material policy or term is misstated; low otherwise.
-- claim: one sentence of at most 30 words stating what the documents say and where they conflict. Name the documents and keep every number exactly as written. No advice, no recommendation, no computed numbers.
+- claim: one sentence of at most 30 words stating what the documents say and where they conflict, or, for a policy_gap, what the document lacks under the rule named. Name the documents and keep every number exactly as written. No advice, no recommendation, no computed numbers.
 
 Respond with only a JSON object and no other text, in exactly this shape:
 {"findings":[{"issue":1,"severity":"high","claim":"<one sentence>"}]}`;
@@ -39,8 +39,15 @@ export const findings: StepDefinition<FindingsInput, FindingsOutput, FindingsRep
   name: "findings",
 
   async loadInput(db, caseId, inputRunId) {
-    const found = await loadCompletedOutput(db, caseId, inputRunId, "contradictions", ContradictionsOutput);
-    const { output } = await loadCompletedOutput(db, caseId, found.inputRunId, "decompose", DecomposeOutput);
+    // A compliance run carries the contradictions run's issues and adds its policy gaps; a pipeline without
+    // the compliance step hands over the contradictions run directly.
+    const found = await loadCompletedOutput(db, caseId, inputRunId, ["contradictions", "compliance"], ContradictionsOutput);
+    // The claims are the decompose run's: one link back from a contradictions run, two from a compliance run.
+    const decomposeRun =
+      found.step === "compliance"
+        ? (await loadCompletedOutput(db, caseId, found.inputRunId, "contradictions", ContradictionsOutput)).inputRunId
+        : found.inputRunId;
+    const { output } = await loadCompletedOutput(db, caseId, decomposeRun, "decompose", DecomposeOutput);
     return { issues: found.output.issues, claims: output.claims };
   },
 
@@ -53,7 +60,7 @@ export const findings: StepDefinition<FindingsInput, FindingsOutput, FindingsRep
     const text = issues
       .map((issue, i) =>
         [
-          `${i + 1}. ${issue.kind}, ${issue.category}: ${issue.explanation}`,
+          `${i + 1}. ${issue.kind}, ${issue.category}${issue.rule ? `, breaks rule ${issue.rule} (${ruleById(issue.rule).title})` : ""}: ${issue.explanation}`,
           `   claim: ${describe(issue.claim_id)}`,
           `   counterpart: ${describe(issue.counterpart_claim_id)}`,
         ].join("\n"),
@@ -90,6 +97,7 @@ export const findings: StepDefinition<FindingsInput, FindingsOutput, FindingsRep
           claim: r?.claim ?? issue.explanation,
           citation,
           counterpart: cite(issue.counterpart_claim_id),
+          ...(issue.rule ? { rule: issue.rule } : {}),
         }),
       ];
     });

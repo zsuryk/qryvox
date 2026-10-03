@@ -1,4 +1,4 @@
-import { FindingCategory, FindingKind, type IngestedDocument } from "@qryvox/shared";
+import { FindingCategory, FindingKind, type IngestedDocument, ProductRuleId } from "@qryvox/shared";
 import { z } from "zod";
 import { type Claim, DecomposeOutput } from "./decompose.js";
 import { loadCompletedOutput, loadDocuments } from "./inputs.js";
@@ -15,6 +15,8 @@ export const Issue = z.object({
   // The claim it conflicts with or lacks; null when nothing in the pack speaks to it.
   counterpart_claim_id: z.string().min(1).nullable(),
   explanation: z.string().min(1),
+  // The product rule a policy_gap breaks; only the compliance step sets it.
+  rule: ProductRuleId.optional(),
 });
 export type Issue = z.infer<typeof Issue>;
 

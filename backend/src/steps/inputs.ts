@@ -15,15 +15,16 @@ export async function loadCompletedOutput<T>(
   db: Db,
   caseId: string,
   runId: string | null,
-  step: StepName,
+  step: StepName | readonly StepName[],
   schema: z.ZodType<T>,
-): Promise<{ output: T; inputRunId: string | null }> {
+): Promise<{ output: T; inputRunId: string | null; step: StepName }> {
   const row = runId === null ? undefined : await findCompletedRun(db, caseId, runId);
   const payload = row?.payload as { step?: string; output?: unknown; input_run_id?: string | null } | undefined;
-  if (!payload || payload.step !== step) {
-    throw new StepPrecondition(`input_run_id must name a completed ${step} run in this case`);
+  const steps: readonly StepName[] = typeof step === "string" ? [step] : step;
+  if (!payload || !steps.includes(payload.step as StepName)) {
+    throw new StepPrecondition(`input_run_id must name a completed ${steps.join(" or ")} run in this case`);
   }
-  return { output: schema.parse(payload.output), inputRunId: payload.input_run_id ?? null };
+  return { output: schema.parse(payload.output), inputRunId: payload.input_run_id ?? null, step: payload.step as StepName };
 }
 
 // pdf.js and models both vary whitespace; compare text with runs of whitespace collapsed.
