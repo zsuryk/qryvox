@@ -1,0 +1,166 @@
+import { describe, expect, it } from "vitest";
+import {
+  activeAdvice,
+  Advice,
+  approvedAdviceFor,
+  ClientProfile,
+  fold,
+  ProductAttributes,
+  productRiskLevel,
+  type Reason,
+  SlimEvent,
+  verdictFor,
+} from "../src";
+import recorded from "../fixtures/case-recorded.json";
+import { larkspurAttributes } from "./larkspur";
+
+const events = SlimEvent.array().parse(recorded);
+const caseId = events[0]!.case_id;
+
+const chan: ClientProfile = {
+  client_id: "persona-chan",
+  goal: "income",
+  horizon_years: 2,
+  risk_level: 2,
+  knowledge: "novice",
+  relies_on_income: true,
+  may_need_cash_at_short_notice: true,
+  exclusions: [],
+};
+
+const horizonBlocks: Reason = {
+  rule: "S1",
+  effect: "blocks",
+  profile_field: "horizon_years",
+  citation: larkspurAttributes.min_holding_years.citation,
+};
+
+// Events appended after the recorded pipeline run, one seq at a time, as the browser and server would.
+function after(...appended: { type: string; payload: unknown; event_id?: string }[]): SlimEvent[] {
+  return [
+    ...events,
+    ...appended.map((e, i) => {
+      const seq = events.length + i + 1;
+      return SlimEvent.parse({
+        seq,
+        event_id: e.event_id ?? `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
+        case_id: caseId,
+        actor: "demo-analyst",
+        at: "2026-10-03T12:00:00.000Z",
+        step_run_id: null,
+        type: e.type,
+        v: 1,
+        payload: e.payload,
+      });
+    }),
+  ];
+}
+
+const ADVICE_ID = "00000000-0000-4000-8000-0000000000aa";
+const draft = (profileSeq: number): Advice => ({
+  client_id: "persona-chan",
+  profile_seq: profileSeq,
+  attributes_run_id: "run-attributes-1",
+  verdict: "not_suitable",
+  reasons: [horizonBlocks],
+  disclosures: [],
+  rules_version: "rules@1",
+});
+
+describe("the client profile", () => {
+  it("takes a pseudonymous id and refuses a name", () => {
+    expect(ClientProfile.safeParse(chan).success).toBe(true);
+    expect(ClientProfile.safeParse({ ...chan, client_id: "Mrs Chan" }).success).toBe(false);
+  });
+
+  it("holds only chosen answers: every field but the id is an enum, a number, a flag or a list of enums", () => {
+    const shapes = Object.entries(ClientProfile.shape)
+      .filter(([field]) => field !== "client_id")
+      .map(([, schema]) => schema.def.type);
+    expect(shapes.every((t) => ["enum", "number", "boolean", "array"].includes(t))).toBe(true);
+  });
+});
+
+describe("product attributes", () => {
+  it("carry a citation on every value", () => {
+    expect(ProductAttributes.safeParse(larkspurAttributes).success).toBe(true);
+    const uncited = { value: larkspurAttributes.min_holding_years.value };
+    expect(ProductAttributes.safeParse({ ...larkspurAttributes, min_holding_years: uncited }).success).toBe(false);
+  });
+
+  it("map to a risk level by the fixed table: Larkspur, up to 40% sub-investment-grade, is 3", () => {
+    const at = (subIg: number, protectedCapital: boolean, derivatives: "none" | "hedging" | "investment" = "none") =>
+      productRiskLevel({
+        ...larkspurAttributes,
+        sub_investment_grade_max_pct: { ...larkspurAttributes.sub_investment_grade_max_pct, value: subIg },
+        capital_protected: { ...larkspurAttributes.capital_protected, value: protectedCapital },
+        derivatives_use: { ...larkspurAttributes.derivatives_use, value: derivatives },
+      });
+
+    expect(productRiskLevel(larkspurAttributes)).toBe(3);
+    expect(at(0, true)).toBe(1);
+    expect(at(0, false)).toBe(2);
+    expect(at(50, false)).toBe(3);
+    expect(at(51, false)).toBe(4);
+    expect(at(0, true, "investment")).toBe(4);
+  });
+});
+
+describe("advice", () => {
+  it("has the verdict its reasons amount to: a block, then a condition, then suitable", () => {
+    const r = (effect: Reason["effect"]): Reason => ({ ...horizonBlocks, effect });
+    expect(verdictFor([r("meets"), r("warns")])).toBe("suitable");
+    expect(verdictFor([r("meets"), r("conditional")])).toBe("conditional");
+    expect(verdictFor([r("conditional"), r("blocks")])).toBe("not_suitable");
+  });
+
+  it("refuses a drafted verdict its reasons do not support", () => {
+    expect(Advice.safeParse(draft(1)).success).toBe(true);
+    expect(Advice.safeParse({ ...draft(1), verdict: "suitable" }).success).toBe(false);
+  });
+});
+
+describe("fold: clients and advice", () => {
+  it("a stage-1 log folds with no clients and no advice", () => {
+    expect(fold(events)).toMatchObject({ clients: [], advice: [] });
+  });
+
+  it("keeps each client's latest profile and counts its versions", () => {
+    const state = fold(after(
+      { type: "client.profiled", payload: chan },
+      { type: "client.profiled", payload: { ...chan, horizon_years: 6 } },
+    ));
+
+    expect(state.clients).toHaveLength(1);
+    expect(state.clients[0]).toMatchObject({ clientId: "persona-chan", version: 2, profile: { horizon_years: 6 } });
+  });
+
+  it("shows a client only advice an adviser approved, and a superseded one never", () => {
+    const profiledAt = events.length + 1;
+    const drafted = after(
+      { type: "client.profiled", payload: chan },
+      { type: "advice.drafted", payload: draft(profiledAt), event_id: ADVICE_ID },
+    );
+    expect(approvedAdviceFor(fold(drafted), "persona-chan")).toEqual([]);
+
+    const decided = fold(after(
+      { type: "client.profiled", payload: chan },
+      { type: "advice.drafted", payload: draft(profiledAt), event_id: ADVICE_ID },
+      { type: "advice.decided", payload: { advice_id: ADVICE_ID, decision: "approved" } },
+    ));
+    expect(approvedAdviceFor(decided, "persona-chan").map((a) => a.adviceId)).toEqual([ADVICE_ID]);
+    expect(decided.advice[0]!.decision).toMatchObject({ decision: "approved", actor: "demo-analyst" });
+
+    const superseded = fold(after(
+      { type: "client.profiled", payload: chan },
+      { type: "advice.drafted", payload: draft(profiledAt), event_id: ADVICE_ID },
+      { type: "advice.decided", payload: { advice_id: ADVICE_ID, decision: "approved" } },
+      { type: "client.profiled", payload: { ...chan, horizon_years: 6 } },
+      { type: "advice.superseded", payload: { advice_id: ADVICE_ID, cause: "profile_changed" } },
+    ));
+    expect(activeAdvice(superseded)).toEqual([]);
+    expect(approvedAdviceFor(superseded, "persona-chan")).toEqual([]);
+    // Out of the client's view, still in the log with its decision.
+    expect(superseded.advice[0]).toMatchObject({ supersededBecause: "profile_changed", decision: { decision: "approved" } });
+  });
+});

@@ -1,7 +1,30 @@
 export { ANALYST_ACTOR } from "./actor.js";
 export {
+  Advice,
+  AdviceDecision,
+  Disclosure,
+  Reason,
+  ReasonEffect,
+  SupersedeCause,
+  Verdict,
+  verdictFor,
+} from "./advice.js";
+export {
+  ClientGoal,
+  ClientProfile,
+  DealingFrequency,
+  DerivativesUse,
+  Exclusion,
+  KnowledgeLevel,
+  ProductAttributes,
+  productRiskLevel,
+  ProfileField,
+} from "./client.js";
+export {
   AppendResponse,
   ChangeDispositionRequest,
+  DecideAdviceRequest,
+  DraftAdviceRequest,
   ErrorResponse,
   EVENT_PAGE_LIMIT,
   EventPage,
@@ -11,13 +34,18 @@ export {
   JUDGE_TOKEN_PARAM,
   OpenCaseRequest,
   OpenCaseResponse,
+  RecordProfileRequest,
   RunStepRequest,
   StepFailure,
   StepResult,
   VerifyResponse,
 } from "./api.js";
 export {
+  AdviceDecided,
+  AdviceDrafted,
+  AdviceSuperseded,
   CaseOpened,
+  ClientProfiled,
   DispositionChanged,
   DocumentIngested,
   DocumentKind,
@@ -37,7 +65,11 @@ export {
 } from "./events.js";
 export { fold, FoldError } from "./fold.js";
 export {
+  activeAdvice,
   activeFindings,
+  approvedAdviceFor,
+  type CaseAdvice,
+  type CaseClient,
   type CaseDocument,
   type CaseFinding,
   type CaseState,

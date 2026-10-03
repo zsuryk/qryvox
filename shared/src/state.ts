@@ -1,3 +1,5 @@
+import type { Advice, AdviceDecision, SupersedeCause } from "./advice.js";
+import type { ClientProfile } from "./client.js";
 import type { DocumentKind, StepName } from "./events.js";
 import type { Disposition, Finding } from "./finding.js";
 
@@ -44,6 +46,26 @@ export type FindingDisposition = {
   changedAtSeq: number;
 };
 
+// A client's latest profile. Earlier versions stay in the log; replay to an earlier seq shows them.
+export type CaseClient = {
+  clientId: string;
+  profile: ClientProfile;
+  // 1 for the first client.profiled, counting up with each new version.
+  version: number;
+  profiledAtSeq: number;
+};
+
+export type CaseAdvice = Advice & {
+  // The advice.drafted event's event_id.
+  adviceId: string;
+  draftedAtSeq: number;
+  // Set once a newer profile or attributes run replaced it; it then leaves the client's view.
+  supersededAtSeq: number | null;
+  supersededBecause: SupersedeCause | null;
+  // The adviser's latest decision, or null while it waits for one.
+  decision: { decision: AdviceDecision; actor: string; decidedAtSeq: number } | null;
+};
+
 export type CaseState = {
   caseId: string | null;
   openedAt: string | null;
@@ -55,12 +77,25 @@ export type CaseState = {
   // The latest disposition per finding that has one, in the order it was first decided. A finding with no
   // entry here has not been decided yet — which is not the same as dismissed, and never happens by itself.
   dispositions: FindingDisposition[];
+  // Stage 2: each client's latest profile, in the order first profiled, and every advice ever drafted.
+  clients: CaseClient[];
+  advice: CaseAdvice[];
   // Highest seq folded so far; 0 means no events.
   lastSeq: number;
 };
 
 export function emptyCaseState(): CaseState {
-  return { caseId: null, openedAt: null, documents: [], stepRuns: [], findings: [], dispositions: [], lastSeq: 0 };
+  return {
+    caseId: null,
+    openedAt: null,
+    documents: [],
+    stepRuns: [],
+    findings: [],
+    dispositions: [],
+    clients: [],
+    advice: [],
+    lastSeq: 0,
+  };
 }
 
 // The board: findings not superseded by a later run.
@@ -72,4 +107,14 @@ export function activeFindings(state: CaseState): CaseFinding[] {
 // this: no step, and no fold rule, ever approves or dismisses on the analyst's behalf.
 export function dispositionOf(state: CaseState, findingId: string): FindingDisposition | null {
   return state.dispositions.find((d) => d.findingId === findingId) ?? null;
+}
+
+// Advice still in play: not superseded by a newer profile or attributes run.
+export function activeAdvice(state: CaseState): CaseAdvice[] {
+  return state.advice.filter((a) => a.supersededAtSeq === null);
+}
+
+// What a client may see: advice in play that an adviser has approved. Nothing reaches a client otherwise.
+export function approvedAdviceFor(state: CaseState, clientId: string): CaseAdvice[] {
+  return activeAdvice(state).filter((a) => a.client_id === clientId && a.decision?.decision === "approved");
 }

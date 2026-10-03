@@ -95,6 +95,53 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
           : [...state.dispositions, decided],
       };
     }
+    case "client.profiled": {
+      const existing = state.clients.find((c) => c.clientId === event.payload.client_id);
+      const profiled = {
+        clientId: event.payload.client_id,
+        profile: event.payload,
+        version: (existing?.version ?? 0) + 1,
+        profiledAtSeq: event.seq,
+      };
+      return {
+        ...next,
+        clients: existing ? state.clients.map((c) => (c === existing ? profiled : c)) : [...state.clients, profiled],
+      };
+    }
+    case "advice.drafted":
+      return {
+        ...next,
+        advice: [
+          ...state.advice,
+          {
+            ...event.payload,
+            adviceId: event.event_id,
+            draftedAtSeq: event.seq,
+            supersededAtSeq: null,
+            supersededBecause: null,
+            decision: null,
+          },
+        ],
+      };
+    case "advice.superseded":
+      return {
+        ...next,
+        advice: state.advice.map((a) =>
+          a.adviceId === event.payload.advice_id && a.supersededAtSeq === null
+            ? { ...a, supersededAtSeq: event.seq, supersededBecause: event.payload.cause }
+            : a,
+        ),
+      };
+    case "advice.decided":
+      // Deciding again replaces the decision; the log keeps both, as for dispositions.
+      return {
+        ...next,
+        advice: state.advice.map((a) =>
+          a.adviceId === event.payload.advice_id
+            ? { ...a, decision: { decision: event.payload.decision, actor: event.actor, decidedAtSeq: event.seq } }
+            : a,
+        ),
+      };
     case "step.completed":
     case "step.failed": {
       const completed = event.type === "step.completed";

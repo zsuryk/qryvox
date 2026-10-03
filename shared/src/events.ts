@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { Advice, AdviceDecision, SupersedeCause } from "./advice.js";
+import { ClientProfile } from "./client.js";
 import { Disposition, Finding } from "./finding.js";
 
 // Envelope fields carried by every event, named as in ADR-0002.
@@ -134,6 +136,43 @@ export const DispositionChanged = z.object({
   payload: z.object({ finding_id: z.string().min(1), disposition: Disposition }),
 });
 
+// --- The client layer (stage 2). None of these is a step event: no model produces them. ---
+
+// A client's answers, appended by the browser. Each one is a new version of that client's profile; the
+// server supersedes advice drafted on an older version in the same transaction.
+export const ClientProfiled = z.object({
+  ...envelope,
+  type: z.literal("client.profiled"),
+  v: z.literal(1),
+  payload: ClientProfile,
+});
+
+// Advice drafted by applying the suitability rules (never a model) to the latest profile and attributes.
+// The advice's id is this event's event_id.
+export const AdviceDrafted = z.object({
+  ...envelope,
+  type: z.literal("advice.drafted"),
+  v: z.literal(1),
+  payload: Advice,
+});
+
+// Advice drafted on a profile or attributes run that has since been replaced. It leaves the client's view
+// but stays in the log, with any decision it was given.
+export const AdviceSuperseded = z.object({
+  ...envelope,
+  type: z.literal("advice.superseded"),
+  v: z.literal(1),
+  payload: z.object({ advice_id: z.uuid(), cause: SupersedeCause }),
+});
+
+// The adviser's sign-off. Who decided is the envelope's actor, as for a disposition (ADR-0004).
+export const AdviceDecided = z.object({
+  ...envelope,
+  type: z.literal("advice.decided"),
+  v: z.literal(1),
+  payload: z.object({ advice_id: z.uuid(), decision: AdviceDecision }),
+});
+
 // Full events: what the hash covers and what the per-event payload endpoint returns.
 export const Event = z.discriminatedUnion("type", [
   CaseOpened,
@@ -144,6 +183,10 @@ export const Event = z.discriminatedUnion("type", [
   FindingCreated,
   FindingSuperseded,
   DispositionChanged,
+  ClientProfiled,
+  AdviceDrafted,
+  AdviceSuperseded,
+  AdviceDecided,
 ]);
 export type Event = z.infer<typeof Event>;
 
@@ -158,6 +201,10 @@ export const SlimEvent = z.discriminatedUnion("type", [
   FindingCreated,
   FindingSuperseded,
   DispositionChanged,
+  ClientProfiled,
+  AdviceDrafted,
+  AdviceSuperseded,
+  AdviceDecided,
 ]);
 export type SlimEvent = z.infer<typeof SlimEvent>;
 
