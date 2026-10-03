@@ -108,7 +108,8 @@ export const RunStepRequest = z
     step_run_id: z.uuid(),
     step: StepName,
     // The completed run of the previous step to consume; null for the steps that read the documents
-    // (extract, attributes) and for parse. For explain, the id of the advice it explains.
+    // (extract, attributes) and for parse. For explain, the id of the advice it explains; for rationale, the
+    // completed findings run whose findings it words.
     input_run_id: z.string().min(1).nullable(),
     // parse only, and required for it: the analyst's free-text intent (ParseInput).
     intent: ParseInput.shape.intent.optional(),

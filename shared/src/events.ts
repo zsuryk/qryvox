@@ -53,8 +53,19 @@ export const DocumentIngested = z.object({
 // compliance checks the documents against the product rules between contradictions and findings (#24);
 // attributes reads the documents for the facts suitability needs (#29); explain words one advice's
 // verdict at three depths (#30); parse reads the analyst's free-text intent for the canvas into intent
-// chips (#51, intent.ts), and is no part of the pipeline.
-export const StepName = z.enum(["extract", "decompose", "contradictions", "findings", "compliance", "attributes", "explain", "parse"]);
+// chips (#51, intent.ts), and is no part of the pipeline; rationale writes one plain-language line on why
+// each finding of a completed findings run matters (#62, rationale.ts), optional and never consumed.
+export const StepName = z.enum([
+  "extract",
+  "decompose",
+  "contradictions",
+  "findings",
+  "compliance",
+  "attributes",
+  "explain",
+  "parse",
+  "rationale",
+]);
 export type StepName = z.infer<typeof StepName>;
 
 // Which prompt produced a step's output. The prompt text lives in the backend and never reaches the
@@ -68,6 +79,7 @@ export const PROMPT_VERSIONS = {
   attributes: "attributes@1",
   explain: "explain@2",
   parse: "parse@1",
+  rationale: "rationale@1",
 } as const satisfies Record<StepName, string>;
 
 const stepRun = {

@@ -7,8 +7,9 @@ import { FindingCategory } from "./finding.js";
 // shorter way to the chip set the buttons give. The chips choose what to look at; nothing in them is a
 // decision, and nothing here changes the board state.
 
-// The steps a chip can ask for: any step but parse itself, which only ever produces chips.
-export const ChipStep = StepName.exclude(["parse"]);
+// The steps a chip can ask for: any step but parse itself, which only ever produces chips, and rationale,
+// which only words the findings a chip already reaches (and whose absence keeps parse@1's prompt as it was).
+export const ChipStep = StepName.exclude(["parse", "rationale"]);
 export type ChipStep = z.infer<typeof ChipStep>;
 
 // One chip names any of a category, a document kind (its authority) and a step; null is "any". A chip
