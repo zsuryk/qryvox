@@ -1218,3 +1218,31 @@ details[open] > summary::before {
     outline: 1px solid var(--separator);
   }
 }
+.canvas-summary {
+  margin-bottom: 0.75rem;
+}
+/* Every card sits in a world slot; when the flow reflows, it moves to its new one on the house curve. */
+.canvas-item {
+  transition: transform 420ms var(--ease-settle);
+}
+/* …and arrives in it: rising a little into place, scaling up from just under its size, fading in. The
+   cards of one arrival follow each other a beat apart, so a board filling up reads as cards dealt out. */
+.canvas-item__body {
+  animation: spawn 380ms var(--ease-settle) both;
+  animation-delay: var(--spawn-delay, 0ms);
+}
+@keyframes spawn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-item {
+    transition: none;
+  }
+  .canvas-item__body {
+    animation: fade-in 200ms ease both;
+    animation-delay: 0ms;
+  }
+}

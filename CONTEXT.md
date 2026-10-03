@@ -156,6 +156,11 @@ passage). Its id says which and is derived from what it shows (`card.ts`): `find
 `excerpt:<document_id>:<page>:<hash of the quote>`, so the same finding or passage is the same card on every
 replay. *Not* the finding: what happens to a card never changes the finding it shows.
 
+**Auto-tiling** — how cards find their place on the canvas without anyone placing them: one size of card,
+left to right in rows of four from world (0, 0), each new card after the last, skipping any slot a pinned
+card is in (`frontend/lib/tiling.ts`). Docked and discarded cards are not in the flow. *Not* a pin: tiling
+moves cards whenever the flow changes; a pin never moves.
+
 **Plan region** — the area of the canvas where docked cards form the reportable set, grouped by category ×
 authority (PPM, fee table, factsheet, deck — the order of `AUTHORITY_ORDER`). Each docked card names its
 group (`plan_slot`) on the event that docked it (`planGroups`).

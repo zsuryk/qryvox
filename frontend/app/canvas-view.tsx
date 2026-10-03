@@ -3,9 +3,9 @@
 import { type KeyboardEvent, type PointerEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SlimEvent } from "@qryvox/shared";
 import { type CanvasMode, type CanvasView as View, canvasView } from "../lib/canvas-source";
+import { canvasLayout } from "../lib/canvas-layout";
 import { errorMessage } from "../lib/errors";
 import {
-  boundsOf,
   fitTo,
   glide,
   gridStyle,
@@ -32,8 +32,6 @@ import {
 // or trackpad pans; with ⌘ or Ctrl held (which is also what a trackpad pinch sends), it zooms about the
 // pointer. The same moves are on the keyboard and on real buttons, for anyone not using a pointer.
 
-const CARD = { w: 300, h: 220 };
-const GAP = 24;
 const KEY_PAN = 64;
 
 export type CanvasViewProps = { events: readonly SlimEvent[]; mode: CanvasMode };
@@ -54,22 +52,26 @@ export default function CanvasView({ events, mode }: CanvasViewProps) {
 }
 
 function Canvas({ view, mode }: { view: View; mode: CanvasMode }) {
-  // Until auto-tiling (#53), cards stand in three columns in the order the view lists them.
-  const placed = useMemo(
-    () =>
-      view.cards.map((card, i) => ({
-        card,
-        rect: { x: (i % 3) * (CARD.w + GAP), y: Math.floor(i / 3) * (CARD.h + GAP), ...{ w: CARD.w, h: CARD.h } } satisfies Rect,
-      })),
-    [view.cards],
-  );
-  const bounds = useMemo(() => boundsOf(placed.map((p) => p.rect)), [placed]);
+  const layout = useMemo(() => canvasLayout(view), [view]);
+  const bounds = layout.bounds;
   const frame = useRef<HTMLDivElement | null>(null);
-  const { viewport, fit, zoom, reset, gestures } = useViewport(frame, bounds);
+  const { viewport, ready, fit, zoom, reset, gestures } = useViewport(frame, bounds);
   const hint = "canvas-hint";
+  const board = view.state.board;
+  const pinned = layout.flow.filter((p) => p.pinned).length;
 
   return (
     <section className="section canvas-section" aria-label="Canvas">
+      <p className="t-footnote muted canvas-summary" aria-live="polite">
+        {[
+          counted(layout.flow.length, "card on the canvas", "cards on the canvas"),
+          pinned > 0 ? `${pinned} pinned` : null,
+          board.docked.length > 0 ? `${board.docked.length} docked to the plan` : null,
+          board.discarded.length > 0 ? `${board.discarded.length} discarded` : null,
+        ]
+          .filter((part) => part !== null)
+          .join(" · ")}
+      </p>
       <div
         ref={frame}
         className="canvas"
@@ -82,9 +84,13 @@ function Canvas({ view, mode }: { view: View; mode: CanvasMode }) {
         {...gestures}
       >
         <div className="canvas__world" style={{ transform: worldTransform(viewport) }}>
-          {placed.map(({ card, rect }) => (
+          {/* Nothing is dealt until the frame has a size and the world is fitted to it, so the cards
+              arrive where they will stay instead of arriving and then jumping to fit. */}
+          {ready && layout.flow.map(({ card, rect }, index) => (
             <div key={card.cardId} className="canvas-item" style={{ transform: placeAt(rect), width: rect.w, height: rect.h }}>
-              <div className="card canvas-stub">
+              {/* The spawn is on the card inside, so it never fights the slot's own transform: a card
+                  arrives in its slot, and later moves between slots, as two separate motions. */}
+              <div className="card canvas-stub canvas-item__body" style={{ "--spawn-delay": `${Math.min(index, 10) * 35}ms` } as React.CSSProperties}>
                 <p className="t-caption faint">{card.kind === "finding" ? "Finding" : "Excerpt"}</p>
                 <p className="t-callout">{card.kind === "finding" ? card.finding.claim : card.citation.quote}</p>
               </div>
@@ -115,10 +121,16 @@ function Canvas({ view, mode }: { view: View; mode: CanvasMode }) {
   );
 }
 
+// "1 card", "3 cards": a count read as words.
+function counted(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
 // The viewport as React state, and the gestures that move it. Everything that changes the viewport goes
 // through lib/viewport.ts; this hook only decides when.
 function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | null) {
   const [viewport, setViewport] = useState<Viewport>(IDENTITY);
+  const [ready, setReady] = useState(false);
   const size = useRef<Size>({ width: 0, height: 0 });
   // What a fit fits, for the observer and the keyboard, which outlive any one render.
   const content = useRef(bounds);
@@ -157,9 +169,10 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
       size.current = { width: entry.contentRect.width, height: entry.contentRect.height };
-      if (!fitted.current && content.current) {
+      if (!fitted.current) {
         fitted.current = true;
         fit();
+        setReady(true);
       }
     });
     observer.observe(el);
@@ -260,5 +273,5 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
     },
   };
 
-  return { viewport, fit, zoom, reset, gestures };
+  return { viewport, ready, fit, zoom, reset, gestures };
 }
