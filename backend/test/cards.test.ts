@@ -10,7 +10,7 @@ import {
   planGroups,
 } from "@qryvox/shared";
 import { describe, expect, it } from "vitest";
-import { board, caseWithPack, factsheet, pipelineLlm, runPipeline, step } from "./fake-pipeline";
+import { board, caseWithPack, factsheet, pipelineLlm, REPLIES, runPipeline, step } from "./fake-pipeline";
 import { EXTRACT_SYSTEM_PROMPT } from "../src/steps/extract";
 import { FakeLlm, setup, type TestApp } from "./helpers";
 
@@ -173,6 +173,50 @@ describe("a card the case does not have", () => {
     expect((await cardOp(t, caseId, "card.pinned", { card_id: candidate, world_pos: { x: 0, y: 0 } })).status).toBe(201);
     expect((await cardOp(t, caseId, "card.docked", { card_id: candidate, plan_slot: { category: "fees", authority: "factsheet" } })).status).toBe(201);
     expect((await cardOp(t, caseId, "card.docked", { card_id: candidate, plan_slot: { category: "risk", authority: "factsheet" } })).status).toBe(409);
+  });
+});
+
+// Every statement of the latest extract run is a card the case has (#60): this run also extracts a passage
+// like the finding's ("Annual management fee", on the fee table) and one like nothing (the factsheet's
+// second page), neither of which any finding cites.
+const neighbour = { document_id: "fee-table", page: 1, quote: "Annual management fee" };
+
+async function caseWithStatements() {
+  const t = await setup({ llm: pipelineLlm({ extract: { statements: [...REPLIES.extract.statements, neighbour, further] } }) });
+  const caseId = await caseWithPack(t);
+  await runPipeline(t, caseId);
+  const [finding] = activeFindings((await board(t, caseId)).state);
+  return { t, caseId, finding: finding! };
+}
+
+describe("a statement of the latest extract run (#60)", () => {
+  it("is a card the case has: it can be pinned and discarded with no find-similar run, though it has no category to dock under", async () => {
+    const { t, caseId } = await caseWithStatements();
+    const card = excerptCardId(further);
+
+    expect((await cardOp(t, caseId, "card.pinned", { card_id: card, world_pos: { x: 0, y: 0 } })).status).toBe(201);
+    expect((await cardOp(t, caseId, "card.discarded", { card_id: card })).status).toBe(201);
+    const docked = await cardOp(t, caseId, "card.docked", { card_id: card, plan_slot: { category: "fees", authority: "factsheet" } });
+    expect(docked.status).toBe(409);
+    expect(ErrorResponse.parse(await docked.json()).error).toMatch(/no category to dock under/);
+
+    const { state } = await board(t, caseId);
+    expect(pinOf(state, card)).toEqual({ x: 0, y: 0 });
+    expect(isDiscarded(state, card)).toBe(true);
+  });
+
+  it("is, once a press of find similar brings it as a neighbour, docked under the category of the card pressed", async () => {
+    const { t, caseId, finding } = await caseWithStatements();
+    const card = excerptCardId(neighbour);
+    const slot = (category: string) => ({ card_id: card, plan_slot: { category, authority: "fee_table" } });
+
+    expect((await cardOp(t, caseId, "card.docked", slot("fees"))).status).toBe(409);
+    expect((await cardOp(t, caseId, "card.similar_requested", { card_id: findingCardId(finding.finding_id), step_kind: "extract" })).status).toBe(201);
+    expect((await cardOp(t, caseId, "card.docked", slot("risk"))).status).toBe(409);
+    expect((await cardOp(t, caseId, "card.docked", slot("fees"))).status).toBe(201);
+
+    const { state } = await board(t, caseId);
+    expect(planGroups(state)).toEqual([expect.objectContaining({ category: "fees", authority: "fee_table", cards: [expect.objectContaining({ cardId: card })] })]);
   });
 });
 
