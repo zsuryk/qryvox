@@ -1,7 +1,7 @@
 # Pitch: strengths by judging criterion
 
 Our strengths against the Capco track's five judging criteria. Every claim points to its evidence: code,
-a test, a measurement or a decision record. The strategic presentation is built from this page.
+a test, a measurement or a decision record. The strategic presentation (12 slides, shared by the team from the Artifact link in #46) is built from this page.
 
 **One line:** private-bank advice, made affordable by doing the expensive diligence once per product. A
 model reads the documents. Fixed rules decide suitability. A named adviser signs off. Every step can be

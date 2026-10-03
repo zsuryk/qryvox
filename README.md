@@ -116,6 +116,10 @@ Stage 2 is tracked in #20.
 | Replay | ✅ A scrubber that rebuilds the case at any event | #14 |
 | Bonus | ✅ Product updates (Larkspur v2), a second product with alternatives (Wrenfield), learned reading depth | #37 #38 #39 |
 | Data ecosystem | ✅ [docs/data-ecosystem.md](docs/data-ecosystem.md) | #36 |
+| Judging criteria pass | ✅ S7 goal fit (`rules@2`), rejection reasons, vulnerable-client confirmation (ADR-0005); the client journey in 繁體中文 (ADR-0006) | #41 #42 #43 |
+| Compliance map | ✅ [docs/compliance.md](docs/compliance.md): SFC, HKMA, PDPO and CFA obligations against our controls | #44 |
+| Cost and scale, measured | ✅ [docs/scalability.md](docs/scalability.md): ≈16k tokens per product, ≈2.8k per client | #45 |
+| Pitch | ✅ [docs/pitch.md](docs/pitch.md): strengths by judging criterion, with evidence; the strategic presentation is built from it | #46 |
 | Spend protection | ✅ Origin allow-list, rate limit, judge-link token end to end · 🚧 switch it on in production | #16 #19 |
 | Production deploy | 🚧 Owner only | #17 |
 
