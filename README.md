@@ -97,7 +97,7 @@ Every step below is a distinct UI surface. Watch the cursor: it never types a se
 | **Fiduciary obligation** | Product diligence (CFA Standard V(A)), policy checks, suitability (III(C)), adviser sign-off, tamper-evident audit log |
 | **Client experience** | Advice and explanation depth fitted to goals, risk profile and knowledge; zero text boxes |
 | **Investment outcomes** | A verdict per client; a changed profile or product re-assesses and supersedes the old advice |
-| **Data ecosystem** (key requirement) | A data map: what is needed, what is hard to capture, assumptions, privacy limits (pseudonymous ids in the log, personal data outside it) |
+| **Data ecosystem** (key requirement) | [docs/data-ecosystem.md](docs/data-ecosystem.md): what is needed, what is hard to capture, assumptions, privacy limits (pseudonymous ids in the log, erasure by deleting a key) |
 | **Bonus** | Product updates trigger re-verification; knowledge level learned from how the client reads |
 
 Stage 2 is tracked in #20.
@@ -116,7 +116,7 @@ Stage 2 is tracked in #20.
 | **Layer 2 — check policy** | ✅ Rules `rules@1` (P1–P4) and the `policy_gap` kind · ⬜ the `compliance` step, its ground truth, the board cards | #23 · #24 #25 #26 |
 | **Layer 3 — match the client** | ✅ Contracts, suitability function, three personas with expected verdicts, `attributes` and `explain` steps, client-layer API | #27 #28 #29 #30 #31 |
 | | ⬜ Questionnaire, adviser console, client advice page (the backend for all three is done) | #32 #33 #34 |
-| Data ecosystem document | ⬜ Not started | #36 |
+| Data ecosystem document | ✅ [docs/data-ecosystem.md](docs/data-ecosystem.md) | #36 |
 | Bonus | ⬜ Product update re-verification, learned knowledge level, second product | #37 #38 #39 |
 
 The `attributes` and `explain` steps are tested against the real pack text with a scripted model; a run against a real model is still to do (#29).
