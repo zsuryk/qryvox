@@ -113,7 +113,7 @@ Stage 2 is tracked in #20.
 | Eval dashboard | ⬜ Not started | #15, #35 |
 | Spend protection | ✅ Origin allow-list, rate limit, judge-link token on the backend · 🚧 frontend must send the token | #16, #19 |
 | Production deploy | 🚧 Preview deploys verified; production and smoke script pending | #6, #17 |
-| **Layer 2 — check policy** | ✅ Rules `rules@1` (P1–P4) and the `policy_gap` kind · ⬜ the `compliance` step, its ground truth, the board cards | #23 · #24 #25 #26 |
+| **Layer 2 — check policy** | ✅ Rules `rules@1` (P1–P4), the `policy_gap` kind, the `compliance` step, four planted policy gaps · ⬜ five-step browser pipeline and the board cards | #23 #24 #25 · #26 |
 | **Layer 3 — match the client** | ✅ Contracts, suitability function, three personas with expected verdicts, `attributes` and `explain` steps, client-layer API | #27 #28 #29 #30 #31 |
 | | ⬜ Questionnaire, adviser console, client advice page (the backend for all three is done) | #32 #33 #34 |
 | Data ecosystem document | ✅ [docs/data-ecosystem.md](docs/data-ecosystem.md) | #36 |
