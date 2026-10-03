@@ -1,7 +1,8 @@
 import type { Advice, AdviceDecision, DecisionConfirmation, RejectionReason, SupersedeCause } from "./advice.js";
+import { AUTHORITY_ORDER, type CardId, type PlanSlot, type WorldPos } from "./card.js";
 import type { ClientProfile, KnowledgeLevel } from "./client.js";
 import type { DocumentKind, StepName } from "./events.js";
-import type { Disposition, Finding } from "./finding.js";
+import { type Disposition, type Finding, FindingCategory } from "./finding.js";
 
 export type CaseDocument = {
   documentId: string;
@@ -72,6 +73,26 @@ export type CaseAdvice = Advice & {
   } | null;
 };
 
+// The board state of the canvas (#48): what the analyst has done to cards, folded from the card events.
+// Each list holds one entry per card, latest decision wins, in the order the card first got one, so a
+// repeated operation replaces rather than accumulates. Who acted is the event's own actor. It names cards
+// only: a finding's own record (findings, dispositions) is never read or changed by any of it.
+export type DockedCard = { cardId: CardId; slot: PlanSlot; actor: string; dockedAtSeq: number };
+export type PinnedCard = { cardId: CardId; worldPos: WorldPos; actor: string; pinnedAtSeq: number };
+export type DiscardedCard = { cardId: CardId; actor: string; discardedAtSeq: number };
+export type SimilarRequest = { cardId: CardId; stepKind: StepName; actor: string; atSeq: number };
+
+export type BoardState = {
+  // The plan region's reportable set; see planGroups() for it by category × authority.
+  docked: DockedCard[];
+  // Positions auto-tiling keeps; a pin is kept while the card is docked or discarded, for when it returns.
+  pinned: PinnedCard[];
+  // The discard bin. A card leaves it when restored or docked again.
+  discarded: DiscardedCard[];
+  // Every find-similar request, in order: a history, not one entry per card.
+  similarRequests: SimilarRequest[];
+};
+
 export type CaseState = {
   caseId: string | null;
   openedAt: string | null;
@@ -88,6 +109,8 @@ export type CaseState = {
   advice: CaseAdvice[];
   // Depths clients chose to read at, where they shared it (#38), in order.
   readings: { clientId: string; adviceId: string; depth: KnowledgeLevel; atSeq: number }[];
+  // The canvas's card operations (#48).
+  board: BoardState;
   // Highest seq folded so far; 0 means no events.
   lastSeq: number;
 };
@@ -103,6 +126,7 @@ export function emptyCaseState(): CaseState {
     clients: [],
     advice: [],
     readings: [],
+    board: { docked: [], pinned: [], discarded: [], similarRequests: [] },
     lastSeq: 0,
   };
 }
@@ -164,4 +188,28 @@ export function knowledgeSuggestion(state: CaseState, clientId: string): { depth
     count += 1;
   }
   return { depth, count };
+}
+
+// One group of the plan region: the docked cards of one category from one kind of document.
+export type PlanGroup = { category: FindingCategory; authority: PlanSlot["authority"]; cards: DockedCard[] };
+
+// The plan region as it lists the reportable set: non-empty groups only, by category in the contract's
+// order, then by authority (PPM, fee table, factsheet, deck), each group's cards in the order docked.
+export function planGroups(state: CaseState): PlanGroup[] {
+  return FindingCategory.options.flatMap((category) =>
+    AUTHORITY_ORDER.flatMap((authority) => {
+      const cards = state.board.docked
+        .filter((d) => d.slot.category === category && d.slot.authority === authority)
+        .sort((a, b) => a.dockedAtSeq - b.dockedAtSeq);
+      return cards.length > 0 ? [{ category, authority, cards }] : [];
+    }),
+  );
+}
+
+export function isDiscarded(state: CaseState, cardId: CardId): boolean {
+  return state.board.discarded.some((d) => d.cardId === cardId);
+}
+
+export function pinOf(state: CaseState, cardId: CardId): WorldPos | null {
+  return state.board.pinned.find((p) => p.cardId === cardId)?.worldPos ?? null;
 }

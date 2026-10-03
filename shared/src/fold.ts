@@ -1,4 +1,5 @@
 import type { SlimEvent } from "./events.js";
+import type { CardId } from "./card.js";
 import { emptyCaseState, type CaseState, type FindingDisposition, type StepRun } from "./state.js";
 
 export class FoldError extends Error {
@@ -162,6 +163,43 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
           { clientId: event.payload.client_id, adviceId: event.payload.advice_id, depth: event.payload.depth, atSeq: event.seq },
         ],
       };
+    // The canvas's card operations (#48). They change the board state and nothing else: no finding is
+    // superseded, removed or decided by any of them.
+    case "card.docked": {
+      const { card_id, plan_slot } = event.payload;
+      const board = state.board;
+      return {
+        ...next,
+        board: {
+          ...board,
+          docked: upsert(board.docked, { cardId: card_id, slot: plan_slot, actor: event.actor, dockedAtSeq: event.seq }),
+          discarded: without(board.discarded, card_id),
+        },
+      };
+    }
+    case "card.undocked":
+      return { ...next, board: { ...state.board, docked: without(state.board.docked, event.payload.card_id) } };
+    case "card.pinned": {
+      const { card_id, world_pos } = event.payload;
+      const pin = { cardId: card_id, worldPos: world_pos, actor: event.actor, pinnedAtSeq: event.seq };
+      return { ...next, board: { ...state.board, pinned: upsert(state.board.pinned, pin) } };
+    }
+    case "card.discarded": {
+      // Discarding again keeps the first discard: the card was already in the bin.
+      const board = state.board;
+      const card_id = event.payload.card_id;
+      const discarded = board.discarded.some((d) => d.cardId === card_id)
+        ? board.discarded
+        : [...board.discarded, { cardId: card_id, actor: event.actor, discardedAtSeq: event.seq }];
+      return { ...next, board: { ...board, docked: without(board.docked, card_id), discarded } };
+    }
+    case "card.restored":
+      return { ...next, board: { ...state.board, discarded: without(state.board.discarded, event.payload.card_id) } };
+    case "card.similar_requested": {
+      const { card_id, step_kind } = event.payload;
+      const request = { cardId: card_id, stepKind: step_kind, actor: event.actor, atSeq: event.seq };
+      return { ...next, board: { ...state.board, similarRequests: [...state.board.similarRequests, request] } };
+    }
     case "step.completed":
     case "step.failed": {
       const completed = event.type === "step.completed";
@@ -180,4 +218,13 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
       };
     }
   }
+}
+
+// One entry per card: a card already listed is replaced in place, a new one goes to the end.
+function upsert<T extends { cardId: CardId }>(list: T[], entry: T): T[] {
+  return list.some((e) => e.cardId === entry.cardId) ? list.map((e) => (e.cardId === entry.cardId ? entry : e)) : [...list, entry];
+}
+
+function without<T extends { cardId: CardId }>(list: T[], cardId: CardId): T[] {
+  return list.filter((e) => e.cardId !== cardId);
 }

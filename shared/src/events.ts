@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Advice, AdviceDecision, DecisionConfirmation, RejectionReason, SupersedeCause } from "./advice.js";
+import { CardId, PlanSlot, WorldPos } from "./card.js";
 import { ClientProfile, KnowledgeLevel } from "./client.js";
 import { Disposition, Finding } from "./finding.js";
 
@@ -196,6 +197,62 @@ export const ClientRead = z.object({
   payload: z.object({ client_id: z.string().min(1), advice_id: z.uuid(), depth: KnowledgeLevel }),
 });
 
+// --- The canvas (#48). What the analyst does to a card; none of these is a step event. ---
+// Like a disposition, each is a person's decision: who acted is the envelope's actor, step_run_id is null,
+// and the latest decision about a card wins in the fold. None of them touches the finding a card shows:
+// discarding a finding card is not dismissing the finding, and nothing here supersedes or removes one.
+
+// The card joins the reportable set in the plan region, in one category × authority group. Docking a card
+// again moves it to the new slot; docking a discarded card takes it out of the discard bin.
+export const CardDocked = z.object({
+  ...envelope,
+  type: z.literal("card.docked"),
+  v: z.literal(1),
+  payload: z.object({ card_id: CardId, plan_slot: PlanSlot }),
+});
+
+// The card leaves the plan region and goes back to the board.
+export const CardUndocked = z.object({
+  ...envelope,
+  type: z.literal("card.undocked"),
+  v: z.literal(1),
+  payload: z.object({ card_id: CardId }),
+});
+
+// The card is held at a world position that auto-tiling flows around. Pinning again moves it.
+export const CardPinned = z.object({
+  ...envelope,
+  type: z.literal("card.pinned"),
+  v: z.literal(1),
+  payload: z.object({ card_id: CardId, world_pos: WorldPos }),
+});
+
+// The card goes to the discard bin: rejected from the board, never deleted. A discarded card leaves the
+// plan region if it was docked; card.restored or a later card.docked brings it back.
+export const CardDiscarded = z.object({
+  ...envelope,
+  type: z.literal("card.discarded"),
+  v: z.literal(1),
+  payload: z.object({ card_id: CardId }),
+});
+
+// The card comes back out of the discard bin onto the board.
+export const CardRestored = z.object({
+  ...envelope,
+  type: z.literal("card.restored"),
+  v: z.literal(1),
+  payload: z.object({ card_id: CardId }),
+});
+
+// The analyst asked for more like this card: a seeded re-run of the step that produced it (#57). The
+// request is recorded here; the run it leads to is an ordinary step run with its own events.
+export const CardSimilarRequested = z.object({
+  ...envelope,
+  type: z.literal("card.similar_requested"),
+  v: z.literal(1),
+  payload: z.object({ card_id: CardId, step_kind: StepName }),
+});
+
 // Full events: what the hash covers and what the per-event payload endpoint returns.
 export const Event = z.discriminatedUnion("type", [
   CaseOpened,
@@ -211,6 +268,12 @@ export const Event = z.discriminatedUnion("type", [
   AdviceSuperseded,
   AdviceDecided,
   ClientRead,
+  CardDocked,
+  CardUndocked,
+  CardPinned,
+  CardDiscarded,
+  CardRestored,
+  CardSimilarRequested,
 ]);
 export type Event = z.infer<typeof Event>;
 
@@ -230,6 +293,12 @@ export const SlimEvent = z.discriminatedUnion("type", [
   AdviceSuperseded,
   AdviceDecided,
   ClientRead,
+  CardDocked,
+  CardUndocked,
+  CardPinned,
+  CardDiscarded,
+  CardRestored,
+  CardSimilarRequested,
 ]);
 export type SlimEvent = z.infer<typeof SlimEvent>;
 

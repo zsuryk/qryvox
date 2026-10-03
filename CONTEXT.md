@@ -136,6 +136,29 @@ keeps both. A superseded finding cannot be decided (409).
 event records as having acted. In stage 1 every event's actor is one fixed identity, `demo-analyst`
 (`ANALYST_ACTOR`), with no login and no picker.
 
+## The canvas (#48)
+
+**Card** — one thing laid out on the canvas: a *finding card* (one finding) or an *excerpt card* (one cited
+passage). Its id says which and is derived from what it shows (`card.ts`): `finding:<finding_id>`, or
+`excerpt:<document_id>:<page>:<hash of the quote>`, so the same finding or passage is the same card on every
+replay. *Not* the finding: what happens to a card never changes the finding it shows.
+
+**Plan region** — the area of the canvas where docked cards form the reportable set, grouped by category ×
+authority (PPM, fee table, factsheet, deck — the order of `AUTHORITY_ORDER`). Each docked card names its
+group (`plan_slot`) on the event that docked it (`planGroups`).
+
+**Board state** — what the analyst has done to cards, folded from the card events into `CaseState.board`:
+the docked set, pinned positions, the discard bin and the find-similar history. Latest decision per card
+wins; the log keeps every one.
+
+**Dock / pin / discard / restore / find similar** — the card operations, each an event the analyst makes
+(`card.docked`, `card.undocked`, `card.pinned`, `card.discarded`, `card.restored`,
+`card.similar_requested`), like a disposition and unlike a step. *Dock* puts a card in the plan region;
+*pin* holds it at a world position that auto-tiling flows around; *discard* rejects it to the discard bin,
+and takes it out of the plan region; *restore*, or docking it again, brings it back; *find similar* asks
+for a seeded re-run of the step that produced it.
+*Discard* is not *dismissed*: discarding a finding card neither dismisses nor supersedes the finding.
+
 ## Policy and advice (stage 2)
 
 **Rules** — the institution's own rules, versioned as one set (`rules@1`, now `rules@2`, which added S7) in two groups: **product rules**
@@ -261,6 +284,7 @@ its category and its quote match a planted finding.
 | kind / category | what sort of problem / which area |
 | disclosure_gap / policy_gap | a document lacks what another document has / a document lacks what our rules require |
 | finding / advice | a problem in the pack / a verdict for one client on one product |
+| discarded / dismissed | a card rejected from the canvas / the analyst's decision on a finding |
 | verdict / disposition | the rules' outcome for a client / the analyst's decision on a finding |
 | product rule / suitability rule | must hold for the product to go on the shelf / decides whether it fits a client |
 | analyst / adviser / client | reviews the pack / signs off advice / receives advice |
