@@ -111,7 +111,11 @@ function check(depth: string, text: ExplanationDepth, items: Item[], documents: 
     if (n !== 1) problems.push(`${depth}: ${item.ref} is explained ${n} times, not once`);
   }
   for (const ref of refs) if (!items.some((i) => i.ref === ref)) problems.push(`${depth}: ${ref} is not in the advice`);
-  if (/\d/.test(text.summary.replace(/\b[PS]\d+\b/g, ""))) problems.push(`${depth}: the summary states a number`);
+  // The summary may state a number only if some item of the advice may: a quote, a page, a client's answer.
+  const grounded = new Set(items.flatMap((i) => [...i.numbers]));
+  for (const n of text.summary.replace(/\b[PS]\d+\b/g, "").match(/\d+(?:\.\d+)?/g) ?? []) {
+    if (!grounded.has(n)) problems.push(`${depth}: the summary states ${n}, which nothing in the advice holds`);
+  }
 
   const cited = new Set(items.flatMap((i) => i.documents));
   const rules = new Set(items.map((i) => i.rule));
@@ -141,8 +145,11 @@ function check(depth: string, text: ExplanationDepth, items: Item[], documents: 
 }
 
 // Spans in double quotes, straight or curly, long enough to be a quotation rather than a word.
+// Punctuation at the very ends is the sentence's, not the source's: a model writes "…of the Fund," with its
+// own comma inside the quotation marks, or adds a full stop a table cell never had (Kimi K3 did both). Only
+// the ends are trimmed; anything that changes the words inside still fails.
 function quotations(text: string): string[] {
-  return [...text.matchAll(/["“]([^"”]{8,})["”]/g)].map((m) => m[1]!);
+  return [...text.matchAll(/["“]([^"”]{8,})["”]/g)].map((m) => m[1]!.replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g, ""));
 }
 
 function numbersIn(...texts: (string | number | null)[]): Set<string> {

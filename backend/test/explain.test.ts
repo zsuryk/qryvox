@@ -161,6 +161,17 @@ describe("explanations it refuses", () => {
     expect(await refused((p) => (p[0]!.text = "Under S5 this fails."))).toMatch(/names rule S5/);
   });
 
+  it("forgives punctuation at the ends of a quote, which is the sentence's, but not a changed word", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    const quote = advice.reasons[0]!.citation!.quote;
+    // Kimi K3: its own comma inside the quotation marks, the clause number dropped.
+    reply = bend(advice, (p) => (p[0]!.text = `The fund says "${quote.replace(/^3\.1 /, "").replace(/\.$/, "")}," and you said two.`));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+
+    reply = bend(advice, (p) => (p[0]!.text = `The fund says "${quote.replace("five", "three")}".`));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(422);
+  });
+
   it("accepts the page a passage cites, written as a number", async () => {
     const { t, caseId, adviceId, advice } = await chanAdvice();
     reply = bend(advice, (p) => (p[0]!.text = `The PPM, p.${advice.reasons[0]!.citation!.page}, sets the minimum.`));
@@ -171,8 +182,14 @@ describe("explanations it refuses", () => {
     expect(await refused((p) => (p[0]!.text = "You would need to hold it for 7 years."))).toMatch(/r0 states 7/);
   });
 
-  it("a summary that states a number", async () => {
-    expect(await refused((_, depth) => (depth.summary = "Three rules fail, so 0 of 4 hold."))).toMatch(/summary states a number/);
+  it("a summary that states a number nothing in the advice holds", async () => {
+    expect(await refused((_, depth) => (depth.summary = "Three rules fail, so 0 of 4 hold."))).toMatch(/summary states 0, which nothing in the advice holds/);
+  });
+
+  it("accepts a summary that states a number the advice holds", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    reply = bend(advice, (_, depth) => (depth.summary = "This fund asks for longer than the 2 years you have."));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
   });
 
   it("one that names a document the advice does not cite", async () => {
