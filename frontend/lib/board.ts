@@ -37,6 +37,7 @@ const KIND_LABELS: Record<FindingKind, string> = {
   contradiction: "Contradiction",
   unsupported_claim: "Unsupported claim",
   disclosure_gap: "Disclosure gap",
+  policy_gap: "Policy gap",
 };
 
 // A citation as the board shows it: the document by name, the page, and the passage verbatim.
@@ -146,6 +147,9 @@ function rationale(finding: CaseFinding): string {
       return `Nothing else in the pack backs what ${from} states.`;
     case "disclosure_gap":
       return `${from} promises it without the risk disclosure ${against ?? "the pack"} attaches to it.`;
+    // A minimal line until #26 shows the rule's title on the card.
+    case "policy_gap":
+      return `${from} falls short of institutional rule ${finding.rule ?? "(unnamed)"}.`;
   }
 }
 
