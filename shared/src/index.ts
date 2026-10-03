@@ -7,6 +7,8 @@ export {
   EventPage,
   EventPayloadResponse,
   IngestDocumentRequest,
+  JUDGE_TOKEN_HEADER,
+  JUDGE_TOKEN_PARAM,
   OpenCaseRequest,
   OpenCaseResponse,
   RunStepRequest,

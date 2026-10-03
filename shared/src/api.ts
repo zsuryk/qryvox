@@ -28,6 +28,12 @@ export const ChangeDispositionRequest = z.object({
 });
 export type ChangeDispositionRequest = z.infer<typeof ChangeDispositionRequest>;
 
+// The judge-link token (ADR-0001): the demo URL carries ?k=<token>, the browser keeps it in sessionStorage
+// and sends it in this header on every POST /cases/:caseId/steps. A backend with JUDGE_TOKEN set refuses an
+// analysis step without the matching token (401); nothing else needs it, so the board and replay stay open.
+export const JUDGE_TOKEN_PARAM = "k";
+export const JUDGE_TOKEN_HEADER = "x-judge-token";
+
 export const EVENT_PAGE_LIMIT = 200;
 
 // GET /cases/:caseId/events?after=N — events with seq > N, oldest first.
