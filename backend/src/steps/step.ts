@@ -12,8 +12,9 @@ export class StepPrecondition extends Error {
 // Output is what the run stores and returns; Reply is what the model must answer, when the two differ.
 export type StepDefinition<Input, Output extends Record<string, unknown>, Reply = Output> = {
   name: StepName;
-  // Reads what the step consumes from the log. Steps are stateless: the log is their only input.
-  loadInput(db: Db, caseId: string, inputRunId: string | null): Promise<Input>;
+  // Reads what the step consumes from the log. Steps are stateless: the log is their only input. intent is
+  // the analyst's words on a parse request, which the run records on its events, so it is in the log too.
+  loadInput(db: Db, caseId: string, inputRunId: string | null, intent?: string): Promise<Input>;
   // The versioned prompt. Never sent to the interface; only PROMPT_VERSIONS[name] is recorded. A seeded
   // run (#64) passes its seed, already checked against the documents; unseeded, the prompt is unchanged.
   messages(input: Input, seed?: Citation): ChatMessage[];

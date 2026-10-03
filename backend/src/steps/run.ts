@@ -13,15 +13,10 @@ import { explain } from "./explain.js";
 import { extract } from "./extract.js";
 import { findings } from "./findings.js";
 import { groundCitation } from "./inputs.js";
+import { parse } from "./parse.js";
 import type { AnyStep } from "./step.js";
 
-// parse (#51) has a contract in shared and no runner yet: no prompt, no step definition.
-const STEPS: Record<Exclude<StepName, "parse">, AnyStep> = { extract, decompose, contradictions, compliance, findings, attributes, explain };
-
-// A step the contract names that this server cannot run yet. Refused before anything is read or appended.
-export class StepNotRunnable extends Error {
-  override name = "StepNotRunnable";
-}
+const STEPS: Record<StepName, AnyStep> = { extract, decompose, contradictions, compliance, findings, attributes, explain, parse };
 
 // A find-similar seed (#64) the server will not run: on a step that takes none, or quoting a passage that is
 // not on the page it cites. Refused before anything is appended or any model is called.
@@ -53,14 +48,13 @@ export async function runStep(
   req: RunStepRequest,
   caller: StepCaller,
 ): Promise<StepOutcome> {
-  if (req.step === "parse") throw new StepNotRunnable("the parse step is not implemented yet");
   const done = await findCompletedRun(db, caseId, req.step_run_id);
   if (done) return completedOutcome(done, req);
 
   const step = STEPS[req.step];
   if (!llm) throw new LlmNotConfigured("no model is configured: set LLM_BASE_URL and LLM_MODEL");
 
-  const input = await step.loadInput(db, caseId, req.input_run_id);
+  const input = await step.loadInput(db, caseId, req.input_run_id, req.intent);
   const seed = req.seed && groundSeed(step, input, req.seed);
   // Only a run about to spend tokens counts: a stored result or a precondition failure never gets here.
   await checkRateLimit(db, caseId, caller.ipHash, caller.limits);
@@ -69,6 +63,7 @@ export async function runStep(
     model: llm.model,
     prompt_version: PROMPT_VERSIONS[req.step],
     input_run_id: req.input_run_id,
+    ...(req.intent !== undefined && { intent: req.intent }),
     ...(seed && { seed }),
   };
   const draft = { v: 1, actor: ANALYST_ACTOR, stepRunId: req.step_run_id, ipHash: caller.ipHash };

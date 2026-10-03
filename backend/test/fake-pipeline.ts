@@ -10,6 +10,7 @@ import { CONTRADICTIONS_SYSTEM_PROMPT } from "../src/steps/contradictions";
 import { DECOMPOSE_SYSTEM_PROMPT } from "../src/steps/decompose";
 import { EXTRACT_SYSTEM_PROMPT } from "../src/steps/extract";
 import { FINDINGS_SYSTEM_PROMPT } from "../src/steps/findings";
+import { PARSE_SYSTEM_PROMPT } from "../src/steps/parse";
 import type { ChatMessage } from "../src/llm";
 import { FakeLlm, sampleDocument, type TestApp } from "./helpers";
 
@@ -50,7 +51,7 @@ export const REPLIES = {
   compliance: { gaps: [] },
   attributes: {},
   explain: {},
-  // No runner yet (#51): the server refuses parse before any model call.
+  // Not part of the pipeline: the analyst's words, here naming nothing in the chip vocabulary.
   parse: { chips: [] },
 } satisfies Record<StepName, unknown>;
 
@@ -62,6 +63,7 @@ const PROMPTS: [string, StepName][] = [
   [COMPLIANCE_SYSTEM_PROMPT, "compliance"],
   [ATTRIBUTES_SYSTEM_PROMPT, "attributes"],
   [EXPLAIN_SYSTEM_PROMPT, "explain"],
+  [PARSE_SYSTEM_PROMPT, "parse"],
 ];
 
 // A seeded run (#64) appends a section to its step's prompt, so a prompt is matched by how it begins.
