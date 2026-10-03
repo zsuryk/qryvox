@@ -1,4 +1,4 @@
-import type { Event, VerifyResponse } from "@qryvox/shared";
+import { type CaseState, type Event, fold, SlimEvent, type VerifyResponse } from "@qryvox/shared";
 import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import type { Db } from "./db/client.js";
 import { events, type EventRow } from "./db/schema.js";
@@ -95,6 +95,39 @@ export async function appendOnce(db: Db, caseId: string, draft: EventDraft): Pro
   }
 }
 
+// appendOnce for an event whose payload, and the events it brings with it (e.g. a new profile
+// superseding old advice), depend on what the log holds: build runs inside the write transaction, and its
+// event commits with its companions or not at all. build may throw to refuse; nothing is appended. A
+// retry of the same event_id returns the stored event without building anything again.
+export async function appendOnceWith(
+  db: Db,
+  caseId: string,
+  head: Omit<EventDraft, "payload">,
+  build: (tx: Tx) => Promise<{ payload: Record<string, unknown>; companions: readonly EventDraft[] }>,
+): Promise<EventRow> {
+  const draft = { ...head, payload: {} };
+  const existing = await findByEventId(db, draft.eventId);
+  if (existing) return sameEventOrThrow(existing, caseId, draft);
+  try {
+    const rows = await append(db, caseId, async (tx) => {
+      const { payload, companions } = await build(tx);
+      return [{ ...head, payload }, ...companions];
+    });
+    return rows[0]!;
+  } catch (err) {
+    if (!isUniqueViolation(err, "events.event_id")) throw err;
+    const winner = await findByEventId(db, draft.eventId);
+    if (!winner) throw err;
+    return sameEventOrThrow(winner, caseId, draft);
+  }
+}
+
+// The case as the fold derives it, read through db or inside a transaction.
+export async function foldCase(db: Db | Tx, caseId: string): Promise<CaseState> {
+  const rows = await db.select().from(events).where(eq(events.caseId, caseId)).orderBy(asc(events.seq));
+  return fold(rows.map((row) => SlimEvent.parse(toWire(row))));
+}
+
 function sameEventOrThrow(row: EventRow, caseId: string, draft: EventDraft): EventRow {
   if (row.caseId !== caseId || row.type !== draft.type) {
     throw new EventIdConflict(`event_id ${draft.eventId} is already used by a different event`);
@@ -187,7 +220,7 @@ export async function listEventsOfType(db: Db | Tx, caseId: string, type: Event[
     .orderBy(asc(events.seq));
 }
 
-export async function findCompletedRun(db: Db, caseId: string, stepRunId: string): Promise<EventRow | undefined> {
+export async function findCompletedRun(db: Db | Tx, caseId: string, stepRunId: string): Promise<EventRow | undefined> {
   const [row] = await db
     .select()
     .from(events)

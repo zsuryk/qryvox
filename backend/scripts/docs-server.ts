@@ -12,6 +12,8 @@ import { serve } from "@hono/node-server";
 import {
   AppendResponse,
   ChangeDispositionRequest,
+  DecideAdviceRequest,
+  DraftAdviceRequest,
   ErrorResponse,
   EVENT_PAGE_LIMIT,
   EventPage,
@@ -20,6 +22,7 @@ import {
   JUDGE_TOKEN_HEADER,
   OpenCaseRequest,
   OpenCaseResponse,
+  RecordProfileRequest,
   RunStepRequest,
   StepFailure,
   StepResult,
@@ -78,6 +81,27 @@ const TEXT = {
     disposeInvalid: "Invalid body; disposition must be approved or dismissed",
     noFinding: "Unknown case, or the case never produced this finding",
     superseded: "The finding was superseded by a later findings run and is off the board",
+    profile: "Record a client's profile",
+    profileDesc:
+      "Appends client.profiled: a new version of the client's answers, under a pseudonymous id (never a name). " +
+      "Advice drafted on the previous version is superseded in the same transaction. Idempotent by event_id.",
+    profiled: "Recorded",
+    profileInvalid: "Invalid body; client_id must be a pseudonymous id and every answer one of the allowed values",
+    draftAdvice: "Draft advice for a client",
+    draftAdviceDesc:
+      "Applies the suitability rules (rules@1) to the client's latest profile and the latest completed attributes " +
+      "run, and appends advice.drafted; the advice's id is this event_id. No model is called. Advice still in play " +
+      "on an older attributes run is superseded. Idempotent by event_id.",
+    drafted: "Drafted",
+    adviceRefused:
+      "No profile for this client, the pack not yet verified (no completed findings run), no completed attributes " +
+      "run, or advice already drafted on these same inputs",
+    decideAdvice: "Approve or reject drafted advice",
+    decideAdviceDesc:
+      "Appends advice.decided, attributed to the adviser. A client only ever sees approved advice still in play. " +
+      "Idempotent by event_id: a retry of a recorded decision returns it even after the advice was superseded.",
+    noAdvice: "Unknown case, or the case has no such advice",
+    adviceSuperseded: "The advice was superseded by a newer profile or attributes run",
     payload: "One event's full payload, heavy fields included",
     payloadOk: "Full payload",
     noEvent: "No such event",
@@ -122,6 +146,24 @@ const TEXT = {
     disposeInvalid: "請求內容不正確；disposition 必須是 approved 或 dismissed",
     noFinding: "找不到此案件，或此案件沒有這筆發現",
     superseded: "這筆發現已被之後的 findings 執行取代，不在看板上",
+    profile: "記錄客戶檔案",
+    profileDesc:
+      "追加一筆 client.profiled：客戶答案的新版本，使用化名 ID（不可填姓名）。" +
+      "依舊版本起草的建議會在同一筆交易中被取代。以 event_id 確保冪等。",
+    profiled: "已記錄",
+    profileInvalid: "請求內容不正確；client_id 必須是化名 ID，每個答案都必須是允許的選項",
+    draftAdvice: "為客戶起草建議",
+    draftAdviceDesc:
+      "以適合度規則（rules@1）比對客戶最新的檔案與最新完成的 attributes 執行，並追加 advice.drafted；" +
+      "建議的 ID 就是這個 event_id。不會呼叫模型。仍有效、但依舊 attributes 執行起草的建議會被取代。以 event_id 確保冪等。",
+    drafted: "已起草",
+    adviceRefused: "此客戶沒有檔案、文件包尚未核實（沒有完成的 findings 執行）、沒有完成的 attributes 執行，或已依相同輸入起草過",
+    decideAdvice: "核准或退回建議草稿",
+    decideAdviceDesc:
+      "追加一筆 advice.decided，記錄為顧問所做。客戶只會看到已核准且仍有效的建議。" +
+      "以 event_id 確保冪等：已記錄的決定重送時會回傳原結果，即使建議之後已被取代。",
+    noAdvice: "找不到此案件，或此案件沒有這筆建議",
+    adviceSuperseded: "這筆建議已被較新的客戶檔案或 attributes 執行取代",
     payload: "單一事件的完整內容，包含大型欄位",
     payloadOk: "完整內容",
     noEvent: "找不到此事件",
@@ -142,6 +184,9 @@ const schemas = {
   StepResult,
   StepFailure,
   ChangeDispositionRequest,
+  RecordProfileRequest,
+  DraftAdviceRequest,
+  DecideAdviceRequest,
   ErrorResponse,
 };
 
@@ -226,6 +271,43 @@ function openapi(lang: Lang) {
             400: error(t.disposeInvalid),
             404: error(t.noFinding),
             409: error(t.superseded),
+          },
+        },
+      },
+      "/cases/{caseId}/clients": {
+        post: {
+          summary: t.profile,
+          description: t.profileDesc,
+          parameters: [caseId],
+          requestBody: body("RecordProfileRequest"),
+          responses: { 201: json("AppendResponse", t.profiled), 400: error(t.profileInvalid), 404: error(t.unknownCase) },
+        },
+      },
+      "/cases/{caseId}/advice": {
+        post: {
+          summary: t.draftAdvice,
+          description: t.draftAdviceDesc,
+          parameters: [caseId],
+          requestBody: body("DraftAdviceRequest"),
+          responses: {
+            201: json("AppendResponse", t.drafted),
+            400: error(t.invalidBody),
+            404: error(t.unknownCase),
+            409: error(t.adviceRefused),
+          },
+        },
+      },
+      "/cases/{caseId}/advice/{adviceId}/decision": {
+        post: {
+          summary: t.decideAdvice,
+          description: t.decideAdviceDesc,
+          parameters: [caseId, { name: "adviceId", in: "path", required: true, schema: { type: "string" } }],
+          requestBody: body("DecideAdviceRequest"),
+          responses: {
+            201: json("AppendResponse", t.disposed),
+            400: error(t.invalidBody),
+            404: error(t.noAdvice),
+            409: error(t.adviceSuperseded),
           },
         },
       },

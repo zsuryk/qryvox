@@ -2,6 +2,8 @@ import {
   ANALYST_ACTOR,
   type AppendResponse,
   ChangeDispositionRequest,
+  DecideAdviceRequest,
+  DraftAdviceRequest,
   EVENT_PAGE_LIMIT,
   EVENT_TYPES,
   type EventPage,
@@ -9,12 +11,14 @@ import {
   IngestDocumentRequest,
   OpenCaseRequest,
   type OpenCaseResponse,
+  RecordProfileRequest,
   RunStepRequest,
   SlimEvent,
 } from "@qryvox/shared";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
+import { AdviceConflict, AdviceNotFound, decideAdvice, draftAdvice, recordProfile } from "./advice.js";
 import { assertAppendOnly } from "./db/append-only.js";
 import type { Database } from "./db/client.js";
 import { clientIp, type Guards, hashIp, judgeLink, originAllowList, RateLimited } from "./guards.js";
@@ -60,7 +64,10 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
   app.use(cors({ origin: [...guards.allowedOrigins] }));
 
   app.onError((err, c) => {
-    if (err instanceof EventIdConflict || err instanceof StepPrecondition) return c.json({ error: err.message }, 409);
+    if (err instanceof EventIdConflict || err instanceof StepPrecondition || err instanceof AdviceConflict) {
+      return c.json({ error: err.message }, 409);
+    }
+    if (err instanceof AdviceNotFound) return c.json({ error: err.message }, 404);
     if (err instanceof LlmNotConfigured) return c.json({ error: err.message }, 503);
     if (err instanceof RateLimited) {
       c.header("Retry-After", String(err.retryAfterSeconds));
@@ -145,6 +152,41 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
       actor: ANALYST_ACTOR,
       payload: { finding_id, disposition },
     });
+    return c.json({ seq: row.seq } satisfies AppendResponse, 201);
+  });
+
+  // The client layer (#31). No model is called and nothing spends tokens, so no judge-link token either.
+  // A new profile version supersedes the client's advice in play, in the same transaction.
+  app.post("/cases/:caseId/clients", async (c) => {
+    const caseId = c.req.param("caseId");
+    const body = RecordProfileRequest.safeParse(await readJson(c));
+    if (!body.success) return badRequest(c, body.error);
+    if (!(await caseExists(db, caseId))) return notFound(c, caseId);
+
+    const row = await recordProfile(db, caseId, body.data.event_id, body.data.profile);
+    return c.json({ seq: row.seq } satisfies AppendResponse, 201);
+  });
+
+  // Drafts advice by the suitability rules: 409 until the pack is verified and its attributes are read.
+  // The advice's id is the request's event_id.
+  app.post("/cases/:caseId/advice", async (c) => {
+    const caseId = c.req.param("caseId");
+    const body = DraftAdviceRequest.safeParse(await readJson(c));
+    if (!body.success) return badRequest(c, body.error);
+    if (!(await caseExists(db, caseId))) return notFound(c, caseId);
+
+    const row = await draftAdvice(db, caseId, body.data.event_id, body.data.client_id);
+    return c.json({ seq: row.seq } satisfies AppendResponse, 201);
+  });
+
+  // The adviser approves or rejects. Only a person decides; nothing approves itself.
+  app.post("/cases/:caseId/advice/:adviceId/decision", async (c) => {
+    const caseId = c.req.param("caseId");
+    const body = DecideAdviceRequest.safeParse(await readJson(c));
+    if (!body.success) return badRequest(c, body.error);
+    if (!(await caseExists(db, caseId))) return notFound(c, caseId);
+
+    const row = await decideAdvice(db, caseId, c.req.param("adviceId"), body.data);
     return c.json({ seq: row.seq } satisfies AppendResponse, 201);
   });
 
