@@ -25,6 +25,7 @@ export const STEP_LABELS: Record<StepName, string> = {
   decompose: "Decompose into claims",
   contradictions: "Cross-check claims",
   findings: "Raise findings",
+  compliance: "Check institutional rules",
   // Not in PIPELINE_STEPS: run for advice, after the board (#29, #31).
   attributes: "Read product facts",
   explain: "Explain advice",
