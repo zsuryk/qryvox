@@ -8,11 +8,12 @@ import { append, EventIdConflict, type EventDraft, findCompletedRun, isUniqueVio
 import { attributes } from "./attributes.js";
 import { contradictions } from "./contradictions.js";
 import { decompose } from "./decompose.js";
+import { explain } from "./explain.js";
 import { extract } from "./extract.js";
 import { findings } from "./findings.js";
 import type { AnyStep } from "./step.js";
 
-const STEPS: Record<RunStepRequest["step"], AnyStep> = { extract, decompose, contradictions, findings, attributes };
+const STEPS: Record<RunStepRequest["step"], AnyStep> = { extract, decompose, contradictions, findings, attributes, explain };
 
 export class LlmNotConfigured extends Error {
   override name = "LlmNotConfigured";

@@ -98,7 +98,8 @@ function latestCompleted(state: CaseState, step: "findings" | "attributes"): str
   return runs.sort((a, b) => (a.settledAtSeq ?? 0) - (b.settledAtSeq ?? 0)).at(-1)?.stepRunId ?? null;
 }
 
-async function attributesOf(tx: Tx, caseId: string, runId: string): Promise<ProductAttributes> {
-  const row = await findCompletedRun(tx, caseId, runId);
+// The stored output of a completed attributes run.
+export async function attributesOf(db: Db | Tx, caseId: string, runId: string): Promise<ProductAttributes> {
+  const row = await findCompletedRun(db, caseId, runId);
   return ProductAttributes.parse((row?.payload as { output?: unknown } | undefined)?.output);
 }

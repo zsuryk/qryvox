@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { EventPage, fold, type IngestedDocument, type StepName, StepResult } from "@qryvox/shared";
 import { expect } from "vitest";
 import { ATTRIBUTES_SYSTEM_PROMPT } from "../src/steps/attributes";
+import { EXPLAIN_SYSTEM_PROMPT } from "../src/steps/explain";
 import { CONTRADICTIONS_SYSTEM_PROMPT } from "../src/steps/contradictions";
 import { DECOMPOSE_SYSTEM_PROMPT } from "../src/steps/decompose";
 import { EXTRACT_SYSTEM_PROMPT } from "../src/steps/extract";
@@ -46,6 +47,7 @@ export const REPLIES = {
   },
   // These two documents state no product attributes; the attributes step has its own tests on the real pack.
   attributes: {},
+  explain: {},
 } satisfies Record<StepName, unknown>;
 
 const PROMPTS: [string, StepName][] = [
@@ -54,6 +56,7 @@ const PROMPTS: [string, StepName][] = [
   [CONTRADICTIONS_SYSTEM_PROMPT, "contradictions"],
   [FINDINGS_SYSTEM_PROMPT, "findings"],
   [ATTRIBUTES_SYSTEM_PROMPT, "attributes"],
+  [EXPLAIN_SYSTEM_PROMPT, "explain"],
 ];
 
 function stepOf(messages: ChatMessage[]): StepName {

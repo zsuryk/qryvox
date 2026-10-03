@@ -3,10 +3,12 @@
 import type { IngestedDocument, StepName } from "@qryvox/shared";
 import { DOCUMENTS } from "@qryvox/shared/pack-source";
 import { ATTRIBUTES_SYSTEM_PROMPT } from "../src/steps/attributes";
+import { EXPLAIN_SYSTEM_PROMPT } from "../src/steps/explain";
 import { CONTRADICTIONS_SYSTEM_PROMPT } from "../src/steps/contradictions";
 import { DECOMPOSE_SYSTEM_PROMPT } from "../src/steps/decompose";
 import { EXTRACT_SYSTEM_PROMPT } from "../src/steps/extract";
 import { FINDINGS_SYSTEM_PROMPT } from "../src/steps/findings";
+import type { ChatMessage } from "../src/llm";
 import { FakeLlm } from "./helpers";
 
 // The real Larkspur pack, page text as the source writes it, so the canned reply quotes real passages.
@@ -68,7 +70,7 @@ const PIPELINE = {
     ],
   },
   attributes: ATTRIBUTES_REPLY,
-} satisfies Record<StepName, unknown>;
+} satisfies Record<Exclude<StepName, "explain">, unknown>;
 
 const PROMPTS: [string, StepName][] = [
   [EXTRACT_SYSTEM_PROMPT, "extract"],
@@ -76,12 +78,14 @@ const PROMPTS: [string, StepName][] = [
   [CONTRADICTIONS_SYSTEM_PROMPT, "contradictions"],
   [FINDINGS_SYSTEM_PROMPT, "findings"],
   [ATTRIBUTES_SYSTEM_PROMPT, "attributes"],
+  [EXPLAIN_SYSTEM_PROMPT, "explain"],
 ];
 
-export function larkspurLlm() {
+// An explanation depends on the advice it explains, so a test that runs explain says how to answer.
+export function larkspurLlm(explain: (messages: ChatMessage[]) => unknown = () => ({})) {
   return new FakeLlm((messages) => {
     const step = PROMPTS.find(([prompt]) => messages[0]?.content === prompt)?.[1];
     if (!step) throw new Error("unknown prompt");
-    return JSON.stringify(PIPELINE[step]);
+    return JSON.stringify(step === "explain" ? explain(messages) : PIPELINE[step]);
   });
 }

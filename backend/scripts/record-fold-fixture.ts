@@ -12,6 +12,7 @@ import { createApp } from "../src/app";
 import { openDatabase, runMigrations } from "../src/db/client";
 import { LlmError, type Llm } from "../src/llm";
 import { ATTRIBUTES_SYSTEM_PROMPT } from "../src/steps/attributes";
+import { EXPLAIN_SYSTEM_PROMPT } from "../src/steps/explain";
 import { CONTRADICTIONS_SYSTEM_PROMPT } from "../src/steps/contradictions";
 import { DECOMPOSE_SYSTEM_PROMPT } from "../src/steps/decompose";
 import { EXTRACT_SYSTEM_PROMPT } from "../src/steps/extract";
@@ -104,6 +105,7 @@ const PROMPTS: Record<StepName, string> = {
   contradictions: CONTRADICTIONS_SYSTEM_PROMPT,
   findings: FINDINGS_SYSTEM_PROMPT,
   attributes: ATTRIBUTES_SYSTEM_PROMPT,
+  explain: EXPLAIN_SYSTEM_PROMPT,
 };
 let calls = 0;
 const llm: Llm = {
