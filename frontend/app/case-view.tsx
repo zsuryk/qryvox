@@ -8,6 +8,7 @@ import { type AttemptFailure, type PipelineAction, type PipelineDeps, runAction 
 import Board from "./board";
 import DispositionConsole from "./disposition";
 import { FindingsEval } from "./eval-tiles";
+import ProductUpdate from "./product-update";
 import Pipeline from "./pipeline";
 
 // The case surface, as the client owns it: the run at the top, the board the run fills beneath it, the
@@ -83,6 +84,16 @@ export default function CaseView({ events, caseId, refetch }: CaseViewProps) {
   return (
     <>
       <Pipeline log={log} running={running} busy={busy} failure={failure} onAction={(action) => void drive(action)} />
+      <ProductUpdate
+        caseId={caseId}
+        log={log}
+        busy={busy}
+        onIngested={async () => {
+          setRead({ server: events, log: await fetchEvents(caseId) });
+          await refetch();
+        }}
+        onVerify={() => void drive({ kind: "rerun", step: "extract" })}
+      />
       <Board events={log} />
       <DispositionConsole caseId={caseId} events={log} refetch={refetch} />
       <FindingsEval events={log} />

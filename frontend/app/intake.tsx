@@ -7,7 +7,7 @@ import { ingestDocument, openCase } from "../lib/api";
 import { errorMessage } from "../lib/errors";
 import { type DocumentTile, intake, type IntakeFile } from "../lib/intake";
 import { browserPdfAssets } from "../lib/pdf";
-import { packSources } from "../lib/pack";
+import { PACKS, packSources } from "../lib/pack";
 import { PIPELINE_STEPS, STEP_LABELS } from "../lib/pipeline";
 
 // The one place a document enters the system. Nothing here asks for a file dialog and nothing waits to
@@ -74,9 +74,20 @@ export default function Intake() {
   const fromDrop = (list: FileList) =>
     run([...list].map((file) => ({ filename: file.name, read: () => file.arrayBuffer().then(toBytes) })));
 
-  // The fabricated pack, through the same road: same read, same parse, same append.
-  const fromPack = async () => {
-    await run(await packSources());
+  // A fabricated pack, through the same road: same read, same parse, same append. Larkspur and the
+  // second product, Wrenfield, each open a case of their own; the revised Larkspur is loaded onto the
+  // Larkspur case it revises, from that case's page.
+  const fromPack = async (dir: string) => {
+    await run(await packSources(dir));
+  };
+
+  // Another review, from a clean screen: a new case for whatever is dropped or loaded next.
+  const reset = () => {
+    opening.current = null;
+    setTiles([]);
+    setIngested([]);
+    setCaseId(null);
+    setNotice(null);
   };
 
   return (
@@ -99,9 +110,21 @@ export default function Intake() {
         <p className="t-footnote muted" style={{ maxWidth: "46ch" }}>
           Every PDF is read in this browser with the pinned pdf.js. No file is uploaded to be parsed.
         </p>
-        <button type="button" className="btn btn--primary" disabled={busy} aria-busy={busy} onClick={() => void fromPack().catch(report)}>
-          {busy ? "Reading…" : "Load the fabricated pack"}
-        </button>
+        <div className="row" style={{ justifyContent: "center" }}>
+          {PACKS.filter((pack) => pack.id !== "larkspur-v2").map((pack, i) => (
+            <button
+              key={pack.id}
+              type="button"
+              className={`btn${i === 0 ? " btn--primary" : ""}`}
+              disabled={busy || caseId !== null}
+              aria-busy={busy}
+              onClick={() => void fromPack(pack.dir).catch(report)}
+            >
+              {busy ? "Reading…" : `Load ${pack.label}`}
+            </button>
+          ))}
+        </div>
+        <p className="t-caption faint">Both products are fabricated for this demonstration.</p>
         {notice && (
           <p className="t-footnote text-negative" role="alert">
             {notice}
@@ -139,10 +162,13 @@ export default function Intake() {
               Run the steps in order — {PIPELINE_STEPS.map((step) => STEP_LABELS[step]).join(" → ")} — and the claim board
               fills as they go.
             </p>
-            <div>
+            <div className="row">
               <Link href={`/cases/${caseId}`} className="btn btn--primary">
                 Open the case →
               </Link>
+              <button type="button" className="btn btn--plain" onClick={reset}>
+                Start another review
+              </button>
             </div>
           </div>
         </>
