@@ -37,6 +37,8 @@ export const STEP_LABELS: Record<StepName, string> = {
   explain: "Explain advice",
   // Not in PIPELINE_STEPS: reads the analyst's words into intent chips on the canvas (#51).
   parse: "Read intent",
+  // Not in PIPELINE_STEPS: optional, after findings, a line per finding on why it matters (#62).
+  rationale: "Word card rationales",
 };
 
 // pending is the fold's "no run for this step", kept as its own word so the panel can say a step has not
