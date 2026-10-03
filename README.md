@@ -111,6 +111,7 @@ Stage 2 is tracked in #20.
 | **Layer 1 — verify documents** | ✅ Drop zone, five-step pipeline, claim board, citation pane, disposition console | #7 #9–#13 |
 | **Layer 2 — check policy** | ✅ `rules@1` P1–P4, the `compliance` step, policy-gap cards naming their rule | #23–#26 |
 | **Layer 3 — match the client** | ✅ Questionnaire, rule-based suitability, adviser console, explanations, the client's page | #27–#34 |
+| Client self-service | ✅ A client link per product: clients answer themselves, the rules draft at once, the adviser confirms from a review queue, the client's page updates by itself | — |
 | Measurement | ✅ Recall / precision and advice-accuracy tiles, live from the log | #15 #35 |
 | Replay | ✅ A scrubber that rebuilds the case at any event | #14 |
 | Bonus | ✅ Product updates (Larkspur v2), a second product with alternatives (Wrenfield), learned reading depth | #37 #38 #39 |
