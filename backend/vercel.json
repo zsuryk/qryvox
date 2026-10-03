@@ -2,12 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --filter @qryvox/backend...",
-  "outputDirectory": "dist",
+  "buildCommand": "pnpm --filter @qryvox/shared build && mkdir -p static && printf 'User-agent: *\\nDisallow: /\\n' > static/robots.txt",
+  "outputDirectory": "static",
   "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/api/index"
     }
-  ],
-  "buildCommand": "pnpm --filter @qryvox/shared build"
+  ]
 }

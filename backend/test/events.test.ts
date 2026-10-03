@@ -195,3 +195,14 @@ describe("GET /health", () => {
     expect(EVENT_TYPES).toContain("case.opened");
   });
 });
+
+describe("GET /", () => {
+  it("answers as the API, in JSON, never with a file (#47)", async () => {
+    const t = await setup();
+    const res = await t.request("GET", "/");
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(await res.json()).toEqual({ service: "qryvox-api", health: "/health" });
+  });
+});

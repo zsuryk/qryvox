@@ -82,6 +82,10 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
   // Returns the shared event vocabulary so a deploy smoke check also proves @qryvox/shared resolved at runtime.
   app.get("/health", (c) => c.json({ status: "ok", eventTypes: EVENT_TYPES }));
 
+  // The root says what this is and nothing more (#47): an API, with its health check. Without a route here a
+  // misconfigured host can answer / with a static file instead of the app.
+  app.get("/", (c) => c.json({ service: "qryvox-api", health: "/health" }));
+
   app.post("/cases", async (c) => {
     const body = OpenCaseRequest.safeParse(await readJson(c));
     if (!body.success) return badRequest(c, body.error);

@@ -20,3 +20,4 @@ frontend/public/pdfjs/
 .env
 .env.*
 !.env.example
+backend/static/
