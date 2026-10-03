@@ -25,7 +25,7 @@ export function recordCardOperation(db: Db, caseId: string, request: CardOperati
     const card = cards.find((c) => c.cardId === payload.card_id);
     if (!card) {
       throw new CardConflict(
-        `card ${payload.card_id} is not on this case's canvas: no finding on the board is it or cites it, and no completed find-similar run returned it`,
+        `card ${payload.card_id} is not on this case's canvas: no finding on the board is it or cites it, it is not a statement of the latest extract run, and no find-similar press or completed run returned it`,
       );
     }
     if (type === "card.docked") {
