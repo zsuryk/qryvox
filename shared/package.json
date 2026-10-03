@@ -12,7 +12,8 @@
     },
     "./case-recorded.json": "./fixtures/case-recorded.json",
     "./pack-source": "./pack/source.ts",
-    "./pack-source-v2": "./pack/source-v2.ts"
+    "./pack-source-v2": "./pack/source-v2.ts",
+    "./pack-source-wrenfield": "./pack/source-wrenfield.ts"
   },
   "scripts": {
     "pack:generate": "tsx scripts/generate-pack.ts",

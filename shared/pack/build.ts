@@ -7,12 +7,24 @@ import { DOCUMENTS, FOOTER, GROUND_TRUTH, ISSUER, PACK_ID, PRODUCT, type SourceD
 // One fabricated pack as authored: its documents and its two answer keys.
 export type PackSource = {
   packId: string;
+  product: string;
+  issuer: string;
+  // The fictional-document notice printed at the foot of every page.
+  footer: string;
   documents: SourceDocument[];
   groundTruth: GroundTruthEntry[];
   personas: Persona[];
 };
 
-export const LARKSPUR_V1: PackSource = { packId: PACK_ID, documents: DOCUMENTS, groundTruth: GROUND_TRUTH, personas: PERSONAS };
+export const LARKSPUR_V1: PackSource = {
+  packId: PACK_ID,
+  product: PRODUCT,
+  issuer: ISSUER,
+  footer: FOOTER,
+  documents: DOCUMENTS,
+  groundTruth: GROUND_TRUTH,
+  personas: PERSONAS,
+};
 
 export type BuiltPack = {
   pdfs: { filename: string; bytes: Uint8Array }[];
@@ -39,7 +51,7 @@ export async function buildPack(source: PackSource = LARKSPUR_V1): Promise<Built
   const pdfs = [];
   const documents = [];
   for (const document of source.documents) {
-    const bytes = await renderDocument(document, source.groundTruth);
+    const bytes = await renderDocument(document, source);
     pdfs.push({ filename: document.filename, bytes });
     documents.push({
       document_id: document.document_id,
@@ -54,8 +66,8 @@ export async function buildPack(source: PackSource = LARKSPUR_V1): Promise<Built
     pdfs,
     manifest: PackManifest.parse({
       pack_id: source.packId,
-      product: PRODUCT,
-      issuer: ISSUER,
+      product: source.product,
+      issuer: source.issuer,
       pdfjs_version: PDFJS_VERSION,
       documents,
     }),
@@ -87,10 +99,10 @@ function isQuoted(groundTruth: GroundTruthEntry[], documentId: string, page: num
   );
 }
 
-async function renderDocument(source: SourceDocument, groundTruth: GroundTruthEntry[]): Promise<Uint8Array> {
+async function renderDocument(source: SourceDocument, pack: PackSource): Promise<Uint8Array> {
   const pdf = await PDFDocument.create({ updateMetadata: false });
   pdf.setTitle(source.title);
-  pdf.setAuthor(ISSUER);
+  pdf.setAuthor(pack.issuer);
   pdf.setSubject("Fabricated document for a software demonstration");
   pdf.setProducer(PRODUCER);
   pdf.setCreator(PRODUCER);
@@ -119,7 +131,7 @@ async function renderDocument(source: SourceDocument, groundTruth: GroundTruthEn
           : [raw, fonts.regular, style.body, 0];
 
       const wrapped = wrap(text, font, fontSize, width);
-      if (wrapped.length > 1 && isQuoted(groundTruth, source.document_id, pageNumber, raw)) {
+      if (wrapped.length > 1 && isQuoted(pack.groundTruth, source.document_id, pageNumber, raw)) {
         throw new Error(`quoted line would wrap on ${source.document_id} p${pageNumber}: "${raw}"`);
       }
 
@@ -130,7 +142,7 @@ async function renderDocument(source: SourceDocument, groundTruth: GroundTruthEn
       }
     }
 
-    const footerTop = drawFooter(page, fonts.regular, style.footer, width, `Page ${pageNumber} of ${source.pages.length}`);
+    const footerTop = drawFooter(page, fonts.regular, style.footer, width, pack.footer, `Page ${pageNumber} of ${source.pages.length}`);
     if (y < footerTop + style.body) {
       throw new Error(`${source.document_id} p${pageNumber} overflows into the footer`);
     }
@@ -140,8 +152,8 @@ async function renderDocument(source: SourceDocument, groundTruth: GroundTruthEn
 }
 
 // Draws the fictional-document notice and page number at the bottom; returns the footer's top edge.
-function drawFooter(page: PDFPage, font: PDFFont, fontSize: number, width: number, label: string): number {
-  const lines = [...wrap(FOOTER, font, fontSize, width), label];
+function drawFooter(page: PDFPage, font: PDFFont, fontSize: number, width: number, footer: string, label: string): number {
+  const lines = [...wrap(footer, font, fontSize, width), label];
   const lineHeight = fontSize * 1.4;
   const top = MARGIN / 2 + lines.length * lineHeight;
   // Top-down, so text extraction reads the footer in order.

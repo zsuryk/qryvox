@@ -8,12 +8,13 @@ import {
   fold,
   GroundTruth,
   PersonaSet,
+  productRiskLevel,
   type Reason,
   SlimEvent,
   undismissedFindings,
 } from "../src";
 import recorded from "../fixtures/case-recorded.json";
-import { larkspurAttributes, larkspurV2Attributes } from "./larkspur";
+import { larkspurAttributes, larkspurV2Attributes, wrenfieldAttributes } from "./larkspur";
 
 const evalDir = new URL("../../frontend/public/eval/", import.meta.url);
 const readJson = (name: string): unknown => JSON.parse(readFileSync(fileURLToPath(new URL(name, evalDir)), "utf8"));
@@ -169,5 +170,31 @@ describe("the personas on Larkspur v2", () => {
     const s5 = assessSuitability(lee, larkspurV2Attributes, v2Findings).reasons.find((r) => r.rule === "S5");
 
     expect(s5).toMatchObject({ effect: "meets", citation: { document_id: "ppm", quote: "3.6 The Fund excludes companies that derive revenue from fossil fuels." } });
+  });
+});
+
+describe("the personas on Wrenfield", () => {
+  const set = PersonaSet.parse(readJson("wrenfield/personas.json")).personas;
+  const truth = GroundTruth.parse(readJson("wrenfield/ground-truth.json"));
+  const board: Finding[] = truth.entries.map((e) => ({
+    finding_id: e.id,
+    category: e.category,
+    kind: e.kind,
+    severity: "medium",
+    claim: e.summary,
+    citation: e.citation,
+    counterpart: e.counterpart,
+  }));
+
+  it.each(set.map((p) => [p.name, p] as const))("%s gets the expected verdict, reasons and disclosures", (_, p) => {
+    const assessment = assessSuitability(p.profile, wrenfieldAttributes, board);
+
+    expect(assessment.verdict).toBe(p.expected_verdict);
+    expect(ruleAndEffect(assessment.reasons)).toEqual(ruleAndEffect(p.expected_reasons));
+    expect(assessment.disclosures.map((d) => d.finding_id).sort()).toEqual([...p.expected_disclosures].sort());
+  });
+
+  it("is a level-2 product: investment-grade only, not capital protected", () => {
+    expect(productRiskLevel(wrenfieldAttributes)).toBe(2);
   });
 });

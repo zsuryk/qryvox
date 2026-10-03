@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildPack, LARKSPUR_V1 } from "../pack/build";
 import { LARKSPUR_V2 } from "../pack/source-v2";
+import { WRENFIELD } from "../pack/source-wrenfield";
 import { GroundTruth, PackManifest, PersonaSet } from "../src";
 
 const publicDir = new URL("../../frontend/public/", import.meta.url);
@@ -107,5 +108,23 @@ describe("Larkspur v2, the revised pack", () => {
   it("no longer plants the two findings the revision resolves", () => {
     const ids = (source: typeof LARKSPUR_V1) => source.groundTruth.map((e) => e.id);
     expect(ids(LARKSPUR_V1).filter((id) => !ids(LARKSPUR_V2).includes(id))).toEqual(["fees-management-fee", "strategy-fossil-fuel-screen"]);
+  });
+});
+
+describe("Wrenfield, the second product", () => {
+  it("is exactly what the generator renders", async () => {
+    const built = await buildPack(WRENFIELD);
+    for (const { filename, bytes } of built.pdfs) {
+      expect(Buffer.from(bytes).equals(read(`pack/wrenfield/${filename}`)), `pack/wrenfield/${filename} is stale`).toBe(true);
+    }
+    expect(PackManifest.parse(readJson("pack/wrenfield/manifest.json"))).toEqual(built.manifest);
+    expect(GroundTruth.parse(readJson("eval/wrenfield/ground-truth.json"))).toEqual(built.groundTruth);
+    expect(PersonaSet.parse(readJson("eval/wrenfield/personas.json"))).toEqual(built.personas);
+  });
+
+  it("names its own product and issuer, and plants two findings and no policy gap", () => {
+    const manifest = PackManifest.parse(readJson("pack/wrenfield/manifest.json"));
+    expect(manifest).toMatchObject({ pack_id: "wrenfield-v1", product: "Wrenfield Short Duration Fund", issuer: "Ashcombe Investment Partners Ltd" });
+    expect(WRENFIELD.groundTruth.map((e) => e.kind)).toEqual(["contradiction", "disclosure_gap"]);
   });
 });

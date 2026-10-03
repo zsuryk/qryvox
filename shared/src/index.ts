@@ -2,6 +2,7 @@ export { ANALYST_ACTOR } from "./actor.js";
 export {
   Advice,
   AdviceDecision,
+  Alternative,
   Disclosure,
   Explanation,
   ExplanationDepth,

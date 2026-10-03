@@ -43,6 +43,23 @@ export const Disclosure = z.object({
 });
 export type Disclosure = z.infer<typeof Disclosure>;
 
+// Another verified product the same rules find suitable for the client (#39), from the case it was
+// verified in: its own reasons, disclosures and citations, and the attributes run they were read from.
+export const Alternative = z
+  .object({
+    case_id: z.string().min(1),
+    product_name: z.string().min(1),
+    attributes_run_id: z.string().min(1),
+    verdict: z.literal("suitable"),
+    reasons: z.array(Reason).min(1),
+    disclosures: z.array(Disclosure),
+  })
+  .refine((a) => verdictFor(a.reasons) === "suitable", {
+    message: "an alternative's reasons must amount to suitable",
+    path: ["verdict"],
+  });
+export type Alternative = z.infer<typeof Alternative>;
+
 // What advice.drafted records. The advice's id is that event's event_id, as a case is named after its
 // case.opened, so a retried draft lands on the same advice.
 export const Advice = z.object({
@@ -55,6 +72,10 @@ export const Advice = z.object({
   reasons: z.array(Reason).min(1),
   disclosures: z.array(Disclosure),
   rules_version: z.string().min(1),
+  // For advice that is not suitable: the other products on the shelf that are, by the same rules. Absent
+  // when drafting did not look (suitable advice, and advice drafted before #39); empty when it looked and
+  // nothing on the shelf fits.
+  alternatives: z.array(Alternative).optional(),
 }).refine((a) => a.verdict === verdictFor(a.reasons), {
   message: "the verdict must be the one its reasons amount to (verdictFor)",
   path: ["verdict"],

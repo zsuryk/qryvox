@@ -1,11 +1,14 @@
-// pnpm --filter @qryvox/shared pack:generate — renders shared/pack/source.ts (and v2, source-v2.ts) into
+// pnpm --filter @qryvox/shared pack:generate — renders shared/pack/source.ts (v2, source-v2.ts; a second
+// product, source-wrenfield.ts) into
 // the static packs. PDFs and manifests go to frontend/public/pack (served as files, never through a
 // function body); the ground truth and the personas go to frontend/public/eval, apart from the documents
-// the pipeline reads. v1 sits at the top of each directory, where it always has; v2 in a v2/ beneath it.
+// the pipeline reads. Larkspur v1 sits at the top of each directory, where it always has; the others in a
+// subdirectory beneath it.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { buildPack, LARKSPUR_V1, type PackSource } from "../pack/build";
 import { LARKSPUR_V2 } from "../pack/source-v2";
+import { WRENFIELD } from "../pack/source-wrenfield";
 
 const publicDir = new URL("../../frontend/public/", import.meta.url);
 
@@ -27,3 +30,4 @@ async function generate(source: PackSource, subdir: string) {
 
 await generate(LARKSPUR_V1, "");
 await generate(LARKSPUR_V2, "v2/");
+await generate(WRENFIELD, "wrenfield/");

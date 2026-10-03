@@ -67,6 +67,10 @@ export const ProductAttributes = z.object({
   // Screens the documents claim, and whether the PPM backs each one. A screen only marketing claims is
   // recorded unbacked, citing the marketing passage, so S5 can make the advice conditional on it.
   exclusion_screens: z.array(z.object({ exclusion: Exclusion, backed_by_ppm: z.boolean(), citation: Citation })),
+  // The product's name as a document states it: how the shelf tells products apart (#39). Optional, so a
+  // run that could not quote it still reads everything suitability needs; such a product is not offered
+  // as an alternative.
+  product_name: cited(z.string().min(1)).optional(),
 });
 export type ProductAttributes = z.infer<typeof ProductAttributes>;
 

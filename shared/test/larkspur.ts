@@ -57,3 +57,17 @@ export const larkspurV2Attributes = ProductAttributes.parse({
     },
   ],
 });
+
+// The Wrenfield Short Duration Fund (#39), as a correct attributes run reads its PPM.
+export const wrenfieldAttributes = ProductAttributes.parse({
+  min_holding_years: { value: 1, citation: ppm(1, "2.1 The Fund aims to preserve capital and provide income over a period of at least one year.") },
+  sub_investment_grade_max_pct: { value: 0, citation: ppm(1, "2.2 The Fund invests only in investment-grade bonds with less than two years to maturity.") },
+  capital_protected: { value: false, citation: ppm(2, "4.1 The Fund is not capital protected. Investors may lose some of the amount invested.") },
+  distributions_may_use_capital: { value: false, citation: ppm(2, "4.2 Distributions are not guaranteed and are paid only from income.") },
+  dealing_frequency: { value: "daily", citation: ppm(3, "6.2 Units can be redeemed on any business day.") },
+  redemption_notice_days: { value: 0, citation: ppm(3, "6.3 Redemption requests received by 12:00 are dealt the same day.") },
+  exit_charge_within_months: { value: 0, citation: ppm(3, "6.4 No redemption charge applies.") },
+  derivatives_use: { value: "none", citation: ppm(1, "2.3 The Fund does not use derivatives.") },
+  exclusion_screens: [],
+  product_name: { value: "Wrenfield Short Duration Fund", citation: ppm(1, "Wrenfield Short Duration Fund - issued by Ashcombe Investment Partners Ltd") },
+});

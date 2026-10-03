@@ -1,5 +1,5 @@
 import type { Persona } from "../src";
-import type { PackSource } from "./build";
+import { LARKSPUR_V1, type PackSource } from "./build";
 import { PERSONAS } from "./personas";
 import { DOCUMENTS, GROUND_TRUTH, type SourceDocument } from "./source";
 
@@ -50,6 +50,7 @@ const personas: Persona[] = PERSONAS.map((p) =>
 );
 
 export const LARKSPUR_V2: PackSource = {
+  ...LARKSPUR_V1,
   packId: PACK_ID_V2,
   documents: DOCUMENTS.map(revise),
   groundTruth: GROUND_TRUTH.filter((e) => !RESOLVED.has(e.id)),
