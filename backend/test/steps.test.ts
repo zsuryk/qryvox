@@ -133,7 +133,7 @@ describe("a failing step", () => {
     expect(StepFailure.parse(await res.json()).error).toMatch(/appear verbatim/);
   });
 
-  it("grounds a verbatim quote whose document_id came back with the kind stuck to it", async () => {
+  it("grounds a verbatim quote whose document_id came back with the kind stuck to it, under the real id", async () => {
     // A real model, handed "document_id: factsheet (factsheet)", copies the whole token back as the id.
     // Every citation then names a document the case does not have, and a run of perfectly verbatim quotes
     // fails for want of one. The id is repaired; the quote is still checked against the page it cites,
@@ -153,10 +153,11 @@ describe("a failing step", () => {
 
     const result = StepResult.parse(await (await runExtract(t, caseId)).json());
 
+    // Both survive under the real id, so nothing downstream ever sees the token the model made up.
     expect(result.output).toEqual({
       statements: [
-        { document_id: "factsheet (factsheet)", page: 1, quote: "Management fee: 0.85% per annum." },
-        { document_id: "factsheet(factsheet)", page: 1, quote: "Management fee: 0.85% per annum." },
+        { document_id: "factsheet", page: 1, quote: "Management fee: 0.85% per annum." },
+        { document_id: "factsheet", page: 1, quote: "Management fee: 0.85% per annum." },
       ],
     });
   });

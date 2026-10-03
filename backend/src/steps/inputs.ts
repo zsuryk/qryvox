@@ -35,8 +35,8 @@ export function normalize(text: string): string {
 // copy what they see: a header reading "factsheet (factsheet, larkspur-factsheet.pdf)" invites the whole
 // token back as the id, which then matches no document and grounds nothing at all. So a cited id is
 // matched exactly first, and only then by the longest known id it begins with — the repair is narrow on
-// purpose. A citation still has to quote its page verbatim to be believed, so a sloppy id costs a claim
-// nothing but the id, never the grounding it would otherwise have had.
+// purpose. A citation still has to quote its page verbatim to be believed, and groundCitation hands it on
+// under the real id, so a sloppy id never reaches the steps or the board that read it.
 export function resolveDocument(
   documents: readonly IngestedDocument[],
   cited: string,
@@ -49,10 +49,17 @@ export function resolveDocument(
     .sort((a, b) => b.document_id.length - a.document_id.length)[0];
 }
 
-// True when the quote appears on that page of that document.
-export function onPage(documents: readonly IngestedDocument[], documentId: string, page: number, quote: string): boolean {
-  const text = resolveDocument(documents, documentId)?.pages[page - 1];
-  return text !== undefined && normalize(text).includes(normalize(quote));
+// The citation, with its document_id rewritten to the document's real id, when the quote appears on that
+// page of that document; undefined otherwise. The rewrite matters as much as the check: a repaired id
+// left as the model wrote it reaches the board, and no document there answers to it.
+export function groundCitation<T extends { document_id: string; page: number; quote: string }>(
+  documents: readonly IngestedDocument[],
+  citation: T,
+): T | undefined {
+  const document = resolveDocument(documents, citation.document_id);
+  const text = document?.pages[citation.page - 1];
+  if (!document || text === undefined || !normalize(text).includes(normalize(citation.quote))) return undefined;
+  return { ...citation, document_id: document.document_id };
 }
 
 // The document text as the model sees it: every page labelled, so it can cite document and page. The id is

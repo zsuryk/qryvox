@@ -1,7 +1,7 @@
 import { FindingCategory, type IngestedDocument } from "@qryvox/shared";
 import { z } from "zod";
 import { ExtractOutput } from "./extract.js";
-import { loadCompletedOutput, loadDocuments, onPage } from "./inputs.js";
+import { groundCitation, loadCompletedOutput, loadDocuments } from "./inputs.js";
 import type { StepDefinition } from "./step.js";
 
 // decompose@1 — splits extracted statements into atomic claims, each with a category, a topic shared
@@ -69,10 +69,11 @@ export const decompose: StepDefinition<DecomposeInput, DecomposeOutput> = {
   // Claims keep only quotes found on their cited page, with unique ids. Fails if none survive.
   ground(output, { documents }) {
     const seen = new Set<string>();
-    const claims = output.claims.filter((c) => {
-      if (seen.has(c.id) || !onPage(documents, c.document_id, c.page, c.quote)) return false;
+    const claims = output.claims.flatMap((c) => {
+      const grounded = seen.has(c.id) ? undefined : groundCitation(documents, c);
+      if (!grounded) return [];
       seen.add(c.id);
-      return true;
+      return [grounded];
     });
     if (claims.length === 0) {
       return { error: `none of the ${output.claims.length} claims quote their cited page verbatim` };
