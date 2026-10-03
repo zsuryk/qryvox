@@ -13,6 +13,7 @@ import {
   type Reason,
   SlimEvent,
   verdictFor,
+  vulnerability,
 } from "../src";
 import recorded from "../fixtures/case-recorded.json";
 import { larkspurAttributes } from "./larkspur";
@@ -79,7 +80,8 @@ describe("the client profile", () => {
   it("holds only chosen answers: every field but the id is an enum, a number, a flag or a list of enums", () => {
     const shapes = Object.entries(ClientProfile.shape)
       .filter(([field]) => field !== "client_id")
-      .map(([, schema]) => schema.def.type);
+      // An optional answer is still a chosen one: look inside it.
+      .map(([, schema]) => (schema.def.type === "optional" ? (schema.def as unknown as { innerType: { def: { type: string } } }).innerType.def.type : schema.def.type));
     expect(shapes.every((t) => ["enum", "number", "boolean", "array"].includes(t))).toBe(true);
   });
 });
@@ -262,5 +264,23 @@ describe("readings and the knowledge suggestion (#38)", () => {
       { type: "client.profiled", payload: { ...chan, knowledge: "informed" } },
     ));
     expect(knowledgeSuggestion(state, "persona-chan")).toBeNull();
+  });
+});
+
+describe("a vulnerable client (#42)", () => {
+  it("is 65 or over, or new to investing while relying on the income, and says which", () => {
+    expect(vulnerability({ ...chan, aged_65_or_over: true })).toEqual(["65 or over", "new to investing and relies on the income"]);
+    expect(vulnerability({ ...chan, knowledge: "informed" })).toEqual([]);
+    expect(vulnerability({ ...chan, relies_on_income: false, aged_65_or_over: false })).toEqual([]);
+  });
+
+  it("carries a decision's reason and confirmations through the fold, and older decisions without them", () => {
+    const profiledAt = events.length + 1;
+    const state = fold(after(
+      { type: "client.profiled", payload: chan },
+      { type: "advice.drafted", payload: draft(profiledAt), event_id: ADVICE_ID },
+      { type: "advice.decided", payload: { advice_id: ADVICE_ID, decision: "rejected", reason: "needs_discussion_first" } },
+    ));
+    expect(state.advice[0]!.decision).toMatchObject({ decision: "rejected", reason: "needs_discussion_first", confirmations: [] });
   });
 });

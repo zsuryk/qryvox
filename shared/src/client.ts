@@ -32,8 +32,20 @@ export const ClientProfile = z.object({
   relies_on_income: z.boolean(),
   may_need_cash_at_short_notice: z.boolean(),
   exclusions: z.array(Exclusion),
+  // A coarse band, not a birth date (data minimisation): whether the client is 65 or over, one of the
+  // signs of a vulnerable client (#42). Optional, so answers recorded before it still parse.
+  aged_65_or_over: z.boolean().optional(),
 });
 export type ClientProfile = z.infer<typeof ClientProfile>;
+
+// A client who calls for extra care (#42): 65 or over, or new to investing while relying on the income.
+// Their advice can be approved only once the adviser confirms they have explained it to them directly.
+export function vulnerability(profile: ClientProfile): string[] {
+  return [
+    ...(profile.aged_65_or_over ? ["65 or over"] : []),
+    ...(profile.knowledge === "novice" && profile.relies_on_income ? ["new to investing and relies on the income"] : []),
+  ];
+}
 
 // The answers a reason can rest on (an advice reason names one).
 export const ProfileField = ClientProfile.keyof().exclude(["client_id"]);

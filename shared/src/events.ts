@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Advice, AdviceDecision, SupersedeCause } from "./advice.js";
+import { Advice, AdviceDecision, DecisionConfirmation, RejectionReason, SupersedeCause } from "./advice.js";
 import { ClientProfile, KnowledgeLevel } from "./client.js";
 import { Disposition, Finding } from "./finding.js";
 
@@ -176,7 +176,14 @@ export const AdviceDecided = z.object({
   ...envelope,
   type: z.literal("advice.decided"),
   v: z.literal(1),
-  payload: z.object({ advice_id: z.uuid(), decision: AdviceDecision }),
+  payload: z.object({
+    advice_id: z.uuid(),
+    decision: AdviceDecision,
+    // #42: why a rejection, and what the adviser confirmed on an approval. Optional, so decisions recorded
+    // before them still parse.
+    reason: RejectionReason.optional(),
+    confirmations: z.array(DecisionConfirmation).optional(),
+  }),
 });
 
 // The depth a client chose to read their advice at (#38). Recorded only once the client has switched on

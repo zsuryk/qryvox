@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { IngestedDocument, Sha256, SlimEvent, StepName } from "./events.js";
-import { AdviceDecision } from "./advice.js";
+import { AdviceDecision, DecisionConfirmation, RejectionReason } from "./advice.js";
 import { ClientProfile, KnowledgeLevel } from "./client.js";
 import { Disposition } from "./finding.js";
 
@@ -49,7 +49,12 @@ export const DraftAdviceRequest = z.object({ event_id: z.uuid(), client_id: z.st
 export type DraftAdviceRequest = z.infer<typeof DraftAdviceRequest>;
 
 // POST /cases/:caseId/advice/:adviceId/decision — the adviser approves or rejects.
-export const DecideAdviceRequest = z.object({ event_id: z.uuid(), decision: AdviceDecision });
+export const DecideAdviceRequest = z.object({
+  event_id: z.uuid(),
+  decision: AdviceDecision,
+  reason: RejectionReason.optional(),
+  confirmations: z.array(DecisionConfirmation).optional(),
+});
 export type DecideAdviceRequest = z.infer<typeof DecideAdviceRequest>;
 
 // The judge-link token (ADR-0001): the demo URL carries ?k=<token>, the browser keeps it in sessionStorage

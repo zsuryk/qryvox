@@ -1,4 +1,4 @@
-import type { Advice, AdviceDecision, SupersedeCause } from "./advice.js";
+import type { Advice, AdviceDecision, DecisionConfirmation, RejectionReason, SupersedeCause } from "./advice.js";
 import type { ClientProfile, KnowledgeLevel } from "./client.js";
 import type { DocumentKind, StepName } from "./events.js";
 import type { Disposition, Finding } from "./finding.js";
@@ -63,7 +63,13 @@ export type CaseAdvice = Advice & {
   supersededAtSeq: number | null;
   supersededBecause: SupersedeCause | null;
   // The adviser's latest decision, or null while it waits for one.
-  decision: { decision: AdviceDecision; actor: string; decidedAtSeq: number } | null;
+  decision: {
+    decision: AdviceDecision;
+    actor: string;
+    decidedAtSeq: number;
+    reason: RejectionReason | null;
+    confirmations: DecisionConfirmation[];
+  } | null;
 };
 
 export type CaseState = {

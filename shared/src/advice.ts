@@ -86,6 +86,21 @@ export type Advice = z.infer<typeof Advice>;
 export const AdviceDecision = z.enum(["approved", "rejected"]);
 export type AdviceDecision = z.infer<typeof AdviceDecision>;
 
+// Why an adviser rejected a draft (#42): chosen, never typed, so the record says why in a word a
+// regulator can count. Required on a rejection.
+export const RejectionReason = z.enum([
+  "circumstances_not_captured",
+  "product_facts_wrong",
+  "explanation_not_adequate",
+  "client_prefers_another_product",
+  "needs_discussion_first",
+]);
+export type RejectionReason = z.infer<typeof RejectionReason>;
+
+// What an adviser confirms on approving (#42). explained_directly is required for a vulnerable client.
+export const DecisionConfirmation = z.enum(["explained_directly"]);
+export type DecisionConfirmation = z.infer<typeof DecisionConfirmation>;
+
 export const SupersedeCause = z.enum(["profile_changed", "product_changed"]);
 export type SupersedeCause = z.infer<typeof SupersedeCause>;
 

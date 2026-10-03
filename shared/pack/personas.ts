@@ -18,6 +18,7 @@ export const PERSONAS: Persona[] = [
       relies_on_income: true,
       may_need_cash_at_short_notice: true,
       exclusions: [],
+      aged_65_or_over: true,
     },
     expected_verdict: "not_suitable",
     expected_reasons: [

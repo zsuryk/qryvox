@@ -141,7 +141,16 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
         ...next,
         advice: state.advice.map((a) =>
           a.adviceId === event.payload.advice_id
-            ? { ...a, decision: { decision: event.payload.decision, actor: event.actor, decidedAtSeq: event.seq } }
+            ? {
+                ...a,
+                decision: {
+                  decision: event.payload.decision,
+                  actor: event.actor,
+                  decidedAtSeq: event.seq,
+                  reason: event.payload.reason ?? null,
+                  confirmations: event.payload.confirmations ?? [],
+                },
+              }
             : a,
         ),
       };

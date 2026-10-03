@@ -3,6 +3,7 @@ export {
   Advice,
   AdviceDecision,
   Alternative,
+  DecisionConfirmation,
   Disclosure,
   Explanation,
   ExplanationDepth,
@@ -10,6 +11,7 @@ export {
   ExplanationRef,
   Reason,
   ReasonEffect,
+  RejectionReason,
   SupersedeCause,
   Verdict,
   verdictFor,
@@ -24,6 +26,7 @@ export {
   ProductAttributes,
   productRiskLevel,
   ProfileField,
+  vulnerability,
 } from "./client.js";
 export {
   AppendResponse,
