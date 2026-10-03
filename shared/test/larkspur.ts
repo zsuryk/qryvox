@@ -45,3 +45,15 @@ export const larkspurAttributes = ProductAttributes.parse({
     },
   ],
 });
+
+// v2 (#37): the same, except the PPM now backs the fossil fuel screen (clause 3.6).
+export const larkspurV2Attributes = ProductAttributes.parse({
+  ...larkspurAttributes,
+  exclusion_screens: [
+    {
+      exclusion: "fossil_fuels",
+      backed_by_ppm: true,
+      citation: ppm(1, "3.6 The Fund excludes companies that derive revenue from fossil fuels."),
+    },
+  ],
+});

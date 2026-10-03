@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { buildPack } from "../pack/build";
+import { buildPack, LARKSPUR_V1 } from "../pack/build";
+import { LARKSPUR_V2 } from "../pack/source-v2";
 import { GroundTruth, PackManifest, PersonaSet } from "../src";
 
 const publicDir = new URL("../../frontend/public/", import.meta.url);
@@ -73,5 +74,38 @@ describe("the personas", () => {
 
   it("enter a case under pseudonymous ids only", () => {
     expect(personas.personas.map((p) => p.profile.client_id)).toEqual(["persona-chan", "persona-lee", "persona-wong"]);
+  });
+});
+
+describe("Larkspur v2, the revised pack", () => {
+  it("is exactly what the generator renders", async () => {
+    const v2 = await buildPack(LARKSPUR_V2);
+    for (const { filename, bytes } of v2.pdfs) {
+      expect(Buffer.from(bytes).equals(read(`pack/v2/${filename}`)), `pack/v2/${filename} is stale: run pack:generate`).toBe(true);
+    }
+    expect(PackManifest.parse(readJson("pack/v2/manifest.json"))).toEqual(v2.manifest);
+    expect(GroundTruth.parse(readJson("eval/v2/ground-truth.json"))).toEqual(v2.groundTruth);
+    expect(PersonaSet.parse(readJson("eval/v2/personas.json"))).toEqual(v2.personas);
+  });
+
+  it("keeps v1's document ids, so ingesting it replaces each v1 document, under new filenames", () => {
+    expect(LARKSPUR_V2.documents.map((d) => d.document_id)).toEqual(LARKSPUR_V1.documents.map((d) => d.document_id));
+    expect(LARKSPUR_V2.documents.every((d) => d.filename.endsWith("-v2.pdf"))).toBe(true);
+  });
+
+  it("changes only the factsheet's date and fee, and adds the PPM's fossil fuel exclusion", () => {
+    const lines = (source: typeof LARKSPUR_V1) => source.documents.flatMap((d) => d.pages.flat().map((l) => `${d.document_id}: ${l}`));
+    const before = new Set(lines(LARKSPUR_V1));
+    const after = new Set(lines(LARKSPUR_V2));
+    expect([...after].filter((l) => !before.has(l))).toEqual([
+      "factsheet: Factsheet - Share class A (USD) - 31 October 2026",
+      "factsheet: Annual management fee: 1.25% per annum",
+      "ppm: 3.6 The Fund excludes companies that derive revenue from fossil fuels.",
+    ]);
+  });
+
+  it("no longer plants the two findings the revision resolves", () => {
+    const ids = (source: typeof LARKSPUR_V1) => source.groundTruth.map((e) => e.id);
+    expect(ids(LARKSPUR_V1).filter((id) => !ids(LARKSPUR_V2).includes(id))).toEqual(["fees-management-fee", "strategy-fossil-fuel-screen"]);
   });
 });

@@ -13,7 +13,7 @@ import {
   undismissedFindings,
 } from "../src";
 import recorded from "../fixtures/case-recorded.json";
-import { larkspurAttributes } from "./larkspur";
+import { larkspurAttributes, larkspurV2Attributes } from "./larkspur";
 
 const evalDir = new URL("../../frontend/public/eval/", import.meta.url);
 const readJson = (name: string): unknown => JSON.parse(readFileSync(fileURLToPath(new URL(name, evalDir)), "utf8"));
@@ -140,5 +140,34 @@ describe("what S6 discloses from", () => {
 
     expect(undismissedFindings(fold(events)).map((f) => f.finding_id)).toEqual(board.map((f) => f.finding_id));
     expect(undismissedFindings(fold(withDismissal)).map((f) => f.finding_id)).not.toContain(dismissed);
+  });
+});
+
+describe("the personas on Larkspur v2", () => {
+  const v2 = PersonaSet.parse(readJson("v2/personas.json")).personas;
+  const v2Truth = GroundTruth.parse(readJson("v2/ground-truth.json"));
+  const v2Findings: Finding[] = v2Truth.entries.map((e) => ({
+    finding_id: e.id,
+    category: e.category,
+    kind: e.kind,
+    severity: "medium",
+    claim: e.summary,
+    citation: e.citation,
+    counterpart: e.counterpart,
+  }));
+
+  it.each(v2.map((p) => [p.name, p] as const))("%s gets the expected verdict, reasons and disclosures", (_, p) => {
+    const assessment = assessSuitability(p.profile, larkspurV2Attributes, v2Findings);
+
+    expect(assessment.verdict).toBe(p.expected_verdict);
+    expect(ruleAndEffect(assessment.reasons)).toEqual(ruleAndEffect(p.expected_reasons));
+    expect(assessment.disclosures.map((d) => d.finding_id).sort()).toEqual([...p.expected_disclosures].sort());
+  });
+
+  it("Mr Lee is suitable once the PPM backs the screen, citing the PPM", () => {
+    const lee = v2.find((p) => p.profile.client_id === "persona-lee")!.profile;
+    const s5 = assessSuitability(lee, larkspurV2Attributes, v2Findings).reasons.find((r) => r.rule === "S5");
+
+    expect(s5).toMatchObject({ effect: "meets", citation: { document_id: "ppm", quote: "3.6 The Fund excludes companies that derive revenue from fossil fuels." } });
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   activeAdvice,
   Advice,
+  adviceToRedraft,
   explanationFor,
   approvedAdviceFor,
   ClientProfile,
@@ -194,5 +195,43 @@ describe("explanationFor", () => {
 
     expect(explanationFor(later, ADVICE_ID)?.depths.novice.summary).toBe("Second.");
     expect(explanationFor(later, "00000000-0000-4000-8000-0000000000bb")).toBeNull();
+  });
+});
+
+describe("re-ingesting a document", () => {
+  it("replaces the earlier version in place; the earlier stays in the log", () => {
+    const factsheet = events.find((e) => e.type === "document.ingested")!;
+    const revised = SlimEvent.parse({
+      ...factsheet,
+      seq: events.length + 1,
+      event_id: "00000000-0000-4000-8000-0000000000cc",
+      payload: { ...factsheet.payload, sha256: "c".repeat(64), filename: "larkspur-factsheet-v2.pdf" },
+    });
+    const state = fold([...events, revised]);
+
+    expect(state.documents.map((d) => d.documentId)).toEqual(["factsheet", "ppm", "deck", "fee-table"]);
+    expect(state.documents[0]).toMatchObject({ filename: "larkspur-factsheet-v2.pdf", ingestedAtSeq: events.length + 1 });
+  });
+});
+
+describe("adviceToRedraft", () => {
+  it("lists a client whose advice was superseded and not redrafted, with why", () => {
+    const profiledAt = events.length + 1;
+    const superseded = fold(after(
+      { type: "client.profiled", payload: chan },
+      { type: "advice.drafted", payload: draft(profiledAt), event_id: ADVICE_ID },
+      { type: "advice.superseded", payload: { advice_id: ADVICE_ID, cause: "product_changed" } },
+    ));
+    expect(adviceToRedraft(superseded)).toEqual([
+      { clientId: "persona-chan", cause: "product_changed", supersededAtSeq: events.length + 3 },
+    ]);
+
+    const redrafted = fold(after(
+      { type: "client.profiled", payload: chan },
+      { type: "advice.drafted", payload: draft(profiledAt), event_id: ADVICE_ID },
+      { type: "advice.superseded", payload: { advice_id: ADVICE_ID, cause: "product_changed" } },
+      { type: "advice.drafted", payload: draft(profiledAt), event_id: "00000000-0000-4000-8000-0000000000ab" },
+    ));
+    expect(adviceToRedraft(redrafted)).toEqual([]);
   });
 });

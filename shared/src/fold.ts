@@ -27,21 +27,24 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
     case "case.opened":
       return { ...next, caseId: event.case_id, openedAt: event.at };
     case "document.ingested": {
+      // A document ingested again under the same id is a new version of it (a product update, #37): it
+      // replaces the earlier one in place, and every later step reads it. The earlier stays in the log.
       const p = event.payload;
+      const document = {
+        documentId: p.document_id,
+        sha256: p.sha256,
+        filename: p.filename,
+        kind: p.kind,
+        pageCount: p.page_count,
+        pdfjsVersion: p.pdfjs_version,
+        ingestedAtSeq: event.seq,
+      };
+      const replaced = state.documents.some((d) => d.documentId === p.document_id);
       return {
         ...next,
-        documents: [
-          ...state.documents,
-          {
-            documentId: p.document_id,
-            sha256: p.sha256,
-            filename: p.filename,
-            kind: p.kind,
-            pageCount: p.page_count,
-            pdfjsVersion: p.pdfjs_version,
-            ingestedAtSeq: event.seq,
-          },
-        ],
+        documents: replaced
+          ? state.documents.map((d) => (d.documentId === p.document_id ? document : d))
+          : [...state.documents, document],
       };
     }
     case "step.started": {

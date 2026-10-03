@@ -1,8 +1,18 @@
 import { createHash } from "node:crypto";
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
-import { GroundTruth, type PackCitation, PackManifest, PDFJS_VERSION, PersonaSet } from "../src";
+import { GroundTruth, type GroundTruthEntry, type PackCitation, PackManifest, PDFJS_VERSION, type Persona, PersonaSet } from "../src";
 import { PERSONAS } from "./personas";
 import { DOCUMENTS, FOOTER, GROUND_TRUTH, ISSUER, PACK_ID, PRODUCT, type SourceDocument } from "./source";
+
+// One fabricated pack as authored: its documents and its two answer keys.
+export type PackSource = {
+  packId: string;
+  documents: SourceDocument[];
+  groundTruth: GroundTruthEntry[];
+  personas: Persona[];
+};
+
+export const LARKSPUR_V1: PackSource = { packId: PACK_ID, documents: DOCUMENTS, groundTruth: GROUND_TRUTH, personas: PERSONAS };
 
 export type BuiltPack = {
   pdfs: { filename: string; bytes: Uint8Array }[];
@@ -23,61 +33,61 @@ const STYLES = {
   landscape: { title: 30, heading: 22, body: 18, footer: 8 },
 };
 
-export async function buildPack(): Promise<BuiltPack> {
-  checkGroundTruth();
+export async function buildPack(source: PackSource = LARKSPUR_V1): Promise<BuiltPack> {
+  checkGroundTruth(source);
 
   const pdfs = [];
   const documents = [];
-  for (const source of DOCUMENTS) {
-    const bytes = await renderDocument(source);
-    pdfs.push({ filename: source.filename, bytes });
+  for (const document of source.documents) {
+    const bytes = await renderDocument(document, source.groundTruth);
+    pdfs.push({ filename: document.filename, bytes });
     documents.push({
-      document_id: source.document_id,
-      kind: source.kind,
-      filename: source.filename,
+      document_id: document.document_id,
+      kind: document.kind,
+      filename: document.filename,
       sha256: createHash("sha256").update(bytes).digest("hex"),
-      page_count: source.pages.length,
+      page_count: document.pages.length,
     });
   }
 
   return {
     pdfs,
     manifest: PackManifest.parse({
-      pack_id: PACK_ID,
+      pack_id: source.packId,
       product: PRODUCT,
       issuer: ISSUER,
       pdfjs_version: PDFJS_VERSION,
       documents,
     }),
-    groundTruth: GroundTruth.parse({ pack_id: PACK_ID, entries: GROUND_TRUTH }),
-    personas: PersonaSet.parse({ pack_id: PACK_ID, personas: PERSONAS }),
+    groundTruth: GroundTruth.parse({ pack_id: source.packId, entries: source.groundTruth }),
+    personas: PersonaSet.parse({ pack_id: source.packId, personas: source.personas }),
   };
 }
 
 // Every cited quote must be a whole body line on the cited page of the cited document.
-function checkGroundTruth(): void {
-  const citations = GROUND_TRUTH.flatMap((e) => (e.counterpart ? [e.citation, e.counterpart] : [e.citation]));
+function checkGroundTruth(source: PackSource): void {
+  const citations = source.groundTruth.flatMap((e) => (e.counterpart ? [e.citation, e.counterpart] : [e.citation]));
   for (const c of citations) {
-    if (!bodyLines(c.document_id, c.page).includes(c.quote)) {
+    if (!bodyLines(source.documents, c.document_id, c.page).includes(c.quote)) {
       throw new Error(`ground truth quote not found as a line on ${c.document_id} p${c.page}: "${c.quote}"`);
     }
   }
 }
 
-function bodyLines(documentId: string, page: number): string[] {
-  const source = DOCUMENTS.find((d) => d.document_id === documentId);
+function bodyLines(documents: SourceDocument[], documentId: string, page: number): string[] {
+  const source = documents.find((d) => d.document_id === documentId);
   return (source?.pages[page - 1] ?? []).filter((line) => !line.startsWith("#"));
 }
 
-function isQuoted(documentId: string, page: number, line: string): boolean {
-  return GROUND_TRUTH.some((e) =>
+function isQuoted(groundTruth: GroundTruthEntry[], documentId: string, page: number, line: string): boolean {
+  return groundTruth.some((e) =>
     [e.citation, e.counterpart].some(
       (c: PackCitation | null) => c?.document_id === documentId && c.page === page && c.quote === line,
     ),
   );
 }
 
-async function renderDocument(source: SourceDocument): Promise<Uint8Array> {
+async function renderDocument(source: SourceDocument, groundTruth: GroundTruthEntry[]): Promise<Uint8Array> {
   const pdf = await PDFDocument.create({ updateMetadata: false });
   pdf.setTitle(source.title);
   pdf.setAuthor(ISSUER);
@@ -109,7 +119,7 @@ async function renderDocument(source: SourceDocument): Promise<Uint8Array> {
           : [raw, fonts.regular, style.body, 0];
 
       const wrapped = wrap(text, font, fontSize, width);
-      if (wrapped.length > 1 && isQuoted(source.document_id, pageNumber, raw)) {
+      if (wrapped.length > 1 && isQuoted(groundTruth, source.document_id, pageNumber, raw)) {
         throw new Error(`quoted line would wrap on ${source.document_id} p${pageNumber}: "${raw}"`);
       }
 

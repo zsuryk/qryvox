@@ -11,7 +11,8 @@
       "default": "./dist/index.js"
     },
     "./case-recorded.json": "./fixtures/case-recorded.json",
-    "./pack-source": "./pack/source.ts"
+    "./pack-source": "./pack/source.ts",
+    "./pack-source-v2": "./pack/source-v2.ts"
   },
   "scripts": {
     "pack:generate": "tsx scripts/generate-pack.ts",

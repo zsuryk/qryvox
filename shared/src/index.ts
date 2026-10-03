@@ -72,6 +72,7 @@ export { fold, FoldError } from "./fold.js";
 export { type Assessment, assessSuitability } from "./suitability.js";
 export {
   activeAdvice,
+  adviceToRedraft,
   activeFindings,
   approvedAdviceFor,
   type CaseAdvice,

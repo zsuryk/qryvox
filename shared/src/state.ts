@@ -124,3 +124,14 @@ export function approvedAdviceFor(state: CaseState, clientId: string): CaseAdvic
 export function undismissedFindings(state: CaseState): CaseFinding[] {
   return activeFindings(state).filter((f) => dispositionOf(state, f.finding_id)?.disposition !== "dismissed");
 }
+
+// Clients whose advice was superseded and not yet redrafted, with why: what the adviser console lists as
+// needing a new draft (#37). A client with advice in play is not listed.
+export function adviceToRedraft(state: CaseState): { clientId: string; cause: SupersedeCause; supersededAtSeq: number }[] {
+  return state.clients.flatMap((client) => {
+    const theirs = state.advice.filter((a) => a.client_id === client.clientId);
+    if (theirs.length === 0 || theirs.some((a) => a.supersededAtSeq === null)) return [];
+    const last = theirs.at(-1)!;
+    return [{ clientId: client.clientId, cause: last.supersededBecause!, supersededAtSeq: last.supersededAtSeq! }];
+  });
+}
