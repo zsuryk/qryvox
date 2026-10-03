@@ -25,6 +25,8 @@ export const STEP_LABELS: Record<StepName, string> = {
   decompose: "Decompose into claims",
   contradictions: "Cross-check claims",
   findings: "Raise findings",
+  // Not in PIPELINE_STEPS: run for advice, after the board (#29, #31).
+  attributes: "Read product facts",
 };
 
 // pending is the fold's "no run for this step", kept as its own word so the panel can say a step has not
@@ -201,7 +203,8 @@ async function advance(deps: PipelineDeps, from: StepName | null, fresh: boolean
 // run's id: the retry restarts the run rather than starting a second one beside it (spec decision 25).
 function plan(runs: readonly StepRun[], from: StepName, fresh: boolean, newRunId: RunIdSource): RunStepRequest[] {
   const calls: RunStepRequest[] = [];
-  const start = PIPELINE_STEPS.indexOf(from);
+  // StepName also names steps outside this chain (attributes, #29); none of them is ever a resume point.
+  const start = (PIPELINE_STEPS as readonly StepName[]).indexOf(from);
   // The run the previous step of this advance ran under, as named above it.
   let previousRunId: string | null = null;
 
