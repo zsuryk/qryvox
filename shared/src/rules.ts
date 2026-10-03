@@ -66,7 +66,7 @@ export const RULES = [
   {
     id: "S3",
     group: "suitability",
-    title: "Income may come from capital",
+    title: "Where the income comes from",
     text: "A client who relies on the income is warned when distributions may be paid out of capital.",
   },
   {
