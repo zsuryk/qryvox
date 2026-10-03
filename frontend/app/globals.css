@@ -1231,7 +1231,6 @@ details[open] > summary::before {
   height: 100%;
   overflow: hidden;
   padding: 0.875rem 0.875rem 0.75rem;
-  user-select: text;
 }
 .canvas-card--pinned {
   box-shadow: 0 0 0 1.5px var(--tint), var(--shadow-1);
@@ -1326,5 +1325,146 @@ details[open] > summary::before {
   .canvas-item__body {
     animation: fade-in 200ms ease both;
     animation-delay: 0ms;
+  }
+}
+
+/* --- Moving cards, and the discard bin ------------------------------------------------------------ */
+
+.canvas-item--movable .canvas-card {
+  cursor: grab;
+}
+/* A card in the hand: above everything, off the page a little, following the pointer with no lag. */
+.canvas-item--lifted {
+  transition: none;
+  z-index: 3;
+}
+.canvas-item--lifted .canvas-card {
+  box-shadow: var(--shadow-2);
+  cursor: grabbing;
+}
+.canvas[data-dragging="true"] {
+  cursor: grabbing;
+}
+.canvas-card button,
+.canvas-card a {
+  cursor: pointer;
+}
+.canvas-card button:disabled {
+  cursor: default;
+}
+
+/* The bin floats in its corner like the zoom controls, the same light material. While a card is in the
+   hand it says it can take it, and grows toward the card held over it. */
+.canvas-bin {
+  -webkit-backdrop-filter: var(--material-blur);
+  backdrop-filter: var(--material-blur);
+  -webkit-tap-highlight-color: transparent;
+  align-items: center;
+  background: var(--material);
+  border: 0;
+  border-radius: 999px;
+  bottom: 0.75rem;
+  box-shadow: var(--shadow-2), inset 0 0 0 0.5px var(--separator);
+  color: var(--label);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  gap: 0.4375rem;
+  left: 0.75rem;
+  padding: 0.4375rem 0.875rem 0.4375rem 0.75rem;
+  position: absolute;
+  transition:
+    transform var(--dur-ui) var(--ease-settle),
+    background-color var(--dur-ui) var(--ease-settle),
+    box-shadow var(--dur-ui) var(--ease-settle);
+  z-index: 5;
+}
+.canvas-bin:active {
+  transform: scale(0.97);
+}
+.canvas-bin__icon {
+  color: var(--label-2);
+  display: inline-flex;
+}
+.canvas-bin__count {
+  background: var(--fill);
+  border-radius: 999px;
+  color: var(--label-2);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.375rem;
+  padding: 0.0625rem 0.375rem;
+  text-align: center;
+}
+.canvas-bin--armed {
+  box-shadow: var(--shadow-2), inset 0 0 0 1.5px var(--negative);
+}
+.canvas-bin--over {
+  background: var(--negative-fill);
+  color: var(--negative);
+  transform: scale(1.08);
+}
+.canvas-bin--over .canvas-bin__icon {
+  color: var(--negative);
+}
+/* What is in the bin, rising from the bin it belongs to. */
+.canvas-tray {
+  -webkit-backdrop-filter: var(--material-blur);
+  backdrop-filter: var(--material-blur);
+  --origin: bottom left;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-radius: var(--radius-m);
+  bottom: 3.5rem;
+  box-shadow: var(--shadow-2), inset 0 0 0 0.5px var(--separator);
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  left: 0.75rem;
+  max-height: calc(100% - 5rem);
+  overflow: auto;
+  padding: 0.75rem 0.875rem;
+  position: absolute;
+  user-select: text;
+  width: min(22rem, calc(100% - 1.5rem));
+  z-index: 6;
+}
+.canvas-tray__list {
+  display: flex;
+  flex-direction: column;
+}
+.canvas-tray__row {
+  align-items: center;
+  border-top: 0.5px solid var(--separator);
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+.canvas-tray__row:first-child {
+  border-top: 0;
+}
+.canvas-tray__what {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.canvas-tray__text {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  display: -webkit-box;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .canvas-bin,
+  .canvas-bin:active,
+  .canvas-bin--over {
+    transform: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .canvas-bin,
+  .canvas-tray {
+    outline: 1px solid var(--separator);
   }
 }

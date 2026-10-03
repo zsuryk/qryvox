@@ -86,6 +86,8 @@ export function describe(event: SlimEvent): string {
       return "Card taken out of the plan";
     case "card.pinned":
       return "Card pinned";
+    case "card.unpinned":
+      return "Card unpinned, back into the flow";
     case "card.discarded":
       return "Card discarded";
     case "card.restored":

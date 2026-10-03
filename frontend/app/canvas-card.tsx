@@ -13,21 +13,23 @@ import type { CardCitation, CardModel } from "../lib/canvas-cards";
 
 const SEVERITY_TONE: Record<Severity, string> = { high: "badge--negative", medium: "badge--caution", low: "" };
 
-export type CardState = { docked: boolean; pinned: boolean; discarded: boolean };
-
 export type CardActions = {
   dock: (cardId: CardId) => void;
   undock: (cardId: CardId) => void;
   pin: (cardId: CardId) => void;
+  unpin: (cardId: CardId) => void;
   discard: (cardId: CardId) => void;
   restore: (cardId: CardId) => void;
   openCitation: (citation: CardCitation, label: string) => void;
   reveal: (cardId: CardId) => void;
 };
 
+// Flat flags rather than one object, so a card whose state has not changed is never re-rendered.
 export type CardProps = {
   model: CardModel;
-  state: CardState;
+  docked: boolean;
+  pinned: boolean;
+  discarded: boolean;
   // Why card operations cannot be recorded here, or null when they can.
   readOnly: string | null;
   // Why this card cannot be docked by its button, or null when it can.
@@ -35,7 +37,8 @@ export type CardProps = {
   actions: CardActions;
 };
 
-export const Card = memo(function Card({ model, state, readOnly, undockable, actions }: CardProps) {
+export const Card = memo(function Card({ model, docked, pinned, discarded, readOnly, undockable, actions }: CardProps) {
+  const state = { docked, pinned, discarded };
   const label = model.kind === "finding" ? `Finding: ${model.title}` : `Excerpt from ${model.documentName}, page ${model.page}`;
   return (
     <article className={`card canvas-card${state.pinned ? " canvas-card--pinned" : ""}`} aria-label={label}>
@@ -109,7 +112,7 @@ function ActionRow({
   actions,
 }: {
   cardId: CardId;
-  state: CardState;
+  state: { docked: boolean; pinned: boolean; discarded: boolean };
   readOnly: string | null;
   undockable: string | null;
   actions: CardActions;
@@ -135,12 +138,11 @@ function ActionRow({
       <button
         type="button"
         className="btn btn--small"
-        aria-pressed={state.pinned}
-        disabled={off || state.pinned || state.docked}
-        title={readOnly ?? (state.pinned ? "Pinned where it is" : "Hold it where it is; the flow goes around it")}
-        onClick={() => actions.pin(cardId)}
+        disabled={off || state.docked || state.discarded}
+        title={readOnly ?? (state.pinned ? "Let it go back into the flow" : "Hold it where it is; the flow goes around it")}
+        onClick={() => (state.pinned ? actions.unpin(cardId) : actions.pin(cardId))}
       >
-        {state.pinned ? "Pinned" : "Pin"}
+        {state.pinned ? "Unpin" : "Pin"}
       </button>
       {state.discarded ? (
         <button type="button" className="btn btn--small" disabled={off} title={readOnly ?? "Bring it back"} onClick={() => actions.restore(cardId)}>

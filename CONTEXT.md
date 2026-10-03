@@ -169,10 +169,12 @@ group (`plan_slot`) on the event that docked it (`planGroups`).
 (the field keeps its name): the docked set, pinned positions, the discard bin and the find-similar history.
 Latest decision per card wins; the log keeps every one.
 
-**Dock / pin / discard / restore / find similar** — the card operations, each an event the analyst makes
-(`card.docked`, `card.undocked`, `card.pinned`, `card.discarded`, `card.restored`,
-`card.similar_requested`), like a disposition and unlike a step. *Dock* puts a card in the plan region;
-*pin* holds it at a world position that auto-tiling flows around; *discard* rejects it to the discard bin,
+**Dock / pin / unpin / discard / restore / find similar** — the card operations, each an event the analyst
+makes (`card.docked`, `card.undocked`, `card.pinned`, `card.unpinned`, `card.discarded`, `card.restored`,
+`card.similar_requested`), like a disposition and unlike a step. Each is a drag on the canvas and a button on
+the card. *Dock* puts a card in the plan region;
+*pin* holds it at a world position that auto-tiling flows around, and *unpin* lets it back into the flow;
+*discard* rejects it to the **discard bin** (the corner of the canvas a card is thrown to, and restored from),
 and takes it out of the plan region; *restore*, or docking it again, brings it back; *find similar* asks
 for a seeded re-run of the step that produced it.
 *Discard* is not *dismissed*: discarding a finding card neither dismisses nor supersedes the finding.

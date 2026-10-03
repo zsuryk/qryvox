@@ -1,8 +1,9 @@
 "use client";
 
 import { type KeyboardEvent, type PointerEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CardId, SlimEvent } from "@qryvox/shared";
+import type { CardId, SlimEvent, WorldPos } from "@qryvox/shared";
 import { type CardCitation, cardModel, naturalSlot } from "../lib/canvas-cards";
+import { type DropTarget, resolveDrop } from "../lib/canvas-drop";
 import { canvasLayout } from "../lib/canvas-layout";
 import { type CanvasMode, type CanvasView as View, canvasView } from "../lib/canvas-source";
 import { appendOp, type CardOp, operations } from "../lib/canvas-store";
@@ -18,6 +19,7 @@ import {
   type Point,
   type Rect,
   type Size,
+  toWorld,
   type Viewport,
   visibleWorld,
   wheelFactor,
@@ -80,12 +82,27 @@ type CanvasProps = {
 function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
   const layout = useMemo(() => canvasLayout(view), [view]);
   const frame = useRef<HTMLDivElement | null>(null);
+  const bin = useRef<HTMLButtonElement | null>(null);
   const { viewport, ready, fit, zoom, reset, reveal, gestures } = useViewport(frame, layout.bounds);
   const [sheet, setSheet] = useState<{ citation: CardCitation; label: string } | null>(null);
+  const [trayOpen, setTrayOpen] = useState(false);
   const hint = "canvas-hint";
   const board = view.state.board;
-  const pinned = layout.flow.filter((p) => p.pinned).length;
+  const pinnedCount = layout.flow.filter((p) => p.pinned).length;
   const models = useMemo(() => new Map(view.cards.map((card) => [card.cardId, cardModel(card, view.state)])), [view]);
+  const discarded = board.discarded.flatMap((d) => models.get(d.cardId) ?? []);
+
+  // What the last operation came to, in words, for everyone: a drop that did nothing says why.
+  const [said, setSaid] = useState<string | null>(null);
+  const quiet = useRef<number | null>(null);
+  const say = useCallback((words: string) => {
+    if (quiet.current !== null) window.clearTimeout(quiet.current);
+    setSaid(words);
+    quiet.current = window.setTimeout(() => setSaid(null), 5000);
+  }, []);
+  useEffect(() => () => {
+    if (quiet.current !== null) window.clearTimeout(quiet.current);
+  }, []);
 
   // The cards' actions read the latest layout through a ref, so they keep one identity across renders and
   // a pan, which re-renders the canvas every frame, never re-renders a card.
@@ -95,6 +112,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
   }, [view, layout]);
   const actions = useMemo((): CardActions => {
     const cardOf = (id: CardId) => latest.current.view.cards.find((c) => c.cardId === id);
+    const rectOf = (id: CardId) => latest.current.layout.flow.find((p) => p.card.cardId === id)?.rect;
     return {
       dock(id) {
         const card = cardOf(id);
@@ -104,34 +122,104 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
       undock: (id) => dispatch({ type: "card.undocked", payload: { card_id: id } }),
       // Pinned where it stands: the button is the keyboard's way to do what dropping the card does.
       pin(id) {
-        const rect = latest.current.layout.flow.find((p) => p.card.cardId === id)?.rect;
-        if (rect) dispatch({ type: "card.pinned", payload: { card_id: id, world_pos: { x: rect.x, y: rect.y } } });
+        const rect = rectOf(id);
+        if (!rect) return;
+        dispatch({ type: "card.pinned", payload: { card_id: id, world_pos: { x: rect.x, y: rect.y } } });
+        say("Pinned where it is. The other cards flow around it.");
       },
-      discard: (id) => dispatch({ type: "card.discarded", payload: { card_id: id } }),
-      restore: (id) => dispatch({ type: "card.restored", payload: { card_id: id } }),
+      unpin(id) {
+        dispatch({ type: "card.unpinned", payload: { card_id: id } });
+        say("Unpinned. It is back in the flow.");
+      },
+      discard(id) {
+        dispatch({ type: "card.discarded", payload: { card_id: id } });
+        say("Discarded. It is in the bin, and can be restored.");
+      },
+      restore(id) {
+        dispatch({ type: "card.restored", payload: { card_id: id } });
+        say("Restored to the canvas.");
+      },
       openCitation: (citation, label) => setSheet({ citation, label }),
       reveal(id) {
-        const rect = latest.current.layout.flow.find((p) => p.card.cardId === id)?.rect;
+        const rect = rectOf(id);
         if (rect) reveal(rect);
       },
     };
-  }, [dispatch, reveal]);
+  }, [dispatch, reveal, say]);
+
+  // Dragging a card. It follows the pointer 1:1 from where it was grabbed, in world units, lifted above
+  // the rest; let go, and the drop is decided by lib/canvas-drop.ts: the bin discards it, open canvas pins
+  // it there, and anything else sends it back to where it came from, on the same curve it would have
+  // settled on. A press only becomes a drag after a few pixels, so a click on a card is still a click.
+  const [drag, setDrag] = useState<{ id: CardId; at: WorldPos; over: DropTarget["kind"] } | null>(null);
+  const press = useRef<{ id: CardId; pointer: number; start: Point; grab: Point; moving: boolean } | null>(null);
+  const local = (event: PointerEvent) => {
+    const box = frame.current!.getBoundingClientRect();
+    return toWorld(viewport, { x: event.clientX - box.left, y: event.clientY - box.top });
+  };
+  const over = (event: PointerEvent): DropTarget["kind"] => {
+    const inside = (el: Element | null) => {
+      const box = el?.getBoundingClientRect();
+      return !!box && event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
+    };
+    return inside(bin.current) ? "bin" : inside(frame.current) ? "canvas" : "outside";
+  };
+  const cardGesture = (id: CardId, rect: Rect) => ({
+    onPointerDown(event: PointerEvent<HTMLDivElement>) {
+      // A card is a thing of its own: pressing it never pans the background behind it.
+      event.stopPropagation();
+      if (readOnly !== null || event.button !== 0 || (event.target as Element).closest("button, a")) return;
+      // Grabbed while still settling: it is picked up from where it is on screen, not from its slot.
+      const shown = presented(event.currentTarget) ?? rect;
+      const at = local(event);
+      press.current = { id, pointer: event.pointerId, start: { x: event.clientX, y: event.clientY }, grab: { x: at.x - shown.x, y: at.y - shown.y }, moving: false };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    onPointerMove(event: PointerEvent<HTMLDivElement>) {
+      const p = press.current;
+      if (!p || p.pointer !== event.pointerId) return;
+      if (!p.moving && Math.hypot(event.clientX - p.start.x, event.clientY - p.start.y) < 6) return;
+      p.moving = true;
+      const at = local(event);
+      setDrag({ id, at: { x: at.x - p.grab.x, y: at.y - p.grab.y }, over: over(event) });
+    },
+    onPointerUp() {
+      const p = press.current;
+      press.current = null;
+      if (!p || !p.moving || !drag) return setDrag(null);
+      const target: DropTarget = drag.over === "canvas" ? { kind: "canvas", at: drag.at } : { kind: drag.over };
+      const outcome = resolveDrop(id, target, {
+        pinned: layout.flow.filter((placed) => placed.pinned).map((placed) => ({ cardId: placed.card.cardId, rect: placed.rect })),
+        obstacles: [],
+        discarded: false,
+      });
+      setDrag(null);
+      if ("ops" in outcome) {
+        for (const op of outcome.ops) dispatch(op);
+        say(outcome.said);
+      } else say(outcome.returned);
+    },
+    onPointerCancel() {
+      press.current = null;
+      setDrag(null);
+    },
+  });
 
   return (
     <section className="section canvas-section" aria-label="Canvas">
       <div className="row spread canvas-summary">
-        <p className="t-footnote muted" aria-live="polite">
+        <p className="t-footnote muted">
           {[
             counted(layout.flow.length, "card on the canvas", "cards on the canvas"),
-            pinned > 0 ? `${pinned} pinned` : null,
+            pinnedCount > 0 ? `${pinnedCount} pinned` : null,
             board.docked.length > 0 ? `${board.docked.length} docked to the plan` : null,
             board.discarded.length > 0 ? `${board.discarded.length} discarded` : null,
           ]
             .filter((part) => part !== null)
             .join(" · ")}
         </p>
-        <p className="t-footnote faint">
-          {readOnly ?? (mode.kind === "fixture" ? "Card operations stay in this tab: a reload starts the recorded case over." : null)}
+        <p className={`t-footnote ${said ? "" : "faint"}`} role="status">
+          {said ?? readOnly ?? (mode.kind === "fixture" ? "Card operations stay in this tab: a reload starts the recorded case over." : null)}
         </p>
       </div>
       <div
@@ -143,36 +231,98 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
         aria-roledescription="canvas"
         aria-label={mode.kind === "fixture" ? "Canvas of the recorded case" : "Canvas of this case"}
         aria-describedby={hint}
+        data-dragging={drag ? "true" : undefined}
         {...gestures}
       >
         <div className="canvas__world" style={{ transform: worldTransform(viewport) }}>
           {/* Nothing is dealt until the frame has a size and the world is fitted to it, so the cards
               arrive where they will stay instead of arriving and then jumping to fit. */}
           {ready &&
-            layout.flow.map(({ card, rect, pinned }, index) => (
-              <div
-                key={card.cardId}
-                className="canvas-item"
-                style={{ transform: placeAt(rect), width: rect.w, height: rect.h }}
-                // A card is a thing of its own: pressing it never pans the background behind it.
-                onPointerDown={(event) => event.stopPropagation()}
-                // Tabbing onto a card off screen brings it into view; a click on one already in view does not.
-                onFocus={(event) => event.target.matches(":focus-visible") && reveal(rect)}
-              >
-                {/* The spawn is on the card inside, so it never fights the slot's own transform: a card
-                    arrives in its slot, and later moves between slots, as two separate motions. */}
-                <div className="canvas-item__body" style={{ "--spawn-delay": `${Math.min(index, 10) * 35}ms` } as React.CSSProperties}>
-                  <Card
-                    model={models.get(card.cardId)!}
-                    state={{ docked: false, pinned, discarded: false }}
-                    readOnly={readOnly}
-                    undockable={naturalSlot(card, view.state) ? null : "No finding cites this passage, so it has no place in the plan"}
-                    actions={actions}
-                  />
+            layout.flow.map(({ card, rect, pinned }, index) => {
+              const lifted = drag?.id === card.cardId;
+              return (
+                <div
+                  key={card.cardId}
+                  className={`canvas-item${lifted ? " canvas-item--lifted" : ""}${readOnly === null ? " canvas-item--movable" : ""}`}
+                  style={{ transform: placeAt(lifted ? drag.at : rect), width: rect.w, height: rect.h }}
+                  // Tabbing onto a card off screen brings it into view; a click on one already in view does not.
+                  onFocus={(event) => event.target.matches(":focus-visible") && reveal(rect)}
+                  {...cardGesture(card.cardId, rect)}
+                >
+                  {/* The spawn is on the card inside, so it never fights the slot's own transform: a card
+                      arrives in its slot, and later moves between slots, as two separate motions. */}
+                  <div className="canvas-item__body" style={{ "--spawn-delay": `${Math.min(index, 10) * 35}ms` } as React.CSSProperties}>
+                    <Card
+                      model={models.get(card.cardId)!}
+                      docked={false}
+                      pinned={pinned}
+                      discarded={false}
+                      readOnly={readOnly}
+                      undockable={naturalSlot(card, view.state) ? null : NO_SLOT}
+                      actions={actions}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
+
+        {/* The discard bin: always in the same corner whatever the pan, so a card can always be thrown
+            to it. Pressing it opens what is in it, to restore from. */}
+        <button
+          ref={bin}
+          type="button"
+          className={`canvas-bin${drag ? " canvas-bin--armed" : ""}${drag?.over === "bin" ? " canvas-bin--over" : ""}`}
+          aria-expanded={trayOpen}
+          aria-controls="canvas-tray"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => setTrayOpen((open) => !open)}
+        >
+          <span aria-hidden className="canvas-bin__icon">
+            <BinIcon />
+          </span>
+          Discarded
+          <span className="canvas-bin__count">{board.discarded.length}</span>
+        </button>
+        {trayOpen && (
+          <div
+            id="canvas-tray"
+            role="region"
+            aria-label="Discard bin"
+            className="canvas-tray materialize"
+            onPointerDown={(event) => event.stopPropagation()}
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              setTrayOpen(false);
+              bin.current?.focus();
+            }}
+          >
+            <div className="row spread">
+              <p className="t-footnote strong">Discard bin</p>
+              <button type="button" className="btn btn--small btn--plain" onClick={() => setTrayOpen(false)}>
+                Done
+              </button>
+            </div>
+            {discarded.length === 0 ? (
+              <p className="t-caption muted">Nothing discarded. A card dropped here, or discarded by its button, waits here to be restored.</p>
+            ) : (
+              <ul className="list-plain canvas-tray__list">
+                {discarded.map((model) => (
+                  <li key={model.cardId} className="canvas-tray__row">
+                    <div className="canvas-tray__what">
+                      <p className="t-caption faint">{model.kind === "finding" ? `Finding · ${model.category}` : `Excerpt · ${model.documentKind ?? model.documentName}, page ${model.page}`}</p>
+                      <p className="t-footnote canvas-tray__text">{model.kind === "finding" ? model.title : model.quote}</p>
+                    </div>
+                    <button type="button" className="btn btn--small" disabled={readOnly !== null} title={readOnly ?? undefined} onClick={() => actions.restore(model.cardId)}>
+                      Restore
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="t-caption faint">Discarding rejects a card from the canvas. The finding it shows is untouched.</p>
+          </div>
+        )}
 
         <div className="canvas__toolbar" role="toolbar" aria-label="Zoom" onPointerDown={(event) => event.stopPropagation()}>
           <button type="button" className="btn btn--small" aria-label="Zoom out" onClick={() => zoom(1 / 1.25)}>
@@ -192,9 +342,29 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
       <p id={hint} className="t-caption faint canvas-hint">
         Drag the background to move around. Scroll to pan; hold ⌘ or Ctrl and scroll, or pinch, to zoom. With the canvas
         focused, the arrow keys pan, + and − zoom, 0 fits everything and 1 is actual size.
+        {readOnly === null && " Drag a card to pin it somewhere, or onto the bin to discard it; each card's buttons do the same."}
       </p>
       {sheet && <CitationSheet events={log} citation={sheet.citation.citation} label={sheet.label} onClose={() => setSheet(null)} />}
     </section>
+  );
+}
+
+const NO_SLOT = "No finding cites this passage, so it has no place in the plan";
+
+// Where a card is on screen right now, in world units: its slot's transform as the browser is drawing it,
+// which differs from the slot while it is still settling into it.
+function presented(el: HTMLElement): Point | null {
+  const transform = getComputedStyle(el).transform;
+  if (!transform || transform === "none") return null;
+  const m = new DOMMatrixReadOnly(transform);
+  return { x: m.m41, y: m.m42 };
+}
+
+function BinIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2.5 4h11M6.5 4V2.75h3V4M4 4l.75 9.25h6.5L12 4" />
+    </svg>
   );
 }
 
