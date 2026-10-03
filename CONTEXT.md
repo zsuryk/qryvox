@@ -159,6 +159,15 @@ and takes it out of the plan region; *restore*, or docking it again, brings it b
 for a seeded re-run of the step that produced it.
 *Discard* is not *dismissed*: discarding a finding card neither dismisses nor supersedes the finding.
 
+**Intent chip** — one thing the analyst wants to look at next on the canvas: a category, a document kind
+(authority) and a step, any of them left open (`IntentChip`, `intent.ts`). Chips are first-class: picked by
+hand, or read from the analyst's words by `parse`. A chip selects; it never decides anything.
+
+**Parse** (`step.parse`) — the step that reads the analyst's free-text intent into intent chips: one model
+call, driven by the browser and recorded as a step run like any other, with the words on the run
+(`intent`). Not part of the pipeline. A failed parse leaves the analyst's own chips standing and changes
+nothing else (`resolveIntent`). *Not* pdf.js parsing a document.
+
 ## Policy and advice (stage 2)
 
 **Rules** — the institution's own rules, versioned as one set (`rules@1`, now `rules@2`, which added S7) in two groups: **product rules**

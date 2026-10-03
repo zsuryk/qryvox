@@ -52,8 +52,9 @@ export const DocumentIngested = z.object({
 // The four analysis steps, driven by the browser in this order (ADR-0001), then the steps stage 2 adds:
 // compliance checks the documents against the product rules between contradictions and findings (#24);
 // attributes reads the documents for the facts suitability needs (#29); explain words one advice's
-// verdict at three depths (#30).
-export const StepName = z.enum(["extract", "decompose", "contradictions", "findings", "compliance", "attributes", "explain"]);
+// verdict at three depths (#30); parse reads the analyst's free-text intent for the canvas into intent
+// chips (#51, intent.ts), and is no part of the pipeline.
+export const StepName = z.enum(["extract", "decompose", "contradictions", "findings", "compliance", "attributes", "explain", "parse"]);
 export type StepName = z.infer<typeof StepName>;
 
 // Which prompt produced a step's output. The prompt text lives in the backend and never reaches the
@@ -66,6 +67,7 @@ export const PROMPT_VERSIONS = {
   compliance: "compliance@1",
   attributes: "attributes@1",
   explain: "explain@1",
+  parse: "parse@1",
 } as const satisfies Record<StepName, string>;
 
 const stepRun = {
@@ -74,6 +76,9 @@ const stepRun = {
   prompt_version: z.string().min(1),
   // The completed run whose output this run consumed; null for extract, which reads the documents.
   input_run_id: z.string().min(1).nullable(),
+  // A parse run's input: the analyst's words, recorded on the run so the log stays the step's only input
+  // (#51). Absent on every other step, and on every event written before it.
+  intent: z.string().min(1).optional(),
 };
 
 // Step events always carry the run's step_run_id in the envelope.

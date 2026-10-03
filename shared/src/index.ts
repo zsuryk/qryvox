@@ -90,6 +90,7 @@ export {
   StepStarted,
 } from "./events.js";
 export { explanationFor } from "./explanation.js";
+export { ChipStep, IntentChip, ParseInput, ParseOutput, type ResolvedIntent, resolveIntent } from "./intent.js";
 export { fold, FoldError } from "./fold.js";
 export { type Assessment, assessSuitability } from "./suitability.js";
 export {
