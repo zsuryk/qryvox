@@ -1062,3 +1062,67 @@ details[open] > summary::before {
   line-height: 1.05;
   margin: 0.25rem 0;
 }
+
+/* --- The replay scrubber -------------------------------------------------------------------------- */
+
+.scrubber {
+  cursor: pointer;
+  height: 2.75rem;
+  margin: 0 0.75rem;
+  position: relative;
+  touch-action: none;
+  user-select: none;
+}
+.scrubber__rail {
+  background: var(--fill-strong);
+  border-radius: 999px;
+  height: 0.25rem;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.scrubber__tick {
+  background: var(--label-3);
+  border-radius: 999px;
+  height: 0.5rem;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+}
+.scrubber__tick--step {
+  height: 0.75rem;
+}
+.scrubber__tick--finding {
+  background: var(--caution);
+  height: 1rem;
+}
+.scrubber__tick--decision {
+  background: var(--positive);
+  height: 1.25rem;
+}
+.scrubber__tick:not(.scrubber__tick--past) {
+  opacity: 0.35;
+}
+.scrubber__thumb {
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.18);
+  cursor: grab;
+  height: 1.75rem;
+  left: -0.875rem;
+  position: absolute;
+  top: 50%;
+  margin-top: -0.875rem;
+  will-change: transform;
+  width: 1.75rem;
+}
+.scrubber__thumb:active {
+  cursor: grabbing;
+}
+.scrubber__thumb:focus-visible {
+  outline-offset: 3px;
+  border-radius: 50%;
+}

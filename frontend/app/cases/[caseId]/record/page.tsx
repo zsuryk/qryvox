@@ -1,7 +1,8 @@
 import { fold } from "@qryvox/shared";
 import { fetchEvents, fetchVerify } from "../../../../lib/api";
+import Replay from "../../../replay";
 
-// Record: what the case was given and everything that happened to it, in order. The chain's latest hash
+// Record: the case replayed to any moment, what it was given, and everything that happened to it, in order. The chain's latest hash
 // anchors the lot: any edit to any event above it would change it (ADR-0002).
 export default async function RecordPage({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = await params;
@@ -10,6 +11,8 @@ export default async function RecordPage({ params }: { params: Promise<{ caseId:
 
   return (
     <>
+      <Replay events={events} />
+
       <section className="section" aria-labelledby="chain-heading">
         <div className="section-head">
           <h2 id="chain-heading" className="t-title">
