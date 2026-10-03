@@ -58,6 +58,7 @@ const REPLIES = {
     exit_charge_within_months: { value: 0, citation: ppm(3, "6.4 No redemption charge applies.") },
     derivatives_use: { value: "none", citation: ppm(1, "2.3 The Fund does not use derivatives.") },
     exclusion_screens: [],
+    primary_objective: { value: "preservation", citation: ppm(1, "2.1 The Fund aims to preserve capital and provide income over a period of at least one year.") },
     product_name: { value: "Wrenfield Short Duration Fund", citation: ppm(1, "Wrenfield Short Duration Fund - issued by Ashcombe Investment Partners Ltd") },
   },
 } satisfies Partial<Record<StepName, unknown>>;

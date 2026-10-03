@@ -56,7 +56,8 @@ describe("advice that points along the shelf", () => {
     expect(advice.alternatives).toHaveLength(1);
     const [alternative] = advice.alternatives!;
     expect(alternative).toMatchObject({ case_id: wrenfield, product_name: "Wrenfield Short Duration Fund", verdict: "suitable" });
-    expect(alternative!.reasons.map((r) => `${r.rule}:${r.effect}`)).toEqual(["S1:meets", "S2:meets", "S3:meets", "S4:meets"]);
+    expect(alternative!.reasons.map((r) => `${r.rule}:${r.effect}`)).toEqual(["S1:meets", "S2:meets", "S3:meets", "S4:meets", "S7:warns"]);
+    // Still offered: S7 tells her Wrenfield is built first to keep capital safe, while her goal is income.
     expect(alternative!.reasons[0]!.citation?.quote).toContain("at least one year");
     // Wrenfield's own fee finding is disclosed with it.
     expect(alternative!.disclosures.map((d) => d.citation.quote)).toEqual(["Annual management fee: 0.45% of net asset value"]);

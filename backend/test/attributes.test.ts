@@ -78,6 +78,12 @@ describe("the attributes step", () => {
     expect(error).not.toMatch(/min_holding_years/);
   });
 
+  it("requires the product's primary objective, cited (S7, rules@2)", async () => {
+    const out = ProductAttributes.parse(StepResult.parse(await (await run(REPLY)).json()).output);
+    expect(out.primary_objective?.value).toBe("income");
+    expect(await failure({ ...REPLY, primary_objective: undefined })).toMatch(/primary_objective \(not given/);
+  });
+
   it("reads the documents, so it takes no input run", async () => {
     expect((await run(REPLY, randomUUID())).status).toBe(409);
   });

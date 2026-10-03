@@ -11,7 +11,7 @@ import { StepPrecondition, type StepDefinition } from "./step.js";
 // fails only when an attribute the suitability rules need is missing, and says which.
 
 type AttributesInput = { documents: IngestedDocument[] };
-type ScalarKey = Exclude<keyof ProductAttributes, "exclusion_screens" | "product_name">;
+type ScalarKey = Exclude<keyof ProductAttributes, "exclusion_screens" | "product_name" | "primary_objective">;
 
 // Every scalar attribute: S1–S5 read all of them.
 const SCALARS = [
@@ -48,11 +48,12 @@ Facts:
 - redemption_notice_days: the notice in days a redemption request needs (0 if none).
 - exit_charge_within_months: the period in months within which a charge applies on redeeming (0 if there is no exit charge; then cite the passage that lists the charges).
 - derivatives_use: "none", "hedging" or "investment".
+- primary_objective: what the product is built mainly for, from the PPM's statement of its objective: "income", "growth" or "preservation" (keeping capital safe). Where it names more than one aim, the one it puts first.
 - product_name: the product's full name, quoted from a line that states it.
 - exclusion_screens: every exclusion screen any document claims, each as {"exclusion": "fossil_fuels" | "tobacco" | "weapons", "citation": …}. If the PPM states the screen, cite the PPM; otherwise cite the document that claims it.
 
 Respond with only a JSON object and no other text, in exactly this shape:
-{"min_holding_years":{"value":<integer>,"citation":{"document_id":"<document_id>","page":<page>,"quote":"<verbatim>"}},"sub_investment_grade_max_pct":{…},"capital_protected":{…},"distributions_may_use_capital":{…},"dealing_frequency":{…},"redemption_notice_days":{…},"exit_charge_within_months":{…},"derivatives_use":{…},"product_name":{…},"exclusion_screens":[{"exclusion":"<exclusion>","citation":{…}}]}`;
+{"min_holding_years":{"value":<integer>,"citation":{"document_id":"<document_id>","page":<page>,"quote":"<verbatim>"}},"sub_investment_grade_max_pct":{…},"capital_protected":{…},"distributions_may_use_capital":{…},"dealing_frequency":{…},"redemption_notice_days":{…},"exit_charge_within_months":{…},"derivatives_use":{…},"primary_objective":{"value":"income","citation":{…}},"product_name":{…},"exclusion_screens":[{"exclusion":"<exclusion>","citation":{…}}]}`;
 
 export const attributes: StepDefinition<AttributesInput, ProductAttributes, AttributesReply> = {
   name: "attributes",
@@ -91,12 +92,18 @@ export const attributes: StepDefinition<AttributesInput, ProductAttributes, Attr
       }
       found[key] = { value: parsed.data.value, citation };
     }
+    // The primary objective (S7, #41): optional in the schema for runs recorded before it, required here.
+    const objective = ProductAttributes.shape.primary_objective.unwrap().safeParse(reply.primary_objective);
+    const objectiveCitation = objective.success ? groundCitation(documents, objective.data.citation) : undefined;
+    if (!objective.success) missing.push("primary_objective (not given in the expected form)");
+    else if (!objectiveCitation) missing.push("primary_objective (its quote is not on the cited page)");
     if (missing.length > 0) {
       return { error: `the attributes suitability needs could not all be established: ${missing.join("; ")}` };
     }
     return {
       output: ProductAttributes.parse({
         ...found,
+        primary_objective: { value: objective.data!.value, citation: objectiveCitation },
         exclusion_screens: screens(reply.exclusion_screens, documents),
         ...name(reply.product_name, documents),
       }),

@@ -79,7 +79,7 @@ describe("advice on a verified pack", () => {
 
     expect((await draft(t, caseId, "persona-chan", adviceId)).status).toBe(201);
     const drafted = (await state(t, caseId)).state.advice[0]!;
-    expect(drafted).toMatchObject({ adviceId, verdict: "not_suitable", rules_version: "rules@1", decision: null });
+    expect(drafted).toMatchObject({ adviceId, verdict: "not_suitable", rules_version: "rules@2", decision: null });
     expect(drafted.reasons.filter((r) => r.effect === "blocks").map((r) => r.rule)).toEqual(["S1", "S2", "S4", "S4", "S4"]);
     // Both fee findings on the board are disclosed, citing the fee table.
     expect(drafted.disclosures.map((d) => d.citation.document_id)).toEqual(["fee-table", "fee-table"]);

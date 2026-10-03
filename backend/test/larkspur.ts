@@ -37,6 +37,10 @@ export const ATTRIBUTES_REPLY = {
   exit_charge_within_months: { value: 24, citation: ppm(3, "7.2 A redemption charge of 2.00% applies to units redeemed within 24 months of purchase.") },
   derivatives_use: { value: "hedging", citation: ppm(1, "3.5 The Fund may use derivatives for hedging purposes only.") },
   exclusion_screens: [{ exclusion: "fossil_fuels", citation: deckScreen }],
+  primary_objective: {
+    value: "income",
+    citation: ppm(1, "3.1 The Fund aims to provide a regular income with the potential for modest capital growth over at least five years."),
+  },
   product_name: {
     value: "Larkspur Global Income Fund",
     citation: ppm(1, "Larkspur Global Income Fund - issued by Calderhaven Asset Management Ltd"),
