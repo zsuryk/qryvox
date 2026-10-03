@@ -1,4 +1,5 @@
 import {
+  ruleById,
   activeFindings,
   fold,
   type CaseDocument,
@@ -60,6 +61,8 @@ export type BoardCard = {
   claim: string;
   // One line saying why that counts as a finding.
   rationale: string;
+  // For a policy gap, the institutional rule it breaks, as rules@1 words it; null on every other kind.
+  rule: { id: string; title: string; text: string } | null;
   citation: BoardCitation | null;
   // The passage it conflicts with, or that it lacks, when the log carries one.
   counterpart: BoardCitation | null;
@@ -126,6 +129,7 @@ function card(finding: CaseFinding, documents: readonly CaseDocument[]): BoardCa
     severityLabel: SEVERITY_LABELS[finding.severity],
     claim: finding.claim,
     rationale: rationale(finding),
+    rule: finding.rule ? { id: finding.rule, title: ruleById(finding.rule).title, text: ruleById(finding.rule).text } : null,
     citation: citation(finding.citation, documents),
     counterpart: citation(finding.counterpart, documents),
     runId: finding.stepRunId,
@@ -147,9 +151,11 @@ function rationale(finding: CaseFinding): string {
       return `Nothing else in the pack backs what ${from} states.`;
     case "disclosure_gap":
       return `${from} promises it without the risk disclosure ${against ?? "the pack"} attaches to it.`;
-    // A minimal line until #26 shows the rule's title on the card.
+    // The rule, in its own words: what the institution requires that this document does not do.
     case "policy_gap":
-      return `${from} falls short of institutional rule ${finding.rule ?? "(unnamed)"}.`;
+      return finding.rule
+        ? `${from} falls short of the institution's rule: ${ruleById(finding.rule).text}`
+        : `${from} falls short of an institutional rule.`;
   }
 }
 

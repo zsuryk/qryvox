@@ -167,7 +167,7 @@ const opened = (): SlimEvent[] => [
 ];
 
 describe("starting the run", () => {
-  it("runs the four steps in order, each named before its call and each awaiting the one before it", async () => {
+  it("runs the steps in order, each named before its call and each awaiting the one before it", async () => {
     const { deps, calls, told } = stepApi(opened());
 
     await startRun(deps());
@@ -234,7 +234,7 @@ describe("a step that fails", () => {
       status: "failed",
       error: "model output did not match the decompose schema",
     });
-    expect(pipelineState(events).steps.map((step) => step.status)).toEqual(["completed", "failed", "pending", "pending"]);
+    expect(pipelineState(events).steps.map((step) => step.status)).toEqual(["completed", "failed", "pending", "pending", "pending"]);
   });
 
   it("leaves the board usable, still folded from the log, while a step is failed", async () => {
@@ -274,7 +274,7 @@ describe("a step that fails", () => {
     expect(api.calls).toHaveLength(before.calls);
     expect(api.events).toHaveLength(before.events);
     expect(run.failure).toBeNull();
-    expect(pipelineState(run.events).steps.map((step) => step.status)).toEqual(["completed", "completed", "completed", "completed"]);
+    expect(pipelineState(run.events).steps.map((step) => step.status)).toEqual(["completed", "completed", "completed", "completed", "completed"]);
   });
 
   it("takes an answer the log already holds as an answer, rather than asking for the run again", async () => {
@@ -285,13 +285,13 @@ describe("a step that fails", () => {
     api.calls.length = 0;
 
     expect(run.failure).toEqual({ step: "contradictions", error: "Failed to fetch" });
-    expect(pipelineState(run.events).steps.map((step) => step.status)).toEqual(["completed", "completed", "completed", "pending"]);
+    expect(pipelineState(run.events).steps.map((step) => step.status)).toEqual(["completed", "completed", "completed", "pending", "pending"]);
 
     await retryStep(api.deps(), "contradictions");
 
     // The step the log says completed is not sent again, so the server spends nothing on it; the chain
-    // picks up at findings instead.
-    expect(api.calls.map((call) => call.step)).toEqual(["findings"]);
+    // picks up at the rules check instead.
+    expect(api.calls.map((call) => call.step)).toEqual(["compliance", "findings"]);
   });
 });
 
@@ -306,7 +306,7 @@ describe("resuming", () => {
     await retryStep(api.deps(), "contradictions");
 
     // extract and decompose are not sent again, and the failed run goes back out under its own id.
-    expect(api.calls.map((call) => call.step)).toEqual(["contradictions", "findings"]);
+    expect(api.calls.map((call) => call.step)).toEqual(["contradictions", "compliance", "findings"]);
     expect(api.calls[0]!.step_run_id).toBe(stoppedAt.step_run_id);
     expect(api.calls[1]!.input_run_id).toBe(stoppedAt.step_run_id);
   });
@@ -314,19 +314,32 @@ describe("resuming", () => {
   it("picks up a run a reloaded browser knows nothing about, from the first step the log has not completed", async () => {
     const first = stepApi(opened(), misbehavesOn("findings", "model endpoint unreachable"));
     await startRun(first.deps());
-    const contradictions = first.calls.at(-2)!;
+    const compliance = first.calls.at(-2)!;
 
     // A browser that has only the log, as after a reload: nothing in its memory of which ids it named.
     const reloaded = stepApi(first.events);
 
     await resumeRun(reloaded.deps());
 
-    // The three that completed are not sent again, and the findings run is fed the contradictions run the
-    // log says completed rather than one this browser had to remember.
+    // The four that completed are not sent again, and the findings run is fed the compliance run the log
+    // says completed rather than one this browser had to remember.
     expect(reloaded.calls.map((call) => call.step)).toEqual(["findings"]);
-    expect(reloaded.calls[0]!.input_run_id).toBe(contradictions.step_run_id);
+    expect(reloaded.calls[0]!.input_run_id).toBe(compliance.step_run_id);
     expect(reloaded.calls[0]!.step_run_id).toBe(first.calls.at(-1)!.step_run_id);
-    expect(pipelineState(reloaded.events).steps.map((step) => step.status)).toEqual(["completed", "completed", "completed", "completed"]);
+    expect(pipelineState(reloaded.events).steps.map((step) => step.status)).toEqual(["completed", "completed", "completed", "completed", "completed"]);
+  });
+
+  it("on a case reviewed before the rules check existed, runs the check and raises the findings again on it", async () => {
+    // The recorded case ran four steps: its findings consumed the cross-check directly.
+    const api = stepApi(recordedLog);
+
+    await resumeRun(api.deps());
+
+    expect(api.calls.map((call) => call.step)).toEqual(["compliance", "findings"]);
+    expect(api.calls[0]!.input_run_id).toBe("1319d46c-9772-4f71-bb08-c0bfc3372780");
+    expect(api.calls[1]!.input_run_id).toBe(api.calls[0]!.step_run_id);
+    // Nothing before the check is sent again.
+    expect(api.calls.some((call) => ["extract", "decompose", "contradictions"].includes(call.step))).toBe(false);
   });
 });
 
@@ -336,13 +349,23 @@ describe("re-running a scope", () => {
 
     await rerunFrom(api.deps(), "contradictions");
 
-    expect(api.calls.map((call) => call.step)).toEqual(["contradictions", "findings"]);
+    expect(api.calls.map((call) => call.step)).toEqual(["contradictions", "compliance", "findings"]);
     const known = new Set(recordedLog.flatMap((event) => (event.step_run_id === null ? [] : [event.step_run_id])));
     expect(api.calls.some((call) => known.has(call.step_run_id))).toBe(false);
-    // The step before the scope keeps supplying the input, and the new findings run consumes the new
-    // contradictions run rather than the one it replaced.
+    // The step before the scope keeps supplying the input, and each new run consumes the new run before it
+    // rather than the one it replaced.
     expect(api.calls[0]!.input_run_id).toBe(decomposeRun);
     expect(api.calls[1]!.input_run_id).toBe(api.calls[0]!.step_run_id);
+    expect(api.calls[2]!.input_run_id).toBe(api.calls[1]!.step_run_id);
+  });
+
+  it("re-runs the findings of a case reviewed before the rules check on the cross-check it consumed", async () => {
+    const api = stepApi(recordedLog);
+
+    await rerunFrom(api.deps(), "findings");
+
+    // No compliance run to feed it: the findings run is fed past it, as the case's own findings were.
+    expect(api.calls.map((call) => [call.step, call.input_run_id])).toEqual([["findings", "1319d46c-9772-4f71-bb08-c0bfc3372780"]]);
   });
 
   it("supersedes the findings the earlier run left on the board, under the new run", async () => {
@@ -369,6 +392,7 @@ describe("re-running a scope", () => {
       [STEP_LABELS.extract, "completed"],
       [STEP_LABELS.decompose, "completed"],
       [STEP_LABELS.contradictions, "completed"],
+      [STEP_LABELS.compliance, "completed"],
       [STEP_LABELS.findings, "completed"],
     ]);
     // The run it replaced stays in the log, and the panel reads the newest run of each step.
@@ -419,6 +443,8 @@ describe("the panel's reading of a case", () => {
       [STEP_LABELS.extract, "completed", extractRun],
       [STEP_LABELS.decompose, "completed", decomposeRun],
       [STEP_LABELS.contradictions, "completed", "1319d46c-9772-4f71-bb08-c0bfc3372780"],
+      // Recorded before the rules check existed: it reads as not yet run, not as a failure.
+      [STEP_LABELS.compliance, "pending", null],
       [STEP_LABELS.findings, "completed", "6cc2d994-172d-4a5b-8e32-8a97eb693f97"],
     ]);
     expect(fold(recordedLog).stepRuns.filter((run) => run.stepRunId === extractRun)).toEqual([
@@ -426,7 +452,7 @@ describe("the panel's reading of a case", () => {
     ]);
   });
 
-  it("reads a case that has run nothing as four steps still waiting", () => {
+  it("reads a case that has run nothing as every step still waiting", () => {
     expect(pipelineState(opened()).steps).toEqual(
       PIPELINE_STEPS.map((step) => ({ step, runId: null, status: "pending", error: null, inputRunId: null, seq: null })),
     );

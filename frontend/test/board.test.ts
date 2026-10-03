@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fold, type FindingCategory, SlimEvent } from "@qryvox/shared";
+import { activeFindings, fold, type FindingCategory, SlimEvent } from "@qryvox/shared";
 import recorded from "@qryvox/shared/case-recorded.json";
 import { boardView, CATEGORIES } from "../lib/board";
 
@@ -29,6 +29,7 @@ describe("the board", () => {
       severityLabel: "High",
       claim: "The factsheet states a 0.85% management fee per annum; the fee table states 1.25% of net asset value.",
       rationale: "Two documents state the same fact differently: factsheet and fee-table.",
+      rule: null,
       citation: {
         documentId: "factsheet",
         documentName: "larkspur-factsheet.pdf",
@@ -159,5 +160,38 @@ describe("the board", () => {
 
     expect(boardView(board, all).active).toBe(1);
     expect(boardView(events, all).active).toBe(6);
+  });
+});
+
+describe("a policy gap on the board", () => {
+  it("names the institutional rule it breaks, in the rule's own words", () => {
+    const seq = events.length + 1;
+    const gap = SlimEvent.parse({
+      seq,
+      event_id: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
+      case_id: events[0]!.case_id,
+      actor: "demo-analyst",
+      at: "2026-10-03T12:00:00.000Z",
+      step_run_id: activeFindings(fold(events))[0]!.stepRunId,
+      type: "finding.created",
+      v: 1,
+      payload: {
+        finding_id: "policy-credit-risk",
+        category: "risk",
+        kind: "policy_gap",
+        severity: "medium",
+        claim: "The factsheet names interest-rate and currency risk but not credit risk.",
+        citation: { document_id: "factsheet", page: 2, quote: "Bond prices generally fall when interest rates rise." },
+        counterpart: { document_id: "ppm", page: 2, quote: "5.4 The Fund is exposed to interest rate, credit and currency risk." },
+        rule: "P1",
+      },
+    });
+    const card = boardView([...events, gap], all).cards.find((c) => c.findingId === "policy-credit-risk")!;
+
+    expect(card.kindLabel).toBe("Policy gap");
+    expect(card.rule).toEqual({ id: "P1", title: "Marketing names every PPM risk", text: expect.stringContaining("every type of risk") });
+    expect(card.rationale).toBe(
+      "factsheet falls short of the institution's rule: The factsheet and the marketing deck each name every type of risk listed in the PPM's risk factors.",
+    );
   });
 });

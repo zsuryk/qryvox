@@ -223,6 +223,11 @@ function Finding({
         </span>
         <span className="badge">{card.categoryLabel}</span>
         <span className="badge">{card.kindLabel}</span>
+        {card.rule && (
+          <span className="badge badge--tint" title={card.rule.text}>
+            Rule {card.rule.id} · {card.rule.title}
+          </span>
+        )}
       </div>
 
       <p className="t-headline">{card.claim}</p>

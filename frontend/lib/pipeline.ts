@@ -1,7 +1,7 @@
 import { fold, type RunStepRequest, type SlimEvent, type StepName, type StepResult, type StepRun } from "@qryvox/shared";
 import { errorMessage } from "./errors";
 
-// The run, as the browser drives it: four stateless steps, each one awaited call, in this order
+// The run, as the browser drives it: five stateless steps, each one awaited call, in this order
 // (spec decision 19, ADR-0001). No background job, no stream, no server-side orchestration — which is
 // why every word of progress below is read out of the case's log rather than remembered here. A browser
 // that goes away mid-run has lost nothing but its place in the queue, and the log says where that was.
@@ -14,9 +14,15 @@ import { errorMessage } from "./errors";
 // Nothing in this file touches React or the DOM, so test/pipeline.test.ts drives the whole run in Node
 // through the same three seams the case page hands it: the transport, the case log, and the id source.
 
-// The four steps, in the order the run makes them. Each consumes the previous one's stored output, so the
-// order is the whole of the pipeline's shape.
-export const PIPELINE_STEPS = ["extract", "decompose", "contradictions", "findings"] as const satisfies readonly StepName[];
+// The five steps, in the order the run makes them. Each consumes the previous one's stored output, so the
+// order is the whole of the pipeline's shape. compliance (#24, #26) checks the documents against the
+// institution's product rules between the cross-check and the findings; the findings step takes its run,
+// or — for a case reviewed before the check existed — the cross-check's run directly.
+export const PIPELINE_STEPS = ["extract", "decompose", "contradictions", "compliance", "findings"] as const satisfies readonly StepName[];
+
+// Steps a later step can be fed past, when a case's log holds no run of them: a case reviewed with four
+// steps has no compliance run, and its findings consumed the cross-check directly.
+const SKIPPABLE: ReadonlySet<StepName> = new Set<StepName>(["compliance"]);
 
 // What each step does, in the analyst's words rather than the step's: this is the only place the
 // interface names the pipeline at all.
@@ -50,7 +56,7 @@ export type StepProgress = {
 };
 
 export type PipelineState = {
-  // Always the four steps in order, whatever the log holds.
+  // Always the five steps in order, whatever the log holds.
   steps: readonly StepProgress[];
   // The highest seq folded, so the panel can say how much of the log it read.
   lastSeq: number;
@@ -93,7 +99,7 @@ export type PipelineAction =
   | { kind: "retry"; step: StepName }
   | { kind: "rerun"; step: StepName };
 
-// The four steps as the log reads them. The newest run of each step wins, because a re-run appends a new
+// The steps as the log reads them. The newest run of each step wins, because a re-run appends a new
 // run and the board shows the latest (ADR-0002); the runs before it stay in the log.
 export function pipelineState(events: readonly SlimEvent[]): PipelineState {
   const state = fold(events);
@@ -197,12 +203,16 @@ async function advance(deps: PipelineDeps, from: StepName | null, fresh: boolean
   return { pipeline: pipelineState(events), events, failure: null };
 }
 
-// The calls one advance makes, in order, and both of its rules are about never spending twice.
+// The calls one advance makes, in order. Two of its rules are about never spending twice, and the third
+// about never leaving the board on an old chain.
 //
 // A step the log says completed is not called for again unless this is a re-run scope, which exists to
 // run it again — so a completed run is never re-sent, and the server's free retry for a call whose
 // response was lost never has to be taken. And a step whose run has not completed is sent under that
 // run's id: the retry restarts the run rather than starting a second one beside it (spec decision 25).
+// But a completed run is only reused when it consumed the run this chain now puts before it: on a case
+// reviewed before the rules check existed, resuming runs compliance and then raises the findings again
+// on top of it, because the findings the log holds were raised without it.
 function plan(runs: readonly StepRun[], from: StepName, fresh: boolean, newRunId: RunIdSource): RunStepRequest[] {
   const calls: RunStepRequest[] = [];
   // StepName also names steps outside this chain (attributes, #29); none of them is ever a resume point.
@@ -213,7 +223,8 @@ function plan(runs: readonly StepRun[], from: StepName, fresh: boolean, newRunId
   for (const [index, step] of PIPELINE_STEPS.entries()) {
     if (index < start) continue;
     const latest = runs.filter((run) => run.step === step).at(-1);
-    if (!fresh && latest?.status === "completed") {
+    const feeds = previousRunId ?? completedRunBefore(runs, index);
+    if (!fresh && latest?.status === "completed" && (index === 0 || latest.inputRunId === feeds)) {
       previousRunId = latest.stepRunId;
       continue;
     }
@@ -225,7 +236,7 @@ function plan(runs: readonly StepRun[], from: StepName, fresh: boolean, newRunId
       // What this step consumes is the run of the step before it in this same chain: the one just named,
       // or the completed one the log holds when that step is not part of this advance. extract reads the
       // documents instead, and so takes none.
-      input_run_id: previousRunId ?? completedRunBefore(runs, index),
+      input_run_id: feeds,
     });
     previousRunId = stepRunId;
   }
@@ -236,7 +247,12 @@ function plan(runs: readonly StepRun[], from: StepName, fresh: boolean, newRunId
 // consume a run that never completed, and the server says exactly that when it is asked to, so the
 // browser does not pre-empt the refusal with a guess of its own.
 function completedRunBefore(runs: readonly StepRun[], index: number): string | null {
-  const previous = PIPELINE_STEPS[index - 1];
-  if (previous === undefined) return null;
-  return runs.filter((run) => run.step === previous && run.status === "completed").at(-1)?.stepRunId ?? null;
+  for (let at = index - 1; at >= 0; at -= 1) {
+    const previous = PIPELINE_STEPS[at]!;
+    const run = runs.filter((candidate) => candidate.step === previous && candidate.status === "completed").at(-1);
+    if (run !== undefined) return run.stepRunId;
+    // A step that may be fed past is passed over; any other is what this step needs, and there is none.
+    if (!SKIPPABLE.has(previous)) return null;
+  }
+  return null;
 }

@@ -16,10 +16,10 @@ import {
   type StepStatus,
 } from "../lib/pipeline";
 
-// The run, above the board it fills. Four rows in the order the run makes them, each saying in words where
+// The run, above the board it fills. One row per step, in the order the run makes them, each saying in words where
 // it has got to — running, done, failed, waiting — because the word is the signal and the colour only
 // repeats it. Nothing here asks the analyst to write anything: the panel is four states and three
-// buttons, and every one of them is a scope the run can take.
+// kinds of button, and every one of them is a scope the run can take.
 //
 // Progress is folded out of the case's log here rather than kept, exactly as the board beneath it is: a
 // reload, a shared link or a step that failed somewhere else all read the same (ADR-0002).
@@ -222,7 +222,12 @@ function summary(
   if (failure !== null) return failure.error;
   const done = state.steps.filter((step) => step.status === "completed");
   const last = done.at(-1);
-  if (done.length === PIPELINE_STEPS.length) return "All four steps completed.";
+  if (done.length === PIPELINE_STEPS.length) return `All ${PIPELINE_STEPS.length} steps completed.`;
+  // A case reviewed before the rules check existed: its board stands, raised without the check.
+  const missing = resumePoint(state);
+  if (missing !== null && state.steps.some((step, i) => i > state.steps.indexOf(missing) && step.status === "completed")) {
+    return `This case was reviewed before ${STEP_LABELS[missing.step].toLowerCase()} existed. Resume to run it; the findings are raised again on top of it.`;
+  }
   if (last === undefined) return "Nothing has run yet. Start the run and each step waits for the one before it.";
   return `The run stopped after ${STEP_LABELS[last.step]}; it can be resumed.`;
 }
