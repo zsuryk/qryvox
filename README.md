@@ -1,13 +1,13 @@
 # Qryvox — Investment Product Diligence Copilot
 
-> *Democratise the diligence behind private banking: an AI copilot that verifies an investment product's own claims — across its factsheet, PPM, marketing deck, and fee table — before it reaches the shelf, and you never write a prompt to use it. Every analysis is a button, every claim a clickable citation, every decision a keystroke — and every one of them logged and replayable. No investment advice.*
+> *Democratise the diligence behind private banking: an AI copilot that verifies an investment product's own claims — across its factsheet, PPM, marketing deck, and fee table — before it reaches the shelf, and you never write a prompt to use it. Every analysis is a button, every claim a clickable citation, every decision a keystroke — and every one of them logged and replayable. It advises only on products it has verified, and only once a licensed adviser signs the advice off.*
 
 ## Target user
 
 **The institution-facing intermediary — small-to-mid wealth platforms, robo-advisors, and licensed advisers — with the retail investor as the beneficiary.**
 
-- **Who it's for:** the investment / operations analyst at a mid-sized robo-advisor or wealth platform who vets a product before shelf placement
-- **Who benefits:** the retail investor, who sees verified claims before buying — the product-vetting layer they could never access or afford directly
+- **Who it's for:** the investment / operations analyst at a mid-sized robo-advisor or wealth platform who vets a product before shelf placement, and the licensed adviser who signs off advice on it
+- **Who benefits:** the retail client, who gets advice fitted to their goals, risk profile and knowledge — on products whose claims were verified first, the product-vetting layer they could never access or afford directly
 - **Explicitly not:** giant banks (in-house due-diligence teams and budgets already cover this) and not individuals picking products themselves (retail investors don't run document diligence — their platform's analyst does, before the product ever reaches them)
 
 ## The pitch: two layers
@@ -39,22 +39,30 @@ For this target user it lands as more than convenience: prompt variance is audit
 
 ## The moat: defensible diligence
 
-The interaction wins the room; the audit layer wins the buyer. A regulated intermediary doesn't switch tools because a UI is pretty — they switch because the output survives scrutiny. The workflow is **claim decomposition → contradiction detection → citation → human disposition → replay**, and it stays document-claim extraction throughout: claims are read and cross-checked, never computed.
+The interaction wins the room; the audit layer wins the buyer. A regulated intermediary doesn't switch tools because a UI is pretty — they switch because the output survives scrutiny. The workflow runs in three layers, each feeding the next:
+
+1. **Verify the documents** — claim decomposition → contradiction detection → citation → human disposition
+2. **Check institutional policy** — each document against the institution's product rules (e.g. every risk type in the PPM named in the factsheet)
+3. **Match the client** — the verified product against a client profile, judged by fixed suitability rules, explained at the client's depth, signed off by an adviser
+
+…and every step is replayable. Nothing is ever computed: claims and attributes are read and cross-checked, and suitability compares levels and terms — no returns, no forecasts.
 
 - **Citation-linked findings** — every flag points to the exact passage in the exact source document; no black-box claims to defend
 - **Replayable audit log** — any past decision reconstructable exactly, on demand, for a regulator or an internal reviewer
 - **Human-in-the-loop disposition** — a state machine of approve/dismiss with no auto-rejection; accountability stays with the licensed human
+- **Rules judge, the model reads** — suitability verdicts come from fixed, versioned rules, so the same client and product always get the same verdict; the model only extracts cited attributes and explains the verdict's own reasons
+- **Verified shelf only** — advice can only be drafted on a product that has been through layers 1 and 2
 - **Live precision/recall** — an eval harness with planted ground truth proves accuracy as a measurement, not a vibe — the standard this buyer already applies to vendors
 
 The comparison class isn't ChatGPT — it's Excel, manual review, and expensive GRC tools. This is what they're buying: product diligence they can stand behind at shelf-placement review.
 
 **Anticipated judge question — "where's the innovation beyond UX?"** → "The UI is how a non-expert drives it; the citation-replay-eval layer is why a regulated firm can trust what comes out. Competitors ship one or the other — a chat box, or a black box."
 
-**Anticipated judge question — "where's the advice?"** → "Advice built on unvetted product claims is exactly what gives democratized wealth products a bad name. We build the trust layer first."
+**Anticipated judge question — "isn't AI advice a regulatory risk?"** → "The AI never decides. Fixed rules decide suitability, every reason cites the product's own documents and the client's own answers, and nothing reaches the client until a licensed adviser approves it. And it can only advise on products it has verified — advice built on unvetted product claims is exactly what gives democratised wealth products a bad name."
 
 ## Why this fits *Finance & Wealth — Democratising Private Bank-Level Advice*
 
-The track is about advice — but what makes private-bank advice trustworthy isn't the recommendation, it's the **products on the shelf**. Private banks run exhaustive product due diligence before an investor ever sees an offer; retail/robo platforms list thinly-vetted products because it costs too much. This project **democratises that product-vetting layer** — and the "no investment advice" fence becomes a feature: it shows judges you understand regulated scope.
+The track is about advice — but what makes private-bank advice trustworthy isn't the recommendation, it's the **products on the shelf**. Private banks run exhaustive product due diligence before an investor ever sees an offer; retail/robo platforms list thinly-vetted products because it costs too much. This project **democratises that product-vetting layer, and builds the advice on top of it**: personalised advice, but only on a verified shelf and only with a human's sign-off — which is how a regulated firm can actually ship it.
 
 Democratising isn't only about cost. Product vetting is also gated by *expertise* — knowing which claim in the marketing deck conflicts with page 12 of the PPM. We democratise that too: the expertise lives in the interface, so a non-expert drives the entire review.
 
@@ -68,7 +76,11 @@ Every step below is a distinct UI surface. Watch the cursor: it never types a se
 4. **Verified claims card** — a one-paragraph verified product profile for shelf-placement review, publishable to the retail investor; regenerate with a button, tune with toggles, never by rewriting a prompt
 5. **Disposition console** — approve/dismiss each finding with buttons or keyboard shortcuts; state machine, no auto-rejection, human-in-the-loop
 6. **Replay scrubber** — drag the timeline scrubber to reconstruct any past decision exactly (audit log + replay)
-7. **Live eval dashboard** — the fabricated product pack ships with N planted contradictions; precision/recall tiles update live during the demo
+7. **Policy checks** — institutional product rules run as a pipeline step; a breach appears on the board as a `policy_gap` card naming the rule
+8. **Client questionnaire** — goals, horizon, risk and knowledge captured with buttons only; three fabricated personas load in one click
+9. **Advice draft + adviser console** — a verdict per client (suitable / conditional / not suitable), every reason tied to a rule, a cited passage and a profile answer; the adviser approves or rejects
+10. **Client advice page** — the approved advice at the client's depth (novice / informed / expert), with a citation chip on every reason
+11. **Live eval dashboard** — the fabricated product pack ships with planted findings, policy gaps and personas with expected verdicts; precision/recall and advice-accuracy tiles update live during the demo
 
 ## Track-Brief Mapping (accurate / auditable / fast)
 
@@ -78,8 +90,21 @@ Every step below is a distinct UI surface. Watch the cursor: it never types a se
 | **Auditable** | Citation-linked findings + replayable audit log |
 | **Fast** | Document pack → scored findings in seconds vs. days of manual review |
 
+## Capco brief mapping (must achieve all three objectives)
+
+| Objective | Met by |
+|---|---|
+| **Fiduciary obligation** | Product diligence (CFA Standard V(A)), policy checks, suitability (III(C)), adviser sign-off, tamper-evident audit log |
+| **Client experience** | Advice and explanation depth fitted to goals, risk profile and knowledge; zero text boxes |
+| **Investment outcomes** | A verdict per client; a changed profile or product re-assesses and supersedes the old advice |
+| **Data ecosystem** (key requirement) | A data map: what is needed, what is hard to capture, assumptions, privacy limits (pseudonymous ids in the log, personal data outside it) |
+| **Bonus** | Product updates trigger re-verification; knowledge level learned from how the client reads |
+
+Stage 2 is tracked in #20.
+
 ## Scope (weekend-feasible)
 
 - **MVP:** fabricated product pack (factsheet, PPM excerpt, marketing deck, fee table), 6 planted contradictions → drop-zone intake, claim board, citation split-pane, disposition console, eval dashboard, audit replay
 - **Stretch:** regulatory filing/news cross-check, tamper signals, retail-facing verified claims card, keyboard-first navigation, continuous re-verification (pack re-checks when the product publishes an update)
-- **Explicitly out of scope (say it in the pitch):** investment recommendations, product suitability, portfolio anything, and any performance computation — no returns, no volatility, no backtesting; claims are extracted and cross-checked, never computed. Zero math, zero advice, zero text boxes.
+- **Stage 2 (in progress, #20):** policy checks (`policy_gap`), client profiles, rule-based suitability, adviser sign-off, client advice page at three depths
+- **Explicitly out of scope (say it in the pitch):** portfolio construction, any performance computation — no returns, no volatility, no backtesting — and advice on any product that has not been verified. Claims and attributes are extracted and cross-checked, never computed; suitability compares levels and terms. Zero math, no unverified advice, zero text boxes.

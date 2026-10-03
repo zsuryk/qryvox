@@ -1,6 +1,7 @@
 # Qryvox domain glossary
 
-The words this project uses for its own concepts, as stage 1 settled them. Issues, tests, code and docs
+The words this project uses for its own concepts, as stage 1 settled them, plus the stage-2 terms agreed
+in #21 (marked *stage 2*: contracts for them land with #23 and #27). Issues, tests, code and docs
 use these terms with these meanings. When a concept you need is missing here, that is a gap to settle,
 not licence to coin a synonym (see `docs/agents/domain.md`).
 
@@ -86,6 +87,10 @@ never computes a number and never advises.
 - `contradiction` — two documents state the same thing differently.
 - `unsupported_claim` — the deck or factsheet asserts something the PPM does not back.
 - `disclosure_gap` — the deck promises a benefit without the risk warning that should accompany it.
+- `policy_gap` *(stage 2)* — a document fails an institutional product rule, whatever the other documents say;
+  the finding names the rule. Differs from `disclosure_gap`, which compares documents with each other: a
+  `disclosure_gap` is "the deck lacks a warning the PPM has", a `policy_gap` is "the factsheet lacks what our
+  rules require". One passage can be both.
 
 **Category** — the area a finding concerns, and the board's filter: `fees`, `strategy`, `risk`, `terms`.
 *Not* the kind: "fees / contradiction" is one finding's category and kind.
@@ -130,6 +135,51 @@ keeps both. A superseded finding cannot be decided (409).
 **Analyst / actor** — the analyst is the licensed human accountable for decisions. The actor is who an
 event records as having acted. In stage 1 every event's actor is one fixed identity, `demo-analyst`
 (`ANALYST_ACTOR`), with no login and no picker.
+
+## Policy and advice (stage 2)
+
+**Rules** — the institution's own rules, versioned as one set (`rules@1`) in two groups: **product rules**
+(P1, P2, …), which a document must meet to go on the shelf, and **suitability rules** (S1, S2, …), which
+decide whether a product fits a client. Fabricated institutional policy, never quoted regulation. Every
+event that applies a rule records the rules version.
+
+**Shelf / verified product** — a product whose pack has been through the analysis steps and the `compliance`
+step. Advice is drafted on verified products only.
+
+**Client** — the person advice is for, known to the log only by a pseudonymous id. *Not* the analyst or the
+adviser, and *not* a user of the analysis.
+
+**Client profile** — a client's answers, captured with buttons only: goal, horizon, risk level (1–5),
+knowledge (`novice`, `informed`, `expert`), whether they rely on the income or may need the money at short
+notice, and exclusions. Recorded as `client.profiled`; a new version supersedes advice drafted on the old
+one. Personal data never enters the log.
+
+**Product attribute** — one fact about a product that suitability needs (minimum holding period,
+sub-investment-grade allowance, capital protection, dealing terms, …), extracted by the `attributes` step
+with a citation, the PPM preferred. Read from the documents, never computed.
+
+**Persona** — a fabricated client with an expected verdict, stored apart like ground truth and never an input
+to any step: Mrs Chan, Mr Lee, Ms Wong.
+
+**Verdict** — `suitable`, `conditional` or `not_suitable`: the outcome of the suitability rules for one
+client and one product. Decided by the rules, never by a model.
+
+**Reason** — one ground for a verdict: a suitability rule, the product citation it rests on, and the profile
+answer it compares against.
+
+**Disclosure** — something the client must be told whatever the verdict, e.g. a fee finding the analyst has
+not dismissed (S6).
+
+**Explanation** — the `explain` step's wording of a verdict's reasons at each knowledge depth. It restates
+the given reasons and quotes and nothing else.
+
+**Advice** — a verdict for one client and one product, with its reasons, disclosures and explanation.
+Drafted by the system (`advice.drafted`), decided by the adviser (`advice.decided`), superseded when the
+profile or the product changes (`advice.superseded`). A client sees approved advice only.
+*Not* a recommendation the model makes: the rules decide and the adviser signs off.
+
+**Adviser** — the licensed human who approves or rejects advice. In stage 2, like the analyst, the fixed
+`demo-analyst` actor (ADR-0004).
 
 ## The log
 
@@ -184,6 +234,11 @@ its category and its quote match a planted finding.
 | citation / counterpart | where the finding comes from / what it conflicts with or lacks |
 | seq / `at` | the order / the wall-clock time |
 | kind / category | what sort of problem / which area |
+| disclosure_gap / policy_gap | a document lacks what another document has / a document lacks what our rules require |
+| finding / advice | a problem in the pack / a verdict for one client on one product |
+| verdict / disposition | the rules' outcome for a client / the analyst's decision on a finding |
+| product rule / suitability rule | must hold for the product to go on the shelf / decides whether it fits a client |
+| analyst / adviser / client | reviews the pack / signs off advice / receives advice |
 
 ## Words we avoid
 
@@ -200,7 +255,10 @@ its category and its quote match a planted finding.
 | tamper-proof, immutable chain | tamper-evident chain | The honest claim (ADR-0002). |
 | snapshot (for the event list) | event list, event page | "Snapshot" is reserved for the stage-2 JSON export. |
 | offset, position (in a document) | page and quote | Citations never use character offsets. |
-| advice, recommendation | — | Out of scope: the product never advises or computes returns. |
+| recommendation (for what the model does) | verdict, advice | The rules decide and the adviser signs off; no model recommends. |
+| suitability score, rating | verdict | A verdict is one of three values; nothing is scored or computed. |
+| advisor | adviser | One spelling, the README's (tickets written before #21 say advisor). |
+| user (for the client) | client | The analyst and the adviser use the product; the client receives advice. |
 
 ## Open questions
 
@@ -219,9 +277,8 @@ settle each one before it spreads further.
    *extracts* statements from that text with a model.
 4. **"Contradictions" names a step that finds more than contradictions.** The step returns all three kinds
    of issue; only one kind is a contradiction.
-5. **The analyst is a constant, not a person.** Stage 1 attributes every decision to `demo-analyst`. Who
-   the actor is once there are several analysts (a picker, a login) is deferred to stage 2 and not yet in
-   an ADR.
+5. **The analyst is a constant, not a person.** Every decision, including an adviser's sign-off in stage 2,
+   is attributed to `demo-analyst` (ADR-0004). Real identities remain future work.
 6. **How exactly a quote "matches" in eval.** Quotes can differ by a section number ("3.3 …") or a
    counterpart can cite another document stating the same fact (fee table vs PPM). Whether a match is
    containment in either direction, and whether a counterpart may match, is #15's to settle.
