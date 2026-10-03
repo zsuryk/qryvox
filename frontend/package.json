@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "assets": "tsx scripts/pdfjs-assets.ts",
-    "dev": "pnpm run assets && next dev",
+    "assets": "tsx --conditions=source scripts/pdfjs-assets.ts",
+    "dev": "pnpm run assets && pnpm --filter @qryvox/shared build && next dev",
     "build": "pnpm run assets && next build",
     "start": "next start",
     "typecheck": "next typegen && tsc --noEmit",
