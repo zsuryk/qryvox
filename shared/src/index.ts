@@ -64,6 +64,7 @@ export {
   StepStarted,
 } from "./events.js";
 export { fold, FoldError } from "./fold.js";
+export { type Assessment, assessSuitability } from "./suitability.js";
 export {
   activeAdvice,
   activeFindings,
@@ -78,6 +79,7 @@ export {
   type FindingDisposition,
   type StepRun,
   type StepRunStatus,
+  undismissedFindings,
 } from "./state.js";
 export { Citation, Disposition, Finding, FindingCategory, FindingKind, Severity } from "./finding.js";
 export {
@@ -92,6 +94,8 @@ export {
 export {
   GroundTruth,
   GroundTruthEntry,
+  Persona,
+  PersonaSet,
   PackCitation,
   PackDocument,
   PackManifest,

@@ -118,3 +118,9 @@ export function activeAdvice(state: CaseState): CaseAdvice[] {
 export function approvedAdviceFor(state: CaseState, clientId: string): CaseAdvice[] {
   return activeAdvice(state).filter((a) => a.client_id === clientId && a.decision?.decision === "approved");
 }
+
+// The findings S6 discloses from: on the board and not dismissed by the analyst. Undecided findings count;
+// only the analyst's explicit dismissal takes one out of what the client is told.
+export function undismissedFindings(state: CaseState): CaseFinding[] {
+  return activeFindings(state).filter((f) => dispositionOf(state, f.finding_id)?.disposition !== "dismissed");
+}

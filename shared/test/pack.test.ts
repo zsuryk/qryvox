@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildPack } from "../pack/build";
-import { GroundTruth, PackManifest } from "../src";
+import { GroundTruth, PackManifest, PersonaSet } from "../src";
 
 const publicDir = new URL("../../frontend/public/", import.meta.url);
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, publicDir)));
@@ -11,6 +11,7 @@ const readJson = (path: string): unknown => JSON.parse(read(path).toString("utf8
 const built = await buildPack();
 const manifest = PackManifest.parse(readJson("pack/manifest.json"));
 const groundTruth = GroundTruth.parse(readJson("eval/ground-truth.json"));
+const personas = PersonaSet.parse(readJson("eval/personas.json"));
 
 describe("the committed pack", () => {
   it("is exactly what the generator renders, so the manifest hashes are valid", () => {
@@ -21,6 +22,7 @@ describe("the committed pack", () => {
     }
     expect(manifest).toEqual(built.manifest);
     expect(groundTruth).toEqual(built.groundTruth);
+    expect(personas).toEqual(built.personas);
   });
 
   it("holds the four fabricated documents", () => {
@@ -55,5 +57,16 @@ describe("the ground truth", () => {
 
   it("is a separate artifact the manifest never lists", () => {
     expect(manifest.documents.every((d) => d.filename.endsWith(".pdf"))).toBe(true);
+  });
+});
+
+describe("the personas", () => {
+  it("disclose only findings the ground truth plants", () => {
+    const planted = new Set(groundTruth.entries.map((e) => e.id));
+    for (const p of personas.personas) expect(p.expected_disclosures.every((id) => planted.has(id))).toBe(true);
+  });
+
+  it("enter a case under pseudonymous ids only", () => {
+    expect(personas.personas.map((p) => p.profile.client_id)).toEqual(["persona-chan", "persona-lee", "persona-wong"]);
   });
 });

@@ -24,8 +24,8 @@ export const ReasonEffect = z.enum([
 export type ReasonEffect = z.infer<typeof ReasonEffect>;
 
 // One ground for a verdict: the rule, the client's answer it compares against, and the product passage
-// it rests on. The citation is null only when the product side is a mapped value rather than a quote
-// (S2's risk level, whose attributes carry their own citations).
+// it rests on. The citation is null only when nothing in the pack speaks to it (S5: the client excludes
+// something no screen covers).
 export const Reason = z.object({
   rule: SuitabilityRuleId,
   effect: ReasonEffect,

@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from "pdf-lib";
-import { GroundTruth, type PackCitation, PackManifest, PDFJS_VERSION } from "../src";
+import { GroundTruth, type PackCitation, PackManifest, PDFJS_VERSION, PersonaSet } from "../src";
+import { PERSONAS } from "./personas";
 import { DOCUMENTS, FOOTER, GROUND_TRUTH, ISSUER, PACK_ID, PRODUCT, type SourceDocument } from "./source";
 
 export type BuiltPack = {
   pdfs: { filename: string; bytes: Uint8Array }[];
   manifest: PackManifest;
   groundTruth: GroundTruth;
+  personas: PersonaSet;
 };
 
 // Fixed metadata so the same source always renders the same bytes and the manifest hashes stay valid.
@@ -48,6 +50,7 @@ export async function buildPack(): Promise<BuiltPack> {
       documents,
     }),
     groundTruth: GroundTruth.parse({ pack_id: PACK_ID, entries: GROUND_TRUTH }),
+    personas: PersonaSet.parse({ pack_id: PACK_ID, personas: PERSONAS }),
   };
 }
 

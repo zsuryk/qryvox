@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { ReasonEffect, Verdict } from "./advice.js";
+import { ClientProfile } from "./client.js";
 import { DocumentKind, Sha256 } from "./events.js";
 import { Citation, FindingCategory, FindingKind } from "./finding.js";
 
@@ -53,3 +55,22 @@ export const GroundTruth = z.object({
   entries: z.array(GroundTruthEntry),
 });
 export type GroundTruth = z.infer<typeof GroundTruth>;
+
+// A fabricated client and the advice suitability should give them on this pack: the answer key for the
+// client layer, as the ground truth is for findings. Never an input to any step. The name and summary are
+// for people reading the eval; only the profile, under its pseudonymous id, ever enters a case.
+export const Persona = z.object({
+  name: z.string().min(1),
+  summary: z.string().min(1),
+  profile: ClientProfile,
+  expected_verdict: Verdict,
+  // Every reason the rules should give, as rule and effect; order does not matter.
+  expected_reasons: z.array(z.object({ rule: z.string().min(1), effect: ReasonEffect })),
+  // Ground-truth ids of the findings S6 should disclose.
+  expected_disclosures: z.array(z.string().min(1)),
+});
+export type Persona = z.infer<typeof Persona>;
+
+// /eval/personas.json
+export const PersonaSet = z.object({ pack_id: z.string().min(1), personas: z.array(Persona) });
+export type PersonaSet = z.infer<typeof PersonaSet>;
