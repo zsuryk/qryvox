@@ -7,6 +7,23 @@ a test, a measurement or a decision record. The strategic presentation (12 slide
 model reads the documents. Fixed rules decide suitability. A named adviser signs off. Every step can be
 replayed for a regulator.
 
+## The hook: a canvas of cards, not a chat box
+
+Other entries put a chat box in front of a model. We turned the analyst's work into **cards on an
+infinite canvas**. The analyst never writes a prompt; it is compiled, versioned and tested behind the
+buttons. Every card is something our program parsed and checked against its source, never free prose.
+[ADR-0007](adr/0007-a-canvas-of-cards-over-the-case-log.md).
+
+| What the analyst does | What makes it more than UX |
+| --- | --- |
+| **Pans and zooms** a canvas where results arrive as cards and tile themselves, on desktop or with touch and pinch | One viewport module and one tiling module, both unit-tested: no overlaps, and pins survive reflow (#52, #53, #61) |
+| **Docks** a card into the plan region, the reportable set grouped by category and source authority (PPM > fee table > factsheet > deck) | Each drop is an event in the hash-chained log, so the reportable set can be replayed. A wrong-category drop is refused (#55, #65) |
+| **Discards, pins, restores** | Discarding is housekeeping, separate from the analyst's Dismiss, which is a recorded judgement. The underlying finding is never deleted (#56, #59) |
+| **Finds similar** passages from any card | First the nearest already-grounded passages, instantly and at no token cost (BM25). Then "look further" runs a grounded model step. Results arrive as candidate cards and never alter reviewed findings (#57, #60, #64) |
+| **Types a sentence, if they want** | It becomes intent chips from a closed vocabulary. Kimi K3: 「PPM 裡的費用」 → fees + PPM; a sentence about nothing gives no chips (#63) |
+| **Reads why each card matters** | One batched, grounded model call per product writes all the lines (about 1.7k tokens, 12 s) (#62) |
+| **Watches the activity panel** | It is the case's own step log, so every run, retry and failure is visible, with its reason (#58) |
+
 ---
 
 ## 1. Fiduciary & regulatory compliance
@@ -66,8 +83,9 @@ replayed for a regulator.
 
 ## Answers to the questions judges will ask
 
-- **"Isn't this a ChatGPT wrapper?"** The model reads and writes. Rules decide, people approve, and the
-  log proves it. The prompting is compiled into buttons.
+- **"Isn't this a ChatGPT wrapper?"** No chat box at all. The analyst works with cards on a canvas, and every card
+  is parsed and grounded by our program. The model reads and writes; rules decide, people approve, and
+  the log proves it. The prompting is compiled into buttons, chips and drags.
 - **"What if the model is wrong?"** Anything it invents is dropped by grounding. What it misses shows up
   in recall on the eval. A person disposes of every finding before the product is shelved.
 - **"Is AI advice allowed?"** Here it is advice by a licensed adviser, who gets a verified product, a rule

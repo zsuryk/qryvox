@@ -102,9 +102,9 @@ Every step below is a distinct UI surface. Watch the cursor: it never types a se
 
 Stage 2 is tracked in #20.
 
-## Status (2026-10-03)
+## Status (2026-10-04)
 
-**Works end to end, locally, on a real model** (Kimi K3 via its OpenAI-compatible API): drop a pack → five analysis steps → findings with citations, checked against the institution's rules → the analyst's decisions → the product's facts read → clients' answers → advice drafted by the rules → explained at three depths → approved by the adviser → the client's own page. Every step is in a hash-chained log that can be replayed to any event. **Not yet deployed to production** (#17, owner only).
+**Works end to end, locally, on a real model** (Kimi K3 via its OpenAI-compatible API): drop a pack → five analysis steps → findings with citations, checked against the institution's rules → the analyst's decisions → the product's facts read → clients' answers → advice drafted by the rules → explained at three depths → approved by the adviser → the client's own page. Every step is in a hash-chained log that can be replayed to any event. The case opens on a **canvas of cards** ([ADR-0007](docs/adr/0007-a-canvas-of-cards-over-the-case-log.md)): results tile in as cards; the analyst docks them into the reportable plan, pins, discards, finds similar passages, and types a sentence that becomes chips, all without a prompt. **Deployed** to qryvox.vercel.app (#17), but the production model is still being switched back to Kimi K3: on the slower stealth model, the pipeline times out at `compliance`.
 
 | Area | State | Tickets |
 |---|---|---|
@@ -119,9 +119,10 @@ Stage 2 is tracked in #20.
 | Judging criteria pass | ✅ S7 goal fit (`rules@2`), rejection reasons, vulnerable-client confirmation (ADR-0005); the client journey in 繁體中文 (ADR-0006) | #41 #42 #43 |
 | Compliance map | ✅ [docs/compliance.md](docs/compliance.md): SFC, HKMA, PDPO and CFA obligations against our controls | #44 |
 | Cost and scale, measured | ✅ [docs/scalability.md](docs/scalability.md): ≈16k tokens per product, ≈2.8k per client | #45 |
+| **Canvas** | ✅ Infinite canvas as the case's first section: pan/zoom/touch, auto-tiled cards, plan region, discard and pin, find similar (instant BM25 + grounded re-run), intent chips (`parse@1`), model-written rationales (`rationale@1`), activity panel | #48–#67 |
 | Pitch | ✅ [docs/pitch.md](docs/pitch.md): strengths by judging criterion, with evidence; the strategic presentation is built from it | #46 |
-| Spend protection | ✅ Origin allow-list, rate limit, judge-link token end to end · 🚧 switch it on in production | #16 #19 |
-| Production deploy | 🚧 Owner only | #17 |
+| Spend protection | ✅ Origin allow-list, rate limit, judge-link token end to end, `JUDGE_TOKEN` set in production | #16 #19 |
+| Production deploy | ✅ Deployed (owner, CLI) · 🚧 switch the production model back to Kimi K3 with `LLM_REASONING_EFFORT=low` | #17 |
 
 **Measured on Kimi K3** (`LLM_REASONING_EFFORT=low`; real pdf.js text): Larkspur recall 9/10, precision 10/10, all five steps in about 2½ minutes; Wrenfield recall 2/2, precision 2/4; every product attribute read correctly on both; all three personas got their expected verdict, and Mrs Chan's advice points her to Wrenfield. Without `low`, a reasoning model can think for over 300 s on one step — past Vercel's limit.
 
