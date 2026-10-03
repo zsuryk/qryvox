@@ -16,6 +16,7 @@ export const TEST_GUARDS: Guards = {
   allowedOrigins: [ALLOWED_ORIGIN],
   ipHashSecret: "test-secret",
   limits: { windowSeconds: 3600, stepsPerIp: 1000, stepsPerCase: 1000 },
+  judgeToken: null,
 };
 
 const cleanups: (() => void)[] = [];

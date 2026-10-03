@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { ErrorResponse } from "@qryvox/shared";
+import { ErrorResponse, JUDGE_TOKEN_HEADER } from "@qryvox/shared";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app";
 import { checkRateLimit, hashIp } from "../src/guards";
@@ -66,6 +66,57 @@ describe("the origin allow-list", () => {
     expect(allowed.status).toBe(204);
     expect(allowed.headers.get("access-control-allow-origin")).toBe(ALLOWED_ORIGIN);
     expect((await preflight("https://evil.example")).status).toBe(403);
+  });
+});
+
+describe("the judge-link token", () => {
+  const judged = { ...TEST_GUARDS, judgeToken: "judge-secret" };
+  const step = (t: TestApp, caseId: string, headers: Record<string, string> = {}) =>
+    t.request("POST", `/cases/${caseId}/steps`, { step_run_id: randomUUID(), step: "extract", input_run_id: null }, headers);
+
+  it("refuses an analysis step without the token, or with the wrong one, before the model is called", async () => {
+    const llm = new FakeLlm(() => EXTRACT_REPLY);
+    const t = await setup({ llm, guards: judged });
+    const caseId = await caseWithDocument(t);
+
+    for (const headers of [{}, { [JUDGE_TOKEN_HEADER]: "a-guess" }] as Record<string, string>[]) {
+      const res = await step(t, caseId, headers);
+      expect(res.status).toBe(401);
+      expect(ErrorResponse.parse(await res.json()).error).toMatch(/token/);
+    }
+    expect(llm.calls).toHaveLength(0);
+    const rs = await t.client.execute("SELECT type FROM events WHERE type LIKE 'step.%'");
+    expect(rs.rows).toHaveLength(0);
+  });
+
+  it("runs the step when the token matches", async () => {
+    const t = await setup({ llm: new FakeLlm(() => EXTRACT_REPLY), guards: judged });
+    const caseId = await caseWithDocument(t);
+
+    expect((await step(t, caseId, { [JUDGE_TOKEN_HEADER]: "judge-secret" })).status).toBe(200);
+  });
+
+  it("leaves everything that spends nothing open: opening a case, ingesting, reading the log", async () => {
+    const t = await setup({ guards: judged });
+    const caseId = await caseWithDocument(t);
+
+    expect((await t.request("GET", `/cases/${caseId}/events`)).status).toBe(200);
+    expect((await t.request("GET", `/cases/${caseId}/verify`)).status).toBe(200);
+  });
+
+  it("is let through a preflight from the allowed origin", async () => {
+    const t = await setup({ guards: judged });
+    const res = await t.app.request("/cases/any/steps", {
+      method: "OPTIONS",
+      headers: {
+        origin: ALLOWED_ORIGIN,
+        "access-control-request-method": "POST",
+        "access-control-request-headers": `content-type,${JUDGE_TOKEN_HEADER}`,
+      },
+    });
+
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-headers")).toContain(JUDGE_TOKEN_HEADER);
   });
 });
 

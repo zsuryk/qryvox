@@ -10,6 +10,7 @@ export const env = {
     // Comma-separated; the frontend origin(s).
     allowedOrigins: (process.env.ALLOWED_ORIGIN ?? "http://localhost:3000").split(",").map((o) => o.trim()),
     ipHashSecret: ipHashSecret(),
+    judgeToken: process.env.JUDGE_TOKEN || null,
     limits: {
       windowSeconds: Number(process.env.RATE_LIMIT_WINDOW_SECONDS ?? 3600),
       stepsPerIp: Number(process.env.RATE_LIMIT_STEPS_PER_IP ?? 60),

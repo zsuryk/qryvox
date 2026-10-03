@@ -1,11 +1,12 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { JUDGE_TOKEN_HEADER } from "@qryvox/shared";
 import { and, count, eq, gte, min } from "drizzle-orm";
 import type { Context, MiddlewareHandler } from "hono";
 import type { Db } from "./db/client.js";
 import { events } from "./db/schema.js";
 
-// Spend protection for a public judge URL (ADR-0001): an origin allow-list, a hashed client IP, and a rate
-// limit counted from the events table. The model provider's hard spend limit is the real backstop
+// Spend protection for a public judge URL (ADR-0001): a judge-link token, an origin allow-list, a hashed
+// client IP, and a rate limit counted from the events table. The model provider's hard spend limit is the real backstop
 // (docs/ops/model-spend.md).
 
 export type RateLimits = {
@@ -19,7 +20,27 @@ export type Guards = {
   allowedOrigins: readonly string[];
   ipHashSecret: string;
   limits: RateLimits;
+  // null leaves analysis steps open, for local development; production sets JUDGE_TOKEN.
+  judgeToken: string | null;
 };
+
+// The judge-link token, checked on analysis steps only: they are what spends money, while the board and
+// replay read the log and cost nothing. Unlike the origin allow-list, a request without an Origin (curl)
+// does not get past it.
+export function judgeLink(token: string | null): MiddlewareHandler {
+  return async (c, next) => {
+    if (token !== null && !sameToken(c.req.header(JUDGE_TOKEN_HEADER) ?? "", token)) {
+      return c.json({ error: "this demo link is missing its access token, or the token is wrong" }, 401);
+    }
+    await next();
+  };
+}
+
+// Compared as digests, so the comparison takes the same time whatever the length or content of the guess.
+function sameToken(given: string, expected: string): boolean {
+  const digest = (s: string) => createHash("sha256").update(s).digest();
+  return timingSafeEqual(digest(given), digest(expected));
+}
 
 // A browser request from any other origin is refused outright, not merely left without CORS headers:
 // otherwise the step would still run and spend tokens. Requests without an Origin (curl, server-side

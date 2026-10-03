@@ -125,6 +125,7 @@ const app = createApp({
     allowedOrigins: ["http://localhost:3000"],
     ipHashSecret: "fixture-secret",
     limits: { windowSeconds: 3600, stepsPerIp: 1000, stepsPerCase: 1000 },
+    judgeToken: null,
   },
 });
 

@@ -17,7 +17,7 @@ import { cors } from "hono/cors";
 import { z } from "zod";
 import { assertAppendOnly } from "./db/append-only.js";
 import type { Database } from "./db/client.js";
-import { clientIp, type Guards, hashIp, originAllowList, RateLimited } from "./guards.js";
+import { clientIp, type Guards, hashIp, judgeLink, originAllowList, RateLimited } from "./guards.js";
 import type { Llm } from "./llm.js";
 import {
   appendOnce,
@@ -109,7 +109,7 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
     return c.json({ seq: row.seq } satisfies AppendResponse, 201);
   });
 
-  app.post("/cases/:caseId/steps", async (c) => {
+  app.post("/cases/:caseId/steps", judgeLink(guards.judgeToken), async (c) => {
     const caseId = c.req.param("caseId");
     const body = RunStepRequest.safeParse(await readJson(c));
     if (!body.success) return badRequest(c, body.error);
