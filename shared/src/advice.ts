@@ -9,6 +9,21 @@ import { SuitabilityRuleId } from "./rules.js";
 export const Verdict = z.enum(["suitable", "conditional", "not_suitable"]);
 export type Verdict = z.infer<typeof Verdict>;
 
+// The verdict as the client's page headlines it, above the explanation, in each language the client may
+// read (#43). One copy for the page, which shows it, and the explain step, which must not repeat it (#67).
+export const VERDICT_HEADLINE: Record<ClientLanguage, Record<Verdict, string>> = {
+  en: {
+    suitable: "This product suits you.",
+    conditional: "This product may suit you, once your adviser confirms one thing.",
+    not_suitable: "This product does not suit you.",
+  },
+  "zh-Hant": {
+    suitable: "這個產品適合你。",
+    conditional: "這個產品可能適合你，需待你的顧問確認一點。",
+    not_suitable: "這個產品不適合你。",
+  },
+};
+
 // What one rule found for this client. "meets" reasons are kept too: a suitable verdict is explained by
 // what it meets, not by an empty list.
 export const ReasonEffect = z.enum([

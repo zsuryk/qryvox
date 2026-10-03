@@ -14,6 +14,7 @@ export {
   RejectionReason,
   SupersedeCause,
   Verdict,
+  VERDICT_HEADLINE,
   verdictFor,
 } from "./advice.js";
 export {

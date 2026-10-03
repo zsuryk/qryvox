@@ -66,7 +66,7 @@ export const PROMPT_VERSIONS = {
   findings: "findings@1",
   compliance: "compliance@1",
   attributes: "attributes@1",
-  explain: "explain@1",
+  explain: "explain@2",
   parse: "parse@1",
 } as const satisfies Record<StepName, string>;
 
