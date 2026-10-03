@@ -1,11 +1,14 @@
 import {
   type AdviceDecision,
   AppendResponse,
+  type CardOperationRequest,
+  CardOperationResponse,
   ChangeDispositionRequest,
   type ClientProfile,
   type DecisionConfirmation,
   type KnowledgeLevel,
   type RejectionReason,
+  ErrorResponse,
   EventPage,
   type IngestedDocument,
   JUDGE_TOKEN_HEADER,
@@ -146,6 +149,22 @@ export async function runStep(caseId: string, req: RunStepRequest): Promise<Step
 // and a retry with the same event_id appends nothing (spec decision 34, ADR-0002).
 export async function changeDisposition(caseId: string, req: ChangeDispositionRequest): Promise<AppendResponse> {
   return AppendResponse.parse(await post(`/cases/${caseId}/dispositions`, req));
+}
+
+// One card operation on a live case's canvas (#65), named by the browser's event_id so a retry appends
+// nothing. The answer is the event as the log recorded it. A refusal is thrown as the server's own reason
+// (a card the case no longer has, a dock into the wrong category), since that is what the analyst needs.
+export async function recordCardOperation(caseId: string, req: CardOperationRequest): Promise<CardOperationResponse> {
+  const res = await send("POST", `/cases/${caseId}/cards`, req);
+  const text = await res.text();
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = undefined;
+  }
+  if (res.ok) return CardOperationResponse.parse(body);
+  throw new Error(ErrorResponse.safeParse(body).data?.error ?? `the server answered ${res.status}`);
 }
 
 // --- The client layer (stage 2). Each is an append the browser names by event_id, so a retry after a lost

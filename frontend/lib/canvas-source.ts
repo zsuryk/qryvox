@@ -1,14 +1,4 @@
-import {
-  activeFindings,
-  type CardId,
-  type CaseFinding,
-  type CaseState,
-  Citation,
-  excerptCardId,
-  findingCardId,
-  fold,
-  SlimEvent,
-} from "@qryvox/shared";
+import { activeFindings, type CaseCard, caseCards, type CaseState, type Citation, findingCardId, fold, SlimEvent } from "@qryvox/shared";
 import recorded from "@qryvox/shared/case-recorded.json";
 import { fetchEvents } from "./api";
 
@@ -82,65 +72,15 @@ function kindOf(state: CaseState, citation: Citation) {
   return document.kind;
 }
 
-// One card per active finding, each followed by an excerpt card for its citation and its counterpart, the
-// first time that passage appears: a passage two findings share is one card. Then the candidates every
-// completed find-similar run offers (#64): an excerpt card per passage it returned, naming the run in
-// candidateOf, unless that passage already has a card. Which cards are docked, pinned or discarded is the
-// board state on the fold beside them, not a property of the card.
-export type CanvasCard =
-  | { cardId: CardId; kind: "finding"; finding: CaseFinding }
-  | { cardId: CardId; kind: "excerpt"; citation: Citation; candidateOf?: string };
+// The cards, and the board state they are laid out with, folded from the log. Which cards a case has is
+// shared/src/canvas.ts's rule (caseCards), the one the backend also checks a card operation against (#65):
+// each active finding and the passages it cites, then the candidates of every completed find-similar run.
+// Which cards are docked, pinned or discarded is the board state beside them, not a property of the card.
+export type CanvasCard = CaseCard;
 
 export type CanvasView = { state: CaseState; cards: CanvasCard[] };
 
 export function canvasView(events: readonly SlimEvent[]): CanvasView {
   const state = fold(events);
-  const cards: CanvasCard[] = [];
-  const seen = new Set<CardId>();
-  const add = (card: CanvasCard) => {
-    if (seen.has(card.cardId)) return;
-    seen.add(card.cardId);
-    cards.push(card);
-  };
-  for (const finding of activeFindings(state)) {
-    add({ cardId: findingCardId(finding.finding_id), kind: "finding", finding });
-    for (const citation of [finding.citation, finding.counterpart]) {
-      if (citation) add({ cardId: excerptCardId(citation), kind: "excerpt", citation });
-    }
-  }
-  for (const run of state.seededRuns) {
-    if (run.status !== "completed") continue;
-    for (const citation of candidatePassages(events, run.stepRunId)) {
-      add({ cardId: excerptCardId(citation), kind: "excerpt", citation, candidateOf: run.stepRunId });
-    }
-  }
-  return { state, cards };
-}
-
-// The passages a completed seeded run returned, read from its stored output the way the steps that would
-// have consumed it read it: a seeded extract's statements are passages already; a seeded contradictions
-// run's issues point at claims of the decompose run it consumed, whose quotes are the passages. Every quote
-// was grounded by the server. Output that does not read as either gives no cards rather than a broken board.
-function candidatePassages(events: readonly SlimEvent[], runId: string): Citation[] {
-  const run = completedRun(events, runId);
-  if (!run) return [];
-  const statements = Citation.array().safeParse(run.output.statements);
-  if (statements.success) return statements.data;
-  const issues = run.output.issues;
-  const claims = run.input_run_id ? completedRun(events, run.input_run_id)?.output.claims : undefined;
-  if (!Array.isArray(issues) || !Array.isArray(claims)) return [];
-  // Only what a card needs of the decompose and contradictions outputs, whose full schemas live in the backend.
-  const byId = new Map<unknown, Citation>();
-  for (const claim of claims as { id?: unknown }[]) {
-    const citation = Citation.safeParse(claim);
-    if (citation.success) byId.set(claim.id, citation.data);
-  }
-  return (issues as { claim_id?: unknown; counterpart_claim_id?: unknown }[])
-    .flatMap((issue) => [issue.claim_id, issue.counterpart_claim_id])
-    .flatMap((id) => byId.get(id) ?? []);
-}
-
-function completedRun(events: readonly SlimEvent[], runId: string) {
-  const event = events.find((e) => e.type === "step.completed" && e.step_run_id === runId);
-  return event?.type === "step.completed" ? event.payload : undefined;
+  return { state, cards: caseCards(events, state) };
 }

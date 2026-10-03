@@ -30,21 +30,19 @@ export type CardProps = {
   docked: boolean;
   pinned: boolean;
   discarded: boolean;
-  // Why card operations cannot be recorded here, or null when they can.
-  readOnly: string | null;
   // Why this card cannot be docked by its button, or null when it can.
   undockable: string | null;
   actions: CardActions;
 };
 
-export const Card = memo(function Card({ model, docked, pinned, discarded, readOnly, undockable, actions }: CardProps) {
+export const Card = memo(function Card({ model, docked, pinned, discarded, undockable, actions }: CardProps) {
   const state = { docked, pinned, discarded };
   const what = model.kind === "finding" ? `Finding: ${model.title}` : `Excerpt from ${model.documentName}, page ${model.page}`;
   const label = `${what}${docked ? " (in the plan)" : pinned ? " (pinned)" : ""}`;
   return (
     <article className={`card canvas-card${state.pinned ? " canvas-card--pinned" : ""}`} aria-label={label}>
       {model.kind === "finding" ? <FindingBody model={model} actions={actions} /> : <ExcerptBody model={model} actions={actions} />}
-      <ActionRow cardId={model.cardId} state={state} readOnly={readOnly} undockable={undockable} actions={actions} />
+      <ActionRow cardId={model.cardId} state={state} undockable={undockable} actions={actions} />
     </article>
   );
 });
@@ -108,29 +106,26 @@ function ExcerptBody({ model, actions }: { model: Extract<CardModel, { kind: "ex
 function ActionRow({
   cardId,
   state,
-  readOnly,
   undockable,
   actions,
 }: {
   cardId: CardId;
   state: { docked: boolean; pinned: boolean; discarded: boolean };
-  readOnly: string | null;
   undockable: string | null;
   actions: CardActions;
 }) {
-  const off = readOnly !== null;
   return (
     <div className="canvas-card__actions" role="group" aria-label="Card actions">
       {state.docked ? (
-        <button type="button" className="btn btn--small" disabled={off} title={readOnly ?? "Take it out of the plan"} onClick={() => actions.undock(cardId)}>
+        <button type="button" className="btn btn--small" title="Take it out of the plan" onClick={() => actions.undock(cardId)}>
           Undock
         </button>
       ) : (
         <button
           type="button"
           className="btn btn--small"
-          disabled={off || undockable !== null}
-          title={readOnly ?? undockable ?? "Add it to the plan's reportable set"}
+          disabled={undockable !== null}
+          title={undockable ?? "Add it to the plan's reportable set"}
           onClick={() => actions.dock(cardId)}
         >
           Dock
@@ -139,18 +134,18 @@ function ActionRow({
       <button
         type="button"
         className="btn btn--small"
-        disabled={off || state.docked || state.discarded}
-        title={readOnly ?? (state.pinned ? "Let it go back into the flow" : "Hold it where it is; the flow goes around it")}
+        disabled={state.docked || state.discarded}
+        title={state.pinned ? "Let it go back into the flow" : "Hold it where it is; the flow goes around it"}
         onClick={() => (state.pinned ? actions.unpin(cardId) : actions.pin(cardId))}
       >
         {state.pinned ? "Unpin" : "Pin"}
       </button>
       {state.discarded ? (
-        <button type="button" className="btn btn--small" disabled={off} title={readOnly ?? "Bring it back"} onClick={() => actions.restore(cardId)}>
+        <button type="button" className="btn btn--small" title="Bring it back" onClick={() => actions.restore(cardId)}>
           Restore
         </button>
       ) : (
-        <button type="button" className="btn btn--small" disabled={off} title={readOnly ?? "Reject it to the discard bin; nothing is deleted"} onClick={() => actions.discard(cardId)}>
+        <button type="button" className="btn btn--small" title="Reject it to the discard bin; nothing is deleted" onClick={() => actions.discard(cardId)}>
           Discard
         </button>
       )}

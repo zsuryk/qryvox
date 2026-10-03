@@ -1,14 +1,15 @@
 "use client";
 
 import { type KeyboardEvent, type PointerEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CardId, FindingCategory, SlimEvent, WorldPos } from "@qryvox/shared";
+import { type CardId, CardOperationRequest, type FindingCategory, type SlimEvent, type WorldPos } from "@qryvox/shared";
 import { categoryLabel } from "../lib/board";
 import { type CardCitation, cardModel, dockableCategories, DOCUMENT_KIND_LABELS, naturalSlot } from "../lib/canvas-cards";
 import { type DropTarget, resolveDrop } from "../lib/canvas-drop";
 import { canvasLayout } from "../lib/canvas-layout";
 import { type PlanLayout, planHit } from "../lib/plan-region";
 import { type CanvasMode, type CanvasView as View, canvasView } from "../lib/canvas-source";
-import { appendOp, type CardOp, operations } from "../lib/canvas-store";
+import { appendOp, type CanvasLog, canvasLog, type CardOp, reread, rolledBack, sent, settled, shownLog } from "../lib/canvas-store";
+import { fetchEvents, recordCardOperation } from "../lib/api";
 import { errorMessage } from "../lib/errors";
 import {
   centreOn,
@@ -48,17 +49,20 @@ const KEY_PAN = 64;
 export type CanvasViewProps = { events: readonly SlimEvent[]; mode: CanvasMode };
 
 export default function CanvasView({ events, mode }: CanvasViewProps) {
-  // The store: the log, and card operations appended to it (lib/canvas-store.ts). Only the fixture
-  // appends here; on a live case the operations are disabled until the backend can record them.
-  const [log, setLog] = useState<readonly SlimEvent[]>(events);
-  const allowed = operations(mode);
-  const dispatch = useCallback(
-    (op: CardOp) => {
-      if (!allowed.enabled) return;
-      setLog((current) => appendOp(current, op, { eventId: crypto.randomUUID(), at: new Date().toISOString() }));
-    },
-    [allowed.enabled],
-  );
+  // What the last operation came to, in words, for everyone: a drop that did nothing says why, and so does
+  // an operation the server refused.
+  const [said, setSaid] = useState<string | null>(null);
+  const quiet = useRef<number | null>(null);
+  const say = useCallback((words: string) => {
+    if (quiet.current !== null) window.clearTimeout(quiet.current);
+    setSaid(words);
+    quiet.current = window.setTimeout(() => setSaid(null), 5000);
+  }, []);
+  useEffect(() => () => {
+    if (quiet.current !== null) window.clearTimeout(quiet.current);
+  }, []);
+
+  const { log, dispatch } = useCanvasStore(events, mode, say);
 
   // A gap in the log is a hard error, not a half-built canvas (ADR-0002), so it is said, not drawn.
   const folded = useMemo((): { view: View } | { error: string } => {
@@ -71,18 +75,70 @@ export default function CanvasView({ events, mode }: CanvasViewProps) {
   if ("error" in folded) {
     return <p className="notice notice--negative t-callout">This canvas cannot be built from the case&apos;s log: {folded.error}</p>;
   }
-  return <Canvas view={folded.view} log={log} mode={mode} readOnly={allowed.enabled ? null : allowed.reason} dispatch={dispatch} />;
+  return <Canvas view={folded.view} log={log} mode={mode} dispatch={dispatch} said={said} say={say} />;
+}
+
+// The store (lib/canvas-store.ts) as React state: the log, and card operations appended to it. On the
+// fixture an operation is appended here and that is all. On a live case it is shown at once and sent to the
+// backend, one at a time and in the order made, so the latest of two operations on a card is the latest in
+// the log too; the answer confirms it, a refusal takes it back off the canvas with the server's reason.
+function useCanvasStore(events: readonly SlimEvent[], mode: CanvasMode, say: (words: string) => void) {
+  // The log shown is kept beside the store rather than derived on each render, so a pan, which renders the
+  // canvas every frame, never folds it again.
+  const [log, setLog] = useState<readonly SlimEvent[]>(events);
+  // Every change goes through update, so this ref is always the store as it now is: an answer arriving
+  // decides against the log as it stands, not as it stood when the operation was sent.
+  const current = useRef<CanvasLog>(canvasLog(events));
+  const update = useCallback((change: (log: CanvasLog) => CanvasLog) => {
+    current.current = change(current.current);
+    setLog(shownLog(current.current));
+  }, []);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const caseId = mode.kind === "live" ? mode.caseId : null;
+
+  // The case's log read again, replacing what this tab had confirmed.
+  const refresh = useCallback(async () => {
+    if (caseId === null) return;
+    const events = await fetchEvents(caseId);
+    update((log) => reread(log, events));
+  }, [caseId, update]);
+
+  const dispatch = useCallback(
+    (op: CardOp) => {
+      const envelope = { eventId: crypto.randomUUID(), at: new Date().toISOString() };
+      if (caseId === null) {
+        update((log) => ({ ...log, confirmed: appendOp(log.confirmed, op, envelope) }));
+        return;
+      }
+      update((log) => sent(log, { op, envelope }));
+      queue.current = queue.current.then(async () => {
+        try {
+          const event = await recordCardOperation(caseId, CardOperationRequest.parse({ event_id: envelope.eventId, ...op }));
+          const next = settled(current.current, event);
+          if (next === "stale") await refresh();
+          else update(() => next);
+        } catch (cause) {
+          update((log) => rolledBack(log, envelope.eventId));
+          say(`Not recorded: ${errorMessage(cause)}`);
+        }
+      });
+    },
+    [caseId, refresh, say, update],
+  );
+
+  return { log, dispatch, refresh };
 }
 
 type CanvasProps = {
   view: View;
   log: readonly SlimEvent[];
   mode: CanvasMode;
-  readOnly: string | null;
   dispatch: (op: CardOp) => void;
+  said: string | null;
+  say: (words: string) => void;
 };
 
-function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
+function Canvas({ view, log, mode, dispatch, said, say }: CanvasProps) {
   const layout = useMemo(() => canvasLayout(view), [view]);
   const frame = useRef<HTMLDivElement | null>(null);
   const bin = useRef<HTMLButtonElement | null>(null);
@@ -94,18 +150,6 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
   const pinnedCount = layout.flow.filter((p) => p.pinned).length;
   const models = useMemo(() => new Map(view.cards.map((card) => [card.cardId, cardModel(card, view.state)])), [view]);
   const discarded = board.discarded.flatMap((d) => models.get(d.cardId) ?? []);
-
-  // What the last operation came to, in words, for everyone: a drop that did nothing says why.
-  const [said, setSaid] = useState<string | null>(null);
-  const quiet = useRef<number | null>(null);
-  const say = useCallback((words: string) => {
-    if (quiet.current !== null) window.clearTimeout(quiet.current);
-    setSaid(words);
-    quiet.current = window.setTimeout(() => setSaid(null), 5000);
-  }, []);
-  useEffect(() => () => {
-    if (quiet.current !== null) window.clearTimeout(quiet.current);
-  }, []);
 
   // The cards' actions read the latest layout through a ref, so they keep one identity across renders and
   // a pan, which re-renders the canvas every frame, never re-renders a card.
@@ -119,7 +163,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
     return {
       dock(id) {
         const card = cardOf(id);
-        const slot = card ? naturalSlot(card, latest.current.view.state) : null;
+        const slot = card ? naturalSlot(card, latest.current.view) : null;
         if (slot) dispatch({ type: "card.docked", payload: { card_id: id, plan_slot: slot } });
       },
       undock: (id) => dispatch({ type: "card.undocked", payload: { card_id: id } }),
@@ -175,7 +219,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
     onPointerDown(event: PointerEvent<HTMLDivElement>) {
       // A card is a thing of its own: pressing it never pans the background behind it.
       event.stopPropagation();
-      if (readOnly !== null || event.button !== 0 || (event.target as Element).closest("button, a")) return;
+      if (event.button !== 0 || (event.target as Element).closest("button, a")) return;
       // Grabbed while still settling: it is picked up from where it is on screen, not from its slot.
       const shown = presented(event.currentTarget) ?? rect;
       const at = local(event);
@@ -190,7 +234,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
       const at = local(event);
       const corner = { x: at.x - p.grab.x, y: at.y - p.grab.y };
       const card = view.cards.find((c) => c.cardId === id);
-      setDrag({ id, at: corner, target: targetOf(event, corner), categories: card ? dockableCategories(card, view.state) : [] });
+      setDrag({ id, at: corner, target: targetOf(event, corner), categories: card ? dockableCategories(card, view) : [] });
     },
     onPointerUp() {
       const p = press.current;
@@ -229,7 +273,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
             .join(" · ")}
         </p>
         <p className={`t-footnote ${said ? "" : "faint"}`} role="status">
-          {said ?? readOnly ?? (mode.kind === "fixture" ? "Card operations stay in this tab: a reload starts the recorded case over." : null)}
+          {said ?? (mode.kind === "fixture" ? "Card operations stay in this tab: a reload starts the recorded case over." : null)}
         </p>
       </div>
       <div
@@ -255,7 +299,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
                 return (
                   <div
                     key={card.cardId}
-                    className={`canvas-item${lifted ? " canvas-item--lifted" : ""}${readOnly === null ? " canvas-item--movable" : ""}`}
+                    className={`canvas-item canvas-item--movable${lifted ? " canvas-item--lifted" : ""}`}
                     style={{ transform: placeAt(lifted ? drag.at : rect), width: rect.w, height: rect.h }}
                     // Tabbing onto a card off screen brings it into view; a click on one already in view does not.
                     onFocus={(event) => event.target.matches(":focus-visible") && reveal(rect)}
@@ -269,8 +313,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
                         docked={docked}
                         pinned={pinned}
                         discarded={false}
-                        readOnly={readOnly}
-                        undockable={naturalSlot(card, view.state) ? null : NO_SLOT}
+                        undockable={naturalSlot(card, view) ? null : NO_SLOT}
                         actions={actions}
                       />
                     </div>
@@ -327,7 +370,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
                       <p className="t-caption faint">{model.kind === "finding" ? `Finding · ${model.category}` : `Excerpt · ${model.documentKind ?? model.documentName}, page ${model.page}`}</p>
                       <p className="t-footnote canvas-tray__text">{model.kind === "finding" ? model.title : model.quote}</p>
                     </div>
-                    <button type="button" className="btn btn--small" disabled={readOnly !== null} title={readOnly ?? undefined} onClick={() => actions.restore(model.cardId)}>
+                    <button type="button" className="btn btn--small" onClick={() => actions.restore(model.cardId)}>
                       Restore
                     </button>
                   </li>
@@ -357,8 +400,8 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
       </div>
       <p id={hint} className="t-caption faint canvas-hint">
         Drag the background to move around. Scroll to pan; hold ⌘ or Ctrl and scroll, or pinch, to zoom. With the canvas
-        focused, the arrow keys pan, + and − zoom, 0 fits everything and 1 is actual size.
-        {readOnly === null && " Drag a card to pin it somewhere, or onto the bin to discard it; each card's buttons do the same."}
+        focused, the arrow keys pan, + and − zoom, 0 fits everything and 1 is actual size. Drag a card to pin it
+        somewhere, or onto the bin to discard it; each card&apos;s buttons do the same.
       </p>
       {sheet && <CitationSheet events={log} citation={sheet.citation.citation} label={sheet.label} onClose={() => setSheet(null)} />}
     </section>

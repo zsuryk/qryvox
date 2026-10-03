@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { rationale } from "../lib/board";
 import { cardModel, dockableCategories, naturalSlot } from "../lib/canvas-cards";
 import { canvasView, fixtureEvents } from "../lib/canvas-source";
-import { appendOp, operations } from "../lib/canvas-store";
+import { appendOp, canvasLog, type PendingOp, reread, rolledBack, sent, settled, shownLog } from "../lib/canvas-store";
 
 // The card component's model (#54) and the canvas store: both kinds read off the fixture, and card
 // operations appended to the log and folded back, never kept anywhere else.
@@ -42,12 +42,12 @@ describe("the card model", () => {
   });
 
   it("docks a card in its category, under the authority of the document it cites", () => {
-    expect(naturalSlot(findingCard, view.state)).toEqual({ category: "fees", authority: "factsheet" });
-    expect(naturalSlot(excerptCard, view.state)).toEqual({ category: "fees", authority: "factsheet" });
-    expect(dockableCategories(excerptCard, view.state)).toEqual(["fees"]);
+    expect(naturalSlot(findingCard, view)).toEqual({ category: "fees", authority: "factsheet" });
+    expect(naturalSlot(excerptCard, view)).toEqual({ category: "fees", authority: "factsheet" });
+    expect(dockableCategories(excerptCard, view)).toEqual(["fees"]);
     // A passage no finding cites has no category, so it has no slot.
     const loose = { cardId: "excerpt:ppm:9:0000beef", kind: "excerpt", citation: { document_id: "ppm", page: 9, quote: "x" } } as const;
-    expect(naturalSlot(loose, view.state)).toBeNull();
+    expect(naturalSlot(loose, view)).toBeNull();
   });
 });
 
@@ -77,10 +77,57 @@ describe("the canvas store", () => {
     expect(() => appendOp([], { type: "card.undocked", payload: { card_id: findingCardId("x") } }, envelope(4))).toThrow();
   });
 
-  it("records on the fixture, and says why not on a live case", () => {
-    expect(operations({ kind: "fixture" })).toEqual({ enabled: true });
-    expect(operations({ kind: "live", caseId: "c" })).toEqual({ enabled: false, reason: expect.stringContaining("backend") });
+  it("undocks on the fixture like any other operation", () => {
     const docked = appendOp(fixtureEvents(), { type: "card.undocked", payload: { card_id: findingCard.cardId } }, envelope(5));
     expect(planGroups(canvasView(docked).state)).toEqual([]);
+  });
+});
+
+// On a live case (#65): an operation is shown at once, as the event it will be, and the server's answer
+// either confirms it or takes it back. What is shown is always the confirmed log plus what is in flight.
+describe("the live store", () => {
+  const events = fixtureEvents();
+  const [, , third] = canvasView(events).cards.filter((c) => c.kind === "finding");
+  const restore: PendingOp = { op: { type: "card.restored", payload: { card_id: third!.cardId } }, envelope: envelope(6) };
+  const pin: PendingOp = { op: { type: "card.pinned", payload: { card_id: third!.cardId, world_pos: { x: 48, y: 960 } } }, envelope: envelope(7) };
+  // The event the server would answer with, at the seq it was given there.
+  const recorded = (p: PendingOp, seq: number) => {
+    const event = appendOp(events, p.op, p.envelope).at(-1)!;
+    return { ...event, seq } as Extract<SlimEvent, { type: "card.restored" | "card.pinned" }>;
+  };
+
+  it("shows a sent operation before the answer, after what the server confirmed", () => {
+    const log = sent(sent(canvasLog(events), restore), pin);
+    const shown = shownLog(log);
+    expect(shown.slice(0, events.length)).toEqual(events);
+    expect(shown.slice(events.length).map((e) => [e.seq, e.type])).toEqual([
+      [31, "card.restored"],
+      [32, "card.pinned"],
+    ]);
+    expect(pinOf(canvasView(shown).state, third!.cardId)).toEqual({ x: 48, y: 960 });
+  });
+
+  it("confirms an answered operation with the event the server wrote", () => {
+    const log = settled(sent(sent(canvasLog(events), restore), pin), recorded(restore, 31));
+    expect(log).not.toBe("stale");
+    if (log === "stale") return;
+    expect(log.confirmed).toHaveLength(events.length + 1);
+    expect(log.pending).toEqual([pin]);
+    expect(shownLog(log).at(-1)).toMatchObject({ seq: 32, type: "card.pinned" });
+  });
+
+  it("takes a refused operation back, leaving the canvas as the server has it plus what is still in flight", () => {
+    const log = rolledBack(sent(sent(canvasLog(events), restore), pin), restore.envelope.eventId);
+    const state = canvasView(shownLog(log)).state;
+    expect(isDiscarded(state, third!.cardId)).toBe(true);
+    expect(shownLog(log).at(-1)).toMatchObject({ seq: 31, type: "card.pinned" });
+  });
+
+  it("asks for the log again when the answer is not the next event, and a re-read settles what it holds", () => {
+    const log = sent(canvasLog(events), pin);
+    expect(settled(log, recorded(pin, 32))).toBe("stale");
+    const elsewhere = appendOp(events, restore.op, restore.envelope);
+    const fresh = [...elsewhere, recorded(pin, 32)];
+    expect(reread(log, fresh)).toEqual({ confirmed: fresh, pending: [] });
   });
 });

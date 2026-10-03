@@ -1,17 +1,18 @@
 import {
+  cardCategories,
   type CardId,
   type CaseState,
   type Citation,
   dispositionOf,
   type Disposition,
   type DocumentKind,
-  excerptCardId,
+  citingFindings,
   findingCardId,
   type PlanSlot,
   type Severity,
 } from "@qryvox/shared";
 import { categoryLabel, KIND_LABELS, rationale, SEVERITY_LABELS } from "./board";
-import type { CanvasCard } from "./canvas-source";
+import type { CanvasCard, CanvasView } from "./canvas-source";
 
 // What a canvas card says (#54), as a pure function of the card and the folded state: the words and the
 // facts the one Card component draws, for both kinds. Nothing here calls a model: a finding card's
@@ -86,7 +87,7 @@ export function cardModel(card: CanvasCard, state: CaseState): CardModel {
     page: card.citation.page,
     quote: card.citation.quote,
     citation: cited,
-    linked: linkedFindings(card.cardId, state).map((f) => ({
+    linked: citingFindings(card.cardId, state).map((f) => ({
       cardId: findingCardId(f.finding_id),
       label: `${categoryLabel(f.category)} · ${KIND_LABELS[f.kind].toLowerCase()}`,
     })),
@@ -96,28 +97,18 @@ export function cardModel(card: CanvasCard, state: CaseState): CardModel {
 
 // Where a card docks when it is docked by its button, or dropped on the plan region: its category, under
 // the authority of the document it is cited on. An excerpt card takes the category of the first finding
-// that cites it; a passage no finding cites (a find-similar candidate) has no category, so it has no
-// slot of its own and cannot be docked until a finding cites it.
-export function naturalSlot(card: CanvasCard, state: CaseState): PlanSlot | null {
+// that cites it, and a find-similar candidate no finding cites the category of the card it was found from
+// (cardCategories, shared/src/canvas.ts). A card with no category has no slot.
+export function naturalSlot(card: CanvasCard, view: CanvasView): PlanSlot | null {
   const citation = card.kind === "finding" ? card.finding.citation : card.citation;
-  const authority = documentKind(citation.document_id, state);
-  const category = card.kind === "finding" ? card.finding.category : linkedFindings(card.cardId, state)[0]?.category;
+  const authority = documentKind(citation.document_id, view.state);
+  const category = dockableCategories(card, view)[0];
   return authority && category ? { category, authority } : null;
 }
 
-// The categories a card may be docked under: its finding's, or the categories of every finding citing
-// its passage. A slot in any other category is the wrong place for it (#55).
-export function dockableCategories(card: CanvasCard, state: CaseState): PlanSlot["category"][] {
-  if (card.kind === "finding") return [card.finding.category];
-  return [...new Set(linkedFindings(card.cardId, state).map((f) => f.category))];
-}
-
-function linkedFindings(cardId: CardId, state: CaseState) {
-  return state.findings.filter(
-    (f) =>
-      f.supersededAtSeq === null &&
-      (excerptCardId(f.citation) === cardId || (f.counterpart !== null && excerptCardId(f.counterpart) === cardId)),
-  );
+// The categories a card may be docked under: the same rule the backend refuses a dock by (#55, #65).
+export function dockableCategories(card: CanvasCard, view: CanvasView): PlanSlot["category"][] {
+  return cardCategories(card, view.state, view.cards);
 }
 
 function documentKind(documentId: string, state: CaseState): DocumentKind | null {

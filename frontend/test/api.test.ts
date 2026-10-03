@@ -1,6 +1,6 @@
 import { ChangeDispositionRequest, IngestedDocument, PDFJS_VERSION, StepResult } from "@qryvox/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { API_URL, changeDisposition, ingestDocument, openCase, runStep } from "../lib/api";
+import { API_URL, changeDisposition, ingestDocument, openCase, recordCardOperation, runStep } from "../lib/api";
 
 // What intake hands the wire. Parsed against the real schema, so this test fails if a field the event
 // needs is ever dropped between the browser and the log.
@@ -135,6 +135,27 @@ describe("changing a disposition", () => {
     await expect(
       changeDisposition("case", ChangeDispositionRequest.parse({ event_id: crypto.randomUUID(), finding_id: "f-1", disposition: "approved" })),
     ).rejects.toThrow("not found in case case");
+  });
+});
+
+describe("recording a card operation", () => {
+  const caseId = crypto.randomUUID();
+  const request = { event_id: crypto.randomUUID(), type: "card.discarded" as const, payload: { card_id: "finding:f-1" } };
+
+  it("posts the operation under the browser's event id and answers with the event the log recorded", async () => {
+    const event = { ...request, seq: 31, case_id: caseId, actor: "demo-analyst", at: "2026-10-03T12:00:00.000Z", step_run_id: null, v: 1 };
+    const fetch = stubFetch(event);
+
+    expect(await recordCardOperation(caseId, request)).toEqual(event);
+
+    const [url, init] = fetch.mock.calls[0]!;
+    expect(url).toBe(`${API_URL}/cases/${caseId}/cards`);
+    expect(init).toMatchObject({ method: "POST", body: JSON.stringify(request) });
+  });
+
+  it("raises the server's reason, not its status line", async () => {
+    stubFetch({ error: "card finding:f-1 is not on this case's canvas" }, 409);
+    await expect(recordCardOperation(caseId, request)).rejects.toThrow(/^card finding:f-1 is not on this case's canvas$/);
   });
 });
 
