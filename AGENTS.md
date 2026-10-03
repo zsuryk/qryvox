@@ -13,7 +13,7 @@
 
 ## Deploying
 
-Deploys are owner-only Vercel CLI, never the Git integration, and they run from a staged copy of the repo that has **no `.git` directory** — Vercel matches commit authors against the account owner on Hobby and blocks everyone else. **Read `docs/deploying.md` before deploying.** Commands: `pnpm deploy:check` (build only), `pnpm deploy:preview` (upload, production untouched), `pnpm deploy:api`, `pnpm deploy:web`, `pnpm deploy:setup` (one-time). Rationale in ADR-0001.
+Deploys are owner-only Vercel CLI, never the Git integration, and they run from a staged copy of the repo that has **no `.git` directory** — Vercel matches commit authors against the account owner on Hobby and blocks everyone else. **Read `docs/deploying.md` before deploying.** Commands: `pnpm deploy:check` (build only), `pnpm deploy:preview` (upload, production untouched), `pnpm deploy:api`, `pnpm deploy:web`, `pnpm deploy:all` (api then web, same commit), `pnpm deploy:setup` (one-time), `pnpm smoke` (post-deploy end-to-end check of the API). Rationale in ADR-0001.
 
 ## Agent skills
 

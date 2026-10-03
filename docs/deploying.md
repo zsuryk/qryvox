@@ -1,7 +1,7 @@
 # Deploying to Vercel
 
-One command per action. All of them go through `scripts/deploy.sh`; read
-`docs/adr/0001-typescript-monorepo-on-vercel.md` for why it works this way.
+One command per action. Deploys go through `scripts/deploy.sh`; `smoke` is a plain tsx script. Read
+`docs/adr/0001-typescript-monorepo-on-vercel.md` for why the deploys work the way they do.
 
 | Command | What it does |
 |---|---|
@@ -9,6 +9,8 @@ One command per action. All of them go through `scripts/deploy.sh`; read
 | `pnpm deploy:preview` | Uploads for real as a **Preview**. Production is untouched. Proves the upload path end to end. |
 | `pnpm deploy:api` | Migrates the database, deploys the backend, verifies `/health`. |
 | `pnpm deploy:web` | Deploys the frontend. |
+| `pnpm deploy:all` | `api` then `web`, from the same commit — the same two can never be deployed out of order, so production never runs a new frontend against an old backend. |
+| `pnpm smoke` | End-to-end check of the deployed backend: health, open a case, ingest the pack, run the full pipeline, verify the chain. |
 | `pnpm deploy:setup` | One-time: creates and links both Vercel projects, pushes production env vars. |
 
 ## First run on a new machine
@@ -58,6 +60,18 @@ curl -fsS https://qryvox-api.vercel.app/health
 
 `eventTypes` in that response comes from `@qryvox/shared`, so a correct answer proves the
 workspace resolved inside the deployed function — which is the failure mode ADR-0001 warns about.
+
+For the full check, run the smoke script:
+
+```sh
+pnpm smoke                              # https://qryvox-api.vercel.app
+SMOKE_BASE_URL=https://... pnpm smoke   # any other deployment
+JUDGE_TOKEN=... pnpm smoke              # when the judge-link token is switched on (#19)
+```
+
+It opens a case, ingests the fabricated pack, runs the pipeline in the browser's order
+(extract, decompose, contradictions, compliance, findings), and asserts the chain verifies
+intact. A fresh case and fresh ids every run, so it is safe to re-run after any contract change.
 
 ## Constraints worth knowing before demo night
 

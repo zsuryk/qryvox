@@ -11,6 +11,7 @@
     "db:migrate": "tsx --conditions=source --env-file-if-exists=../.env scripts/db.ts migrate",
     "db:check": "tsx --conditions=source --env-file-if-exists=../.env scripts/db.ts check",
     "record:fixture": "tsx --conditions=source scripts/record-fold-fixture.ts",
+    "smoke": "tsx --conditions=source scripts/smoke.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
