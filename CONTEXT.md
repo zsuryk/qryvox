@@ -288,9 +288,10 @@ settle each one before it spreads further.
    of issue; only one kind is a contradiction.
 5. **The analyst is a constant, not a person.** Every decision, including an adviser's sign-off in stage 2,
    is attributed to `demo-analyst` (ADR-0004). Real identities remain future work.
-6. **How exactly a quote "matches" in eval.** Quotes can differ by a section number ("3.3 …") or a
-   counterpart can cite another document stating the same fact (fee table vs PPM). Whether a match is
-   containment in either direction, and whether a counterpart may match, is #15's to settle.
+6. ~~**How exactly a quote "matches" in eval.**~~ Settled by the eval tiles (#15): a finding matches a planted
+   one when they share a category and either of the finding's quotes (citation or counterpart) contains the
+   planted citation's quote or is contained by it (`frontend/lib/eval.ts`). It does not check the rule a
+   policy gap names, so a P1 finding on a passage the answer key plants as P2 still counts.
 7. **Severity has no written definition.** It is whatever the `findings` prompt asks the model for; nothing
    yet says what high, medium and low must mean to the analyst.
 8. **Rationale is not in the log.** It is derived on screen, so a replayed board shows today's wording,
