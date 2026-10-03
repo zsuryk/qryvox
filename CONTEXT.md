@@ -161,6 +161,11 @@ passage). Its id says which and is derived from what it shows (`card.ts`): `find
 `excerpt:<document_id>:<page>:<hash of the quote>`, so the same finding or passage is the same card on every
 replay. *Not* the finding: what happens to a card never changes the finding it shows.
 
+**Latent card** — an extracted statement the case has as a card (it was grounded when extracted) that
+nothing has brought onto the canvas yet: no finding cites it, and no Similar press or Look further run
+returned it. It is not drawn; it may be pinned or discarded, and docks only once a press gives it a
+category. *Not* hidden: it simply has not been asked for.
+
 **Auto-tiling** — how cards find their place on the canvas without anyone placing them: one size of card,
 left to right in rows of four from world (0, 0), each new card after the last, skipping any slot a pinned
 card is in (`frontend/lib/tiling.ts`). Docked and discarded cards are not in the flow. *Not* a pin: tiling
@@ -184,9 +189,12 @@ the card. *Dock* puts a card in the plan region;
 *pin* holds it at a world position that auto-tiling flows around, and *unpin* lets it back into the flow;
 *discard* rejects it to the **discard bin** (the corner of the canvas a card is thrown to, and restored from),
 and takes it out of the plan region; *restore*, or docking it again, brings it back; *find similar* asks
-for a seeded re-run of **extract** over the documents, seeded with the passage the card shows — a finding
-card's own citation included (#66). *Not* contradictions, which a finding card used to re-run: it returned
-the issue the finding was already made of, whose passage already had a card (#57).
+for the card's nearest **extracted statements** at once: no model, ranked by BM25 over the latest extract
+run as it stood at the press (`similarNeighbours`, `canvas.ts`), and brought onto the canvas as
+*neighbours* (#60). **Look further** then asks for a seeded re-run of **extract** over the documents,
+seeded with the passage the card shows — a finding card's own citation included (#66) — whose passages
+arrive as *candidates*. *Not* contradictions, which a finding card used to re-run: it returned the issue
+the finding was already made of, whose passage already had a card (#57).
 *Discard* is not *dismissed*: discarding a finding card neither dismisses nor supersedes the finding.
 
 **Status panel** — the canvas's view of the case's own log (`frontend/lib/canvas-status.ts`): one line per
