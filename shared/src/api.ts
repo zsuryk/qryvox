@@ -80,7 +80,8 @@ export type ErrorResponse = z.infer<typeof ErrorResponse>;
 export const RunStepRequest = z.object({
   step_run_id: z.uuid(),
   step: StepName,
-  // The completed run of the previous step to consume; null for extract.
+  // The completed run of the previous step to consume; null for the steps that read the documents
+  // (extract, attributes).
   input_run_id: z.string().min(1).nullable(),
 });
 export type RunStepRequest = z.infer<typeof RunStepRequest>;

@@ -48,8 +48,9 @@ export const DocumentIngested = z.object({
   payload: IngestedDocument,
 });
 
-// The four analysis steps, driven by the browser in this order (ADR-0001).
-export const StepName = z.enum(["extract", "decompose", "contradictions", "findings"]);
+// The four analysis steps, driven by the browser in this order (ADR-0001), then the steps stage 2 adds:
+// attributes reads the documents for the facts suitability needs (#29).
+export const StepName = z.enum(["extract", "decompose", "contradictions", "findings", "attributes"]);
 export type StepName = z.infer<typeof StepName>;
 
 // Which prompt produced a step's output. The prompt text lives in the backend and never reaches the
@@ -59,6 +60,7 @@ export const PROMPT_VERSIONS = {
   decompose: "decompose@1",
   contradictions: "contradictions@1",
   findings: "findings@1",
+  attributes: "attributes@1",
 } as const satisfies Record<StepName, string>;
 
 const stepRun = {
