@@ -229,6 +229,15 @@ export async function findCompletedRun(db: Db | Tx, caseId: string, stepRunId: s
   return row;
 }
 
+// Every case holding a completed run of the step, e.g. the cases a product's attributes were read in.
+export async function casesWithCompletedStep(db: Db | Tx, step: string): Promise<string[]> {
+  const rows = await db
+    .selectDistinct({ caseId: events.caseId })
+    .from(events)
+    .where(and(eq(events.type, "step.completed"), sql`json_extract(${events.payload}, '$.step') = ${step}`));
+  return rows.map((r) => r.caseId);
+}
+
 // Where a finding stands: created and still on the board, superseded by a later findings run, or unknown.
 export async function findingStatus(db: Db, caseId: string, findingId: string): Promise<"active" | "superseded" | null> {
   const rows = await db

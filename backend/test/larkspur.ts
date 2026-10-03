@@ -37,6 +37,10 @@ export const ATTRIBUTES_REPLY = {
   exit_charge_within_months: { value: 24, citation: ppm(3, "7.2 A redemption charge of 2.00% applies to units redeemed within 24 months of purchase.") },
   derivatives_use: { value: "hedging", citation: ppm(1, "3.5 The Fund may use derivatives for hedging purposes only.") },
   exclusion_screens: [{ exclusion: "fossil_fuels", citation: deckScreen }],
+  product_name: {
+    value: "Larkspur Global Income Fund",
+    citation: ppm(1, "Larkspur Global Income Fund - issued by Calderhaven Asset Management Ltd"),
+  },
 };
 const managementFee = { document_id: "factsheet", page: 1, quote: "Annual management fee: 0.85% per annum" };
 const feeTableFee = { document_id: "fee-table", page: 1, quote: "Annual management fee: 1.25% of net asset value" };

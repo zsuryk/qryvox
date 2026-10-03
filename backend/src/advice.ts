@@ -1,4 +1,5 @@
 import {
+  type Alternative,
   ANALYST_ACTOR,
   assessSuitability,
   type CaseState,
@@ -11,7 +12,15 @@ import {
 import { randomUUID } from "node:crypto";
 import type { Db } from "./db/client.js";
 import type { EventRow } from "./db/schema.js";
-import { appendOnceWith, type EventDraft, findByEventId, findCompletedRun, foldCase, type Tx } from "./log.js";
+import {
+  appendOnceWith,
+  casesWithCompletedStep,
+  type EventDraft,
+  findByEventId,
+  findCompletedRun,
+  foldCase,
+  type Tx,
+} from "./log.js";
 
 // The client layer (#31): profiles, advice drafted by the suitability rules, and the adviser's decision.
 // No model is called here. Every check runs inside the write transaction against the case as it stands
@@ -58,7 +67,10 @@ export function draftAdvice(db: Db, caseId: string, eventId: string, clientId: s
     const same = current.find((a) => a.attributes_run_id === run && a.profile_seq === client.profiledAtSeq);
     if (same) throw new AdviceConflict(`advice ${same.adviceId} is already drafted on this profile and these attributes`);
 
-    const assessment = assessSuitability(client.profile, await attributesOf(tx, caseId, run), undismissedFindings(state));
+    const attributes = await attributesOf(tx, caseId, run);
+    const assessment = assessSuitability(client.profile, attributes, undismissedFindings(state));
+    const alternatives =
+      assessment.verdict === "suitable" ? undefined : await alternativesFor(tx, caseId, attributes, client.profile);
     return {
       payload: {
         client_id: clientId,
@@ -66,6 +78,7 @@ export function draftAdvice(db: Db, caseId: string, eventId: string, clientId: s
         attributes_run_id: run,
         ...assessment,
         rules_version: RULES_VERSION,
+        ...(alternatives ? { alternatives } : {}),
       },
       companions: current.map((a) => supersede(a.adviceId, "product_changed")),
     };
@@ -85,6 +98,46 @@ export async function decideAdvice(db: Db, caseId: string, adviceId: string, req
       throw new AdviceConflict(`advice ${adviceId} was superseded by a newer profile or attributes run`);
     }
     return { payload: { advice_id: adviceId, decision: req.decision }, companions: [] };
+  });
+}
+
+// The shelf (#39): every other verified product, from the cases it was verified in — a completed findings
+// run and an attributes run that named the product — the latest verified case per product. Never the
+// advice's own product, however many cases it has.
+async function shelf(tx: Tx, caseId: string, own: ProductAttributes) {
+  const ownName = own.product_name?.value.toLowerCase();
+  const products = new Map<string, { caseId: string; runId: string; at: string; attributes: ProductAttributes; state: CaseState }>();
+  for (const id of await casesWithCompletedStep(tx, "attributes")) {
+    if (id === caseId) continue;
+    const state = await foldCase(tx, id);
+    const runId = latestCompleted(state, "attributes");
+    if (!runId || !latestCompleted(state, "findings")) continue;
+    const row = await findCompletedRun(tx, id, runId);
+    const attributes = ProductAttributes.parse((row?.payload as { output?: unknown } | undefined)?.output);
+    const name = attributes.product_name?.value;
+    if (!name || name.toLowerCase() === ownName) continue;
+    const seen = products.get(name.toLowerCase());
+    if (!seen || seen.at < row!.at) products.set(name.toLowerCase(), { caseId: id, runId, at: row!.at, attributes, state });
+  }
+  return [...products.values()];
+}
+
+// The products on the shelf the same rules find suitable for this client, each with its own reasons,
+// disclosures and citations. Empty when none fits: the advice then says so.
+async function alternativesFor(tx: Tx, caseId: string, own: ProductAttributes, profile: ClientProfile): Promise<Alternative[]> {
+  return (await shelf(tx, caseId, own)).flatMap((product) => {
+    const assessment = assessSuitability(profile, product.attributes, undismissedFindings(product.state));
+    if (assessment.verdict !== "suitable") return [];
+    return [
+      {
+        case_id: product.caseId,
+        product_name: product.attributes.product_name!.value,
+        attributes_run_id: product.runId,
+        verdict: "suitable" as const,
+        reasons: assessment.reasons,
+        disclosures: assessment.disclosures,
+      },
+    ];
   });
 }
 

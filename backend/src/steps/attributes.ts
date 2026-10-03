@@ -11,7 +11,7 @@ import { StepPrecondition, type StepDefinition } from "./step.js";
 // fails only when an attribute the suitability rules need is missing, and says which.
 
 type AttributesInput = { documents: IngestedDocument[] };
-type ScalarKey = Exclude<keyof ProductAttributes, "exclusion_screens">;
+type ScalarKey = Exclude<keyof ProductAttributes, "exclusion_screens" | "product_name">;
 
 // Every scalar attribute: S1–S5 read all of them.
 const SCALARS = [
@@ -48,10 +48,11 @@ Facts:
 - redemption_notice_days: the notice in days a redemption request needs (0 if none).
 - exit_charge_within_months: the period in months within which a charge applies on redeeming (0 if there is no exit charge; then cite the passage that lists the charges).
 - derivatives_use: "none", "hedging" or "investment".
+- product_name: the product's full name, quoted from a line that states it.
 - exclusion_screens: every exclusion screen any document claims, each as {"exclusion": "fossil_fuels" | "tobacco" | "weapons", "citation": …}. If the PPM states the screen, cite the PPM; otherwise cite the document that claims it.
 
 Respond with only a JSON object and no other text, in exactly this shape:
-{"min_holding_years":{"value":<integer>,"citation":{"document_id":"<document_id>","page":<page>,"quote":"<verbatim>"}},"sub_investment_grade_max_pct":{…},"capital_protected":{…},"distributions_may_use_capital":{…},"dealing_frequency":{…},"redemption_notice_days":{…},"exit_charge_within_months":{…},"derivatives_use":{…},"exclusion_screens":[{"exclusion":"<exclusion>","citation":{…}}]}`;
+{"min_holding_years":{"value":<integer>,"citation":{"document_id":"<document_id>","page":<page>,"quote":"<verbatim>"}},"sub_investment_grade_max_pct":{…},"capital_protected":{…},"distributions_may_use_capital":{…},"dealing_frequency":{…},"redemption_notice_days":{…},"exit_charge_within_months":{…},"derivatives_use":{…},"product_name":{…},"exclusion_screens":[{"exclusion":"<exclusion>","citation":{…}}]}`;
 
 export const attributes: StepDefinition<AttributesInput, ProductAttributes, AttributesReply> = {
   name: "attributes",
@@ -94,7 +95,11 @@ export const attributes: StepDefinition<AttributesInput, ProductAttributes, Attr
       return { error: `the attributes suitability needs could not all be established: ${missing.join("; ")}` };
     }
     return {
-      output: ProductAttributes.parse({ ...found, exclusion_screens: screens(reply.exclusion_screens, documents) }),
+      output: ProductAttributes.parse({
+        ...found,
+        exclusion_screens: screens(reply.exclusion_screens, documents),
+        ...name(reply.product_name, documents),
+      }),
     };
   },
 
@@ -130,6 +135,16 @@ function screens(reply: unknown, documents: readonly IngestedDocument[]): Produc
     const best = claims.find((s) => s.backed_by_ppm) ?? claims[0];
     return best ? [best] : [];
   });
+}
+
+// The product's name, kept only when its quote grounds and states it: the shelf tells products apart by
+// it (#39), so a name the documents do not say is worse than none.
+function name(reply: unknown, documents: readonly IngestedDocument[]): Pick<ProductAttributes, "product_name"> {
+  const parsed = ProductAttributes.shape.product_name.unwrap().safeParse(reply);
+  if (!parsed.success) return {};
+  const citation = groundCitation(documents, parsed.data.citation);
+  const stated = citation && normalize(citation.quote).toLowerCase().includes(normalize(parsed.data.value).toLowerCase());
+  return stated ? { product_name: { value: normalize(parsed.data.value), citation } } : {};
 }
 
 const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
