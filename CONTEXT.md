@@ -181,6 +181,11 @@ and takes it out of the plan region; *restore*, or docking it again, brings it b
 for a seeded re-run of the step that produced it.
 *Discard* is not *dismissed*: discarding a finding card neither dismisses nor supersedes the finding.
 
+**Status panel** — the canvas's view of the case's own log (`frontend/lib/canvas-status.ts`): one line per
+step run, parse and find-similar runs included, with the reason any failed, and one line per card
+operation. It keeps nothing of its own. *Not* the Run panel on Review, which drives the pipeline; this one
+only reads.
+
 **Intent chip** — one thing the analyst wants to look at next on the canvas: a category, a document kind
 (authority) and a step, any of them left open (`IntentChip`, `intent.ts`). Chips are first-class: picked by
 hand, or read from the analyst's words by `parse`. A chip selects; it never decides anything.

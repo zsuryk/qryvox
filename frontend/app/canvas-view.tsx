@@ -30,6 +30,7 @@ import {
   zoomBy,
 } from "../lib/viewport";
 import { Card, type CardActions } from "./canvas-card";
+import CanvasStatus from "./canvas-status";
 import CitationSheet from "./citation-sheet";
 
 // The canvas (#48): the case's findings and the passages they cite, laid out as cards on a board that pans
@@ -302,6 +303,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
             role="region"
             aria-label="Discard bin"
             className="canvas-tray materialize"
+            data-scrolls
             onPointerDown={(event) => event.stopPropagation()}
             onKeyDown={(event) => {
               if (event.key !== "Escape") return;
@@ -335,6 +337,8 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
             <p className="t-caption faint">Discarding rejects a card from the canvas. The finding it shows is untouched.</p>
           </div>
         )}
+
+        <CanvasStatus events={log} />
 
         <div className="canvas__toolbar" role="toolbar" aria-label="Zoom" onPointerDown={(event) => event.stopPropagation()}>
           <button type="button" className="btn btn--small" aria-label="Zoom out" onClick={() => zoom(1 / 1.25)}>
@@ -499,6 +503,8 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
     const el = frame.current;
     if (!el) return;
     const onWheel = (event: WheelEvent) => {
+      // A list floating over the canvas scrolls itself; it is not the canvas being panned.
+      if (event.target instanceof Element && event.target.closest("[data-scrolls]")) return;
       event.preventDefault();
       stopGlide();
       const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? size.current.height : 1;
