@@ -44,7 +44,8 @@
       "expected_disclosures": [
         "fees-management-fee",
         "fees-exit-charge",
-        "terms-dealing-frequency"
+        "terms-dealing-frequency",
+        "policy-factsheet-exit-charge"
       ]
     },
     {
@@ -80,7 +81,8 @@
       "expected_disclosures": [
         "fees-management-fee",
         "fees-exit-charge",
-        "terms-dealing-frequency"
+        "terms-dealing-frequency",
+        "policy-factsheet-exit-charge"
       ]
     },
     {
@@ -110,7 +112,8 @@
       "expected_disclosures": [
         "fees-management-fee",
         "fees-exit-charge",
-        "terms-dealing-frequency"
+        "terms-dealing-frequency",
+        "policy-factsheet-exit-charge"
       ]
     }
   ]

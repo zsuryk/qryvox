@@ -92,6 +92,74 @@
         "page": 3,
         "quote": "7.3 Redemptions are processed monthly, on the last business day of each month."
       }
+    },
+    {
+      "id": "policy-factsheet-credit-risk",
+      "category": "risk",
+      "kind": "policy_gap",
+      "summary": "The factsheet's risk section names interest-rate and currency risk but not the credit risk the PPM lists.",
+      "citation": {
+        "document_id": "factsheet",
+        "page": 2,
+        "quote": "Bond prices generally fall when interest rates rise."
+      },
+      "counterpart": {
+        "document_id": "ppm",
+        "page": 2,
+        "quote": "5.4 The Fund is exposed to interest rate, credit and currency risk."
+      },
+      "rule": "P1"
+    },
+    {
+      "id": "policy-deck-risk-types",
+      "category": "risk",
+      "kind": "policy_gap",
+      "summary": "The deck names none of the interest-rate, credit and currency risks the PPM lists.",
+      "citation": {
+        "document_id": "deck",
+        "page": 1,
+        "quote": "A diversified portfolio of government and corporate bonds."
+      },
+      "counterpart": {
+        "document_id": "ppm",
+        "page": 2,
+        "quote": "5.4 The Fund is exposed to interest rate, credit and currency risk."
+      },
+      "rule": "P1"
+    },
+    {
+      "id": "policy-factsheet-capital-protection",
+      "category": "risk",
+      "kind": "policy_gap",
+      "summary": "The factsheet does not say the fund is not capital protected, as the PPM does.",
+      "citation": {
+        "document_id": "factsheet",
+        "page": 2,
+        "quote": "The value of investments and the income from them can fall as well as rise."
+      },
+      "counterpart": {
+        "document_id": "ppm",
+        "page": 2,
+        "quote": "5.1 The Fund is not capital protected. Investors may lose some or all of the amount invested."
+      },
+      "rule": "P2"
+    },
+    {
+      "id": "policy-factsheet-exit-charge",
+      "category": "fees",
+      "kind": "policy_gap",
+      "summary": "The factsheet's key facts list no exit charge, though the PPM charges 2.00% on redemptions within 24 months.",
+      "citation": {
+        "document_id": "factsheet",
+        "page": 1,
+        "quote": "Minimum initial investment: USD 1,000"
+      },
+      "counterpart": {
+        "document_id": "ppm",
+        "page": 3,
+        "quote": "7.2 A redemption charge of 2.00% applies to units redeemed within 24 months of purchase."
+      },
+      "rule": "P3"
     }
   ]
 }
