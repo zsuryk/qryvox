@@ -1,6 +1,8 @@
 import {
   ANALYST_ACTOR,
   type AppendResponse,
+  CardOperationRequest,
+  CardOperationResponse,
   ChangeDispositionRequest,
   DecideAdviceRequest,
   DraftAdviceRequest,
@@ -20,6 +22,7 @@ import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
 import { AdviceConflict, AdviceNotFound, decideAdvice, draftAdvice, recordProfile } from "./advice.js";
+import { CardConflict, recordCardOperation } from "./cards.js";
 import { assertAppendOnly } from "./db/append-only.js";
 import type { Database } from "./db/client.js";
 import { clientIp, type Guards, hashIp, judgeLink, originAllowList, RateLimited } from "./guards.js";
@@ -66,7 +69,7 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
   app.use(cors({ origin: [...guards.allowedOrigins] }));
 
   app.onError((err, c) => {
-    if (err instanceof EventIdConflict || err instanceof StepPrecondition || err instanceof AdviceConflict) {
+    if (err instanceof EventIdConflict || err instanceof StepPrecondition || err instanceof AdviceConflict || err instanceof CardConflict) {
       return c.json({ error: err.message }, 409);
     }
     if (err instanceof AdviceNotFound) return c.json({ error: err.message }, 404);
@@ -160,6 +163,19 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
       payload: { finding_id, disposition },
     });
     return c.json({ seq: row.seq } satisfies AppendResponse, 201);
+  });
+
+  // One card operation on the canvas (#65): dock, undock, pin, unpin, discard, restore or find similar, as
+  // the analyst made it. No model is called, so no judge-link token; find similar's own run goes through
+  // /steps like any step. 409 for a card the case does not have, or a dock into another category.
+  app.post("/cases/:caseId/cards", async (c) => {
+    const caseId = c.req.param("caseId");
+    const body = CardOperationRequest.safeParse(await readJson(c));
+    if (!body.success) return badRequest(c, body.error);
+    if (!(await caseExists(db, caseId))) return notFound(c, caseId);
+
+    const row = await recordCardOperation(db, caseId, body.data);
+    return c.json(CardOperationResponse.parse(toWire(row)), 201);
   });
 
   // The client layer (#31). No model is called and nothing spends tokens, so no judge-link token either.

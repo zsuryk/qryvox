@@ -11,6 +11,8 @@
 import { serve } from "@hono/node-server";
 import {
   AppendResponse,
+  CardOperationRequest,
+  CardOperationResponse,
   ChangeDispositionRequest,
   DecideAdviceRequest,
   DraftAdviceRequest,
@@ -91,6 +93,18 @@ const TEXT = {
     disposeInvalid: "Invalid body; disposition must be approved or dismissed",
     noFinding: "Unknown case, or the case never produced this finding",
     superseded: "The finding was superseded by a later findings run and is off the board",
+    card: "Record a card operation on the canvas",
+    cardDesc:
+      "Appends one card event, attributed to the analyst: card.docked (into a plan slot), card.undocked, card.pinned " +
+      "(at a world position), card.unpinned, card.discarded, card.restored, or card.similar_requested (step_kind " +
+      "contradictions for a finding card, extract for an excerpt card; the seeded run itself is a separate call to " +
+      "/steps). Nothing touches a finding: discarding a finding card is not dismissing it. Idempotent by event_id. " +
+      "Answers with the event appended.",
+    cardRecorded: "Recorded; the card event as appended",
+    cardInvalid: "Invalid body: not a card event, a malformed card id, or find similar naming a step other than the card's",
+    cardRefused:
+      "The case has no such card (a finding not on the board, or a passage no active finding cites and no completed " +
+      "find-similar run returned), a dock into a slot of another category, or the event_id used by another event",
     profile: "Record a client's profile",
     profileDesc:
       "Appends client.profiled: a new version of the client's answers, under a pseudonymous id (never a name). " +
@@ -168,6 +182,17 @@ const TEXT = {
     disposeInvalid: "請求內容不正確；disposition 必須是 approved 或 dismissed",
     noFinding: "找不到此案件，或此案件沒有這筆發現",
     superseded: "這筆發現已被之後的 findings 執行取代，不在看板上",
+    card: "記錄畫布上的卡片操作",
+    cardDesc:
+      "追加一筆卡片事件，記錄為分析師所做：card.docked（放入計畫區的某一格）、card.undocked、card.pinned（固定在畫布座標）、" +
+      "card.unpinned、card.discarded、card.restored，或 card.similar_requested（發現卡片的 step_kind 為 contradictions，" +
+      "摘錄卡片為 extract；帶種子的重新執行本身另外呼叫 /steps）。不會改動任何發現：丟棄發現卡片不等於駁回該發現。" +
+      "以 event_id 確保冪等。回傳所追加的事件。",
+    cardRecorded: "已記錄；回傳所追加的卡片事件",
+    cardInvalid: "請求內容不正確：不是卡片事件、卡片 ID 格式錯誤，或「找相似」指定的步驟與卡片種類不符",
+    cardRefused:
+      "此案件沒有這張卡片（發現不在看板上，或摘錄既未被任何有效發現引用、也不是已完成的「找相似」執行所回傳），" +
+      "放入其他類別的格子，或 event_id 已被其他事件使用",
     profile: "記錄客戶檔案",
     profileDesc:
       "追加一筆 client.profiled：客戶答案的新版本，使用化名 ID（不可填姓名）。" +
@@ -211,6 +236,8 @@ const schemas = {
   StepResult,
   StepFailure,
   ChangeDispositionRequest,
+  CardOperationRequest,
+  CardOperationResponse,
   RecordProfileRequest,
   RecordReadingRequest,
   DraftAdviceRequest,
@@ -300,6 +327,20 @@ function openapi(lang: Lang) {
             400: error(t.disposeInvalid),
             404: error(t.noFinding),
             409: error(t.superseded),
+          },
+        },
+      },
+      "/cases/{caseId}/cards": {
+        post: {
+          summary: t.card,
+          description: t.cardDesc,
+          parameters: [caseId],
+          requestBody: body("CardOperationRequest"),
+          responses: {
+            201: json("CardOperationResponse", t.cardRecorded),
+            400: error(t.cardInvalid),
+            404: error(t.unknownCase),
+            409: error(t.cardRefused),
           },
         },
       },

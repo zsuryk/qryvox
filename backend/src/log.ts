@@ -124,8 +124,13 @@ export async function appendOnceWith(
 
 // The case as the fold derives it, read through db or inside a transaction.
 export async function foldCase(db: Db | Tx, caseId: string): Promise<CaseState> {
+  return fold(await caseLog(db, caseId));
+}
+
+// The case's whole log as the browser reads it (slim), for a rule that needs more than the fold keeps.
+export async function caseLog(db: Db | Tx, caseId: string): Promise<SlimEvent[]> {
   const rows = await db.select().from(events).where(eq(events.caseId, caseId)).orderBy(asc(events.seq));
-  return fold(rows.map((row) => SlimEvent.parse(toWire(row))));
+  return rows.map((row) => SlimEvent.parse(toWire(row)));
 }
 
 function sameEventOrThrow(row: EventRow, caseId: string, draft: EventDraft): EventRow {
