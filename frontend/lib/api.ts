@@ -5,6 +5,8 @@ import {
   type ClientProfile,
   EventPage,
   type IngestedDocument,
+  JUDGE_TOKEN_HEADER,
+  JUDGE_TOKEN_PARAM,
   OpenCaseResponse,
   type RunStepRequest,
   type SlimEvent,
@@ -27,11 +29,49 @@ export class StepFailureError extends Error {
   }
 }
 
+// The judge-link token (ADR-0001, #19). The demo link carries ?k=<token>; it is kept for the tab in
+// sessionStorage and taken out of the address bar, so it does not travel on in a screenshot, a copied link
+// or a referrer. Every call carries it; only analysis steps need it. Without one, nothing changes: a local
+// backend with no JUDGE_TOKEN asks for none.
+const TOKEN_KEY = "qryvox.judge-token";
+
+export function captureJudgeToken(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get(JUDGE_TOKEN_PARAM);
+  if (!token) return;
+  try {
+    window.sessionStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // Storage refused (a private window, blocked site data): the link still works for this page load.
+    memoryToken = token;
+  }
+  url.searchParams.delete(JUDGE_TOKEN_PARAM);
+  window.history.replaceState(window.history.state, "", url);
+}
+
+let memoryToken: string | null = null;
+
+function judgeToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(TOKEN_KEY) ?? memoryToken;
+  } catch {
+    return memoryToken;
+  }
+}
+
 async function send(method: "GET" | "POST", path: string, body?: unknown): Promise<Response> {
+  const token = judgeToken();
+  const headers = {
+    ...(body === undefined ? {} : { "content-type": "application/json" }),
+    ...(token ? { [JUDGE_TOKEN_HEADER]: token } : {}),
+  };
   return fetch(`${API_URL}${path}`, {
     method,
     cache: "no-store",
-    ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+    ...(Object.keys(headers).length === 0 ? {} : { headers }),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 }
 
@@ -92,6 +132,10 @@ export async function runStep(caseId: string, req: RunStepRequest): Promise<Step
   }
   const failure = StepFailure.safeParse(body);
   if (failure.success) throw new StepFailureError(failure.data);
+  // The judge-link token, missing or wrong: said as what to do, not as a status code.
+  if (res.status === 401) {
+    throw new Error("this demo link is missing its access token, or the token is wrong. Open the link you were given again.");
+  }
   throw new Error(`POST ${path}: ${res.status} ${text}`);
 }
 

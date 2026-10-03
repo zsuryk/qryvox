@@ -137,3 +137,45 @@ describe("changing a disposition", () => {
     ).rejects.toThrow("not found in case case");
   });
 });
+
+describe("the judge-link token", () => {
+  function browser(search: string, stored: Record<string, string> = {}) {
+    const storage = new Map(Object.entries(stored));
+    const replaced: string[] = [];
+    vi.stubGlobal("window", {
+      location: { href: `https://qryvox.vercel.app/${search}` },
+      history: { state: null, replaceState: (_: unknown, __: string, url: URL) => replaced.push(String(url)) },
+      sessionStorage: { getItem: (k: string) => storage.get(k) ?? null, setItem: (k: string, v: string) => storage.set(k, v) },
+    });
+    return { storage, replaced };
+  }
+  const step = { step_run_id: crypto.randomUUID(), step: "extract" as const, input_run_id: null };
+
+  it("is taken off the demo link into the tab's storage, and out of the address bar", async () => {
+    const { storage, replaced } = browser("?k=judge-secret&x=1");
+    const { captureJudgeToken } = await import("../lib/api");
+    captureJudgeToken();
+    expect([...storage.values()]).toEqual(["judge-secret"]);
+    expect(replaced).toEqual(["https://qryvox.vercel.app/?x=1"]);
+  });
+
+  it("travels with every call once captured", async () => {
+    browser("", { "qryvox.judge-token": "judge-secret" });
+    const fetch = stubFetch(StepResult.parse({ step_run_id: step.step_run_id, step: "extract", seq: 3, prompt_version: "extract@1", model: "m", output: {} }), 200);
+    await runStep("case-1", step);
+    expect(fetch.mock.calls[0]![1]!.headers).toMatchObject({ "x-judge-token": "judge-secret" });
+  });
+
+  it("is not asked for without one: no header is sent", async () => {
+    browser("");
+    const fetch = stubFetch({ case_id: "c", seq: 1 });
+    await openCase(crypto.randomUUID());
+    expect(fetch.mock.calls[0]![1]!.headers).toEqual({ "content-type": "application/json" });
+  });
+
+  it("says what to do when a step is refused for want of it", async () => {
+    browser("");
+    stubFetch({ error: "this demo link is missing its access token, or the token is wrong" }, 401);
+    await expect(runStep("case-1", step)).rejects.toThrow(/Open the link you were given again/);
+  });
+});

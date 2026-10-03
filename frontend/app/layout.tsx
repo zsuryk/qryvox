@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import "./globals.css";
 import SiteNav from "./site-nav";
+import TokenCapture from "./token-capture";
 
 export const metadata: Metadata = {
   title: "Qryvox",
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body>
+        <TokenCapture />
         <header className="header">
           <div className="header-inner">
             <Link href="/" className="wordmark">
