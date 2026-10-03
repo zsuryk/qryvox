@@ -6,6 +6,7 @@ import {
   type CardId,
   CardOperationRequest,
   type Disposition,
+  FIND_SIMILAR_STEP,
   dispositionOf,
   type FindingCategory,
   findingIdOfCard,
@@ -21,7 +22,7 @@ import { canvasLayout } from "../lib/canvas-layout";
 import { CARD_W } from "../lib/tiling";
 import { type PlanLayout, planHit } from "../lib/plan-region";
 import { type CanvasMode, type CanvasView as View, canvasView } from "../lib/canvas-source";
-import { candidatesOf, hasRecording, planSimilar, playback, similarFailure, similarRequest } from "../lib/canvas-similar";
+import { asked, candidatesOf, hasRecording, instantSaid, instantSimilar, planSimilar, playback, similarFailure, similarRequest } from "../lib/canvas-similar";
 import { appendOp, type CanvasLog, canvasLog, type CardOp, reread, rolledBack, sent, settled, shownLog } from "../lib/canvas-store";
 import { changeDisposition, fetchEvents, recordCardOperation, runStep } from "../lib/api";
 import { DISPOSITION_LABEL, keyIntent } from "../lib/disposition";
@@ -158,16 +159,25 @@ function useCanvasStore(events: readonly SlimEvent[], mode: CanvasMode, say: (wo
 
 type Store = ReturnType<typeof useCanvasStore>;
 
-// Find similar (#57), as the canvas runs it: the request recorded as a card event first, then the seeded run
-// (lib/canvas-similar.ts) once the request is on the log, so the log reads request then run. On a live case
-// the run is one awaited call to the steps endpoint, judge-link token and all, and the log is read again
-// every couple of seconds while it runs, so the status panel shows it running; on the fixture a recorded run
-// is played back. Either way the candidates arrive through the fold like everything else. A failure leaves
-// the canvas as the log has it, with the reason said; a failed run is on the log as a failed run.
+// Find similar, as the canvas runs it. Similar is instant (#60): the press is recorded as a card event, and
+// the card's nearest neighbours among the statements already extracted come back through the fold at once,
+// shown before the server has even answered; those already on the canvas are lit up rather than drawn
+// twice. Once pressed, the card offers Look further (#57), the model's seeded run: on a live case one awaited
+// call to the steps endpoint, judge-link token and all, with the log read again every couple of seconds
+// while it runs so the status panel shows it running; on the fixture a recorded run is played back. Either
+// way the candidates arrive through the fold like everything else. A failure leaves the canvas as the log
+// has it, with the reason said; a failed run is on the log as a failed run.
 function useFindSimilar(view: View, mode: CanvasMode, store: Store, say: (words: string) => void) {
   const [searching, setSearching] = useState<ReadonlySet<CardId>>(new Set());
-  // The run whose candidates the canvas should bring into view once they are laid out.
-  const [arrived, setArrived] = useState<string | null>(null);
+  // What the canvas should bring into view once it is laid out: a run's first candidate, or a card a press
+  // found. The key is new on every press, so the same card can be brought into view again.
+  const [arrived, setArrived] = useState<{ key: string; run: string } | { key: string; card: CardId } | null>(null);
+  // The neighbours of the latest press, lit for a moment so the analyst sees which cards it meant.
+  const [lit, setLit] = useState<ReadonlySet<CardId>>(new Set());
+  const unlight = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (unlight.current !== null) window.clearTimeout(unlight.current);
+  }, []);
   const latest = useRef(view);
   useEffect(() => {
     latest.current = view;
@@ -176,19 +186,33 @@ function useFindSimilar(view: View, mode: CanvasMode, store: Store, say: (words:
 
   const similar = useCallback(
     async (cardId: CardId) => {
+      const found = instantSimilar(latest.current, shownLog(current.current), cardId);
+      if ("refused" in found) return say(found.refused);
+      say(instantSaid(found));
+      if (unlight.current !== null) window.clearTimeout(unlight.current);
+      setLit(new Set(found.neighbours));
+      unlight.current = window.setTimeout(() => setLit(new Set()), 4000);
+      const first = found.fresh[0] ?? found.neighbours[0];
+      if (first) setArrived({ key: crypto.randomUUID(), card: first });
+      await dispatch({ type: "card.similar_requested", payload: { card_id: cardId, step_kind: FIND_SIMILAR_STEP } });
+    },
+    [current, dispatch, say],
+  );
+
+  const further = useCallback(
+    async (cardId: CardId) => {
       const planned = planSimilar(latest.current, cardId);
       if ("refused" in planned) return say(planned.refused);
       const { plan } = planned;
       const done = () => setSearching((s) => new Set([...s].filter((id) => id !== cardId)));
       setSearching((s) => new Set(s).add(cardId));
-      say("Looking for more like this…");
-      if (!(await dispatch({ type: "card.similar_requested", payload: { card_id: cardId, step_kind: plan.step } }))) return done();
+      say("Looking further, with the model…");
 
       const stepRunId = crypto.randomUUID();
       const found = () => {
         const count = candidatesOf(canvasView(current.current.confirmed), stepRunId).length;
-        setArrived(stepRunId);
-        say(count === 0 ? "Nothing new turned up: every passage it found already has a card." : `${count} similar passage${count === 1 ? "" : "s"} added to the canvas, marked Similar.`);
+        setArrived({ key: stepRunId, run: stepRunId });
+        say(count === 0 ? "Nothing new turned up: every passage the model found already has a card." : `${count} more passage${count === 1 ? "" : "s"} from the model, marked Similar.`);
       };
       if (mode.kind === "fixture") {
         const played = playback(current.current.confirmed, plan, stepRunId, new Date().toISOString());
@@ -206,16 +230,16 @@ function useFindSimilar(view: View, mode: CanvasMode, store: Store, say: (words:
       } catch (cause) {
         window.clearInterval(poll);
         await refresh().catch(() => undefined);
-        say(`Find similar did not finish: ${similarFailure(cause)}`);
+        say(`Look further did not finish: ${similarFailure(cause)}`);
       } finally {
         window.clearInterval(poll);
         done();
       }
     },
-    [current, dispatch, mode, refresh, say, update],
+    [current, mode, refresh, say, update],
   );
 
-  return { similar, searching, arrived };
+  return { similar, further, searching, arrived, lit };
 }
 
 // The analyst's decision on a finding, made from its card (#59). The same decision as the Review console's:
@@ -268,7 +292,7 @@ type CanvasProps = {
 
 function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
   const dispatch = store.dispatch;
-  const { similar, searching, arrived } = useFindSimilar(view, mode, store, say);
+  const { similar, further, searching, arrived, lit } = useFindSimilar(view, mode, store, say);
   // Both layouts, wide and narrow (#61): the frame's width picks one, and the first fit has to know the
   // bounds of whichever it picks before anything is drawn.
   const layouts = useMemo(() => ({ wide: canvasLayout(view), narrow: canvasLayout(view, { narrow: true }) }), [view]);
@@ -340,6 +364,7 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
         say("Restored to the canvas.");
       },
       similar: (id) => void similar(id),
+      further: (id) => void further(id),
       decide: (id, disposition) => void decide(id, disposition),
       openCitation: (citation, label) => setSheet({ citation, label }),
       reveal(id) {
@@ -347,17 +372,23 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
         if (rect) reveal(rect);
       },
     };
-  }, [decide, dispatch, reveal, say, similar]);
+  }, [decide, dispatch, further, reveal, say, similar]);
 
-  // A find-similar run's candidates, once laid out, are brought into view: the first of them, centred if
-  // it landed off screen, so the analyst sees what the press came to.
+  // What find similar found, once laid out, is brought into view: a run's first candidate, or the first
+  // card a press found, centred if it landed off screen, so the analyst sees what the press came to. Once
+  // per press: a later change of layout (a dock, a pin) does not pull the view back to it.
+  const shownArrival = useRef<string | null>(null);
   useEffect(() => {
-    if (arrived === null) return;
-    const placed = layout.flow.find((p) => p.card.kind === "excerpt" && p.card.candidateOf === arrived);
-    if (placed) reveal(placed.rect);
+    if (arrived === null || shownArrival.current === arrived.key) return;
+    const placed = [...layout.flow, ...layout.docked].find((p) =>
+      "run" in arrived ? p.card.kind === "excerpt" && p.card.candidateOf === arrived.run : p.card.cardId === arrived.card,
+    );
+    if (!placed) return;
+    shownArrival.current = arrived.key;
+    reveal(placed.rect);
   }, [arrived, layout, reveal]);
 
-  // Why Similar cannot run from a card, per card, or null where it can (lib/canvas-similar.ts).
+  // Why Look further cannot run from a card, per card, or null where it can (lib/canvas-similar.ts).
   const similarOff = useMemo(() => {
     const off = new Map<CardId, string>();
     for (const card of view.cards) {
@@ -601,6 +632,8 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
                         discarded={false}
                         undockable={naturalSlot(card, view) ? null : NO_SLOT}
                         searching={searching.has(card.cardId)}
+                        asked={asked(view, card.cardId)}
+                        lit={lit.has(card.cardId)}
                         similarOff={similarOff.get(card.cardId) ?? null}
                         deciding={deciding.has(card.cardId)}
                         actions={actions}
@@ -819,7 +852,7 @@ function PlanSheet({
 
 const NO_SLOT = "No finding cites this passage, so it has no place in the plan";
 const NO_RECORDING =
-  "The recorded case has no model behind it, and no find-similar run was recorded from this card. On a live case it runs the model.";
+  "The recorded case has no model behind it, and no Look further run was recorded from this card. On a live case it runs the model.";
 
 // Where a card is on screen right now, in world units: its slot's transform as the browser is drawing it,
 // which differs from the slot while it is still settling into it.

@@ -94,6 +94,6 @@ describe("the status panel", () => {
     const lines = runs(
       statusLines(withSteps({ type: "step.started", run: "s1", payload: { step: "extract", prompt_version: "extract@1", seed } })),
     );
-    expect(lines.at(-1)).toMatchObject({ label: "Find similar · Extract statements", status: "running", detail: "More like “No entry or exit charges.”, page 2" });
+    expect(lines.at(-1)).toMatchObject({ label: "Look further · Extract statements", status: "running", detail: "More like “No entry or exit charges.”, page 2" });
   });
 });

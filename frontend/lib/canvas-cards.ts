@@ -53,8 +53,10 @@ export type ExcerptCardModel = {
   citation: CardCitation;
   // The finding cards that cite this passage, as their citation or their counterpart.
   linked: { cardId: CardId; label: string }[];
-  // Set when the passage came from a find-similar run rather than from a finding (#57, #64).
+  // Set when the passage came from find similar rather than from a finding (#57, #64).
   candidate: boolean;
+  // Set when it came at once, from a press's lexical neighbours (#60), rather than from a model's run.
+  instant: boolean;
   // For a candidate, what it was found from, in words: "Similar to “…”, factsheet page 1".
   similarTo: string | null;
 };
@@ -93,8 +95,9 @@ export function cardModel(card: CanvasCard, state: CaseState): CardModel {
       cardId: findingCardId(f.finding_id),
       label: `${categoryLabel(f.category)} · ${KIND_LABELS[f.kind].toLowerCase()}`,
     })),
-    candidate: card.candidateOf !== undefined,
-    similarTo: card.candidateOf === undefined ? null : similarTo(card.candidateOf, state),
+    candidate: card.candidateOf !== undefined || card.neighbourOf !== undefined,
+    instant: card.neighbourOf !== undefined,
+    similarTo: card.neighbourOf ? similarLine(card.neighbourOf.seed, state) : card.candidateOf === undefined ? null : similarTo(card.candidateOf, state),
   };
 }
 
@@ -117,7 +120,10 @@ export function dockableCategories(card: CanvasCard, view: CanvasView): PlanSlot
 // The passage a find-similar run was seeded with, as a line on the candidates it found.
 function similarTo(runId: string, state: CaseState): string | null {
   const seed = state.seededRuns.find((r) => r.stepRunId === runId)?.seed;
-  if (!seed) return null;
+  return seed ? similarLine(seed, state) : null;
+}
+
+function similarLine(seed: Citation, state: CaseState): string {
   return `Similar to “${seed.quote}”, ${cardCitation(seed, state).documentName} page ${seed.page}`;
 }
 

@@ -23,7 +23,10 @@ export type CardActions = {
   unpin: (cardId: CardId) => void;
   discard: (cardId: CardId) => void;
   restore: (cardId: CardId) => void;
+  // Similar: the card's nearest neighbours among the statements already extracted, at once (#60).
   similar: (cardId: CardId) => void;
+  // Look further: once Similar has been pressed, the model's seeded run (#57).
+  further: (cardId: CardId) => void;
   // The analyst's decision on a finding card's finding (#59).
   decide: (cardId: CardId, disposition: Disposition) => void;
   openCitation: (citation: CardCitation, label: string) => void;
@@ -38,16 +41,20 @@ export type CardProps = {
   discarded: boolean;
   // Why this card cannot be docked by its button, or null when it can.
   undockable: string | null;
-  // A find-similar run from this card is under way.
+  // A Look further run from this card is under way.
   searching: boolean;
-  // Why find similar cannot run from this card, or null when it can.
+  // Similar has been pressed on this card, so its button now looks further.
+  asked: boolean;
+  // One of the neighbours the latest press of Similar found, lit for a moment.
+  lit: boolean;
+  // Why Look further cannot run from this card, or null when it can.
   similarOff: string | null;
   // A decision on this card's finding is on its way to the log.
   deciding: boolean;
   actions: CardActions;
 };
 
-export const Card = memo(function Card({ model, docked, pinned, discarded, undockable, searching, similarOff, deciding, actions }: CardProps) {
+export const Card = memo(function Card({ model, docked, pinned, discarded, undockable, searching, asked, lit, similarOff, deciding, actions }: CardProps) {
   const state = { docked, pinned, discarded };
   const what =
     model.kind === "finding"
@@ -58,13 +65,13 @@ export const Card = memo(function Card({ model, docked, pinned, discarded, undoc
   return (
     // A finding card is focusable as a whole, so the keyboard can stand on it and decide it as on Review.
     <article
-      className={`card canvas-card${state.pinned ? " canvas-card--pinned" : ""}${dismissed ? " canvas-card--dismissed" : ""}`}
+      className={`card canvas-card${state.pinned ? " canvas-card--pinned" : ""}${dismissed ? " canvas-card--dismissed" : ""}${lit ? " canvas-card--lit" : ""}`}
       aria-label={label}
       tabIndex={model.kind === "finding" ? 0 : undefined}
       data-finding-card={model.kind === "finding" ? model.cardId : undefined}
     >
       {model.kind === "finding" ? <FindingBody model={model} deciding={deciding} actions={actions} /> : <ExcerptBody model={model} actions={actions} />}
-      <ActionRow cardId={model.cardId} state={state} undockable={undockable} searching={searching} similarOff={similarOff} actions={actions} />
+      <ActionRow cardId={model.cardId} state={state} undockable={undockable} searching={searching} asked={asked} similarOff={similarOff} actions={actions} />
     </article>
   );
 });
@@ -131,8 +138,8 @@ function ExcerptBody({ model, actions }: { model: Extract<CardModel, { kind: "ex
     <>
       <div className="row canvas-card__badges">
         {model.similarTo && (
-          <span className="badge badge--tint" title={model.similarTo}>
-            Similar
+          <span className="badge badge--tint" title={model.instant ? `${model.similarTo}. Found at once among the statements already extracted, with no model` : model.similarTo}>
+            {model.instant ? "Similar · instant" : "Similar"}
           </span>
         )}
         {model.documentKind && <span className="badge badge--strong badge--tint">{model.documentKind}</span>}
@@ -163,6 +170,7 @@ function ActionRow({
   state,
   undockable,
   searching,
+  asked,
   similarOff,
   actions,
 }: {
@@ -170,6 +178,7 @@ function ActionRow({
   state: { docked: boolean; pinned: boolean; discarded: boolean };
   undockable: string | null;
   searching: boolean;
+  asked: boolean;
   similarOff: string | null;
   actions: CardActions;
 }) {
@@ -213,16 +222,27 @@ function ActionRow({
           Discard
         </button>
       )}
-      <button
-        type="button"
-        className="btn btn--small"
-        disabled={searching || similarOff !== null}
-        aria-busy={searching}
-        title={similarOff ?? (searching ? "Looking for more like this" : "Find more passages like this one; they arrive as cards marked Similar")}
-        onClick={() => actions.similar(cardId)}
-      >
-        {searching ? "Finding…" : "Similar"}
-      </button>
+      {asked ? (
+        <button
+          type="button"
+          className="btn btn--small"
+          disabled={searching || similarOff !== null}
+          aria-busy={searching}
+          title={similarOff ?? (searching ? "The model is looking for more like this" : "Ask the model for passages the extracted statements missed; they arrive as cards marked Similar")}
+          onClick={() => actions.further(cardId)}
+        >
+          {searching ? "Looking…" : "Look further"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn btn--small"
+          title="Show the passages most like this one among the statements already extracted, at once and with no model"
+          onClick={() => actions.similar(cardId)}
+        >
+          Similar
+        </button>
+      )}
     </div>
   );
 }

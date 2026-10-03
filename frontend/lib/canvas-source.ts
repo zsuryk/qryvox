@@ -75,7 +75,9 @@ function kindOf(state: CaseState, citation: Citation) {
 
 // The cards, and the board state they are laid out with, folded from the log. Which cards a case has is
 // shared/src/canvas.ts's rule (caseCards), the one the backend also checks a card operation against (#65):
-// each active finding and the passages it cites, then the candidates of every completed find-similar run.
+// each active finding and the passages it cites, then what find similar brought, a press's instant
+// neighbours (#60) and a completed run's candidates. A latent card, a statement of the extract run that
+// nothing has brought onto the canvas, is the case's but is not drawn, until an operation names it.
 // Which cards are docked, pinned or discarded is the board state beside them, not a property of the card.
 export type CanvasCard = CaseCard;
 
@@ -83,5 +85,8 @@ export type CanvasView = { state: CaseState; cards: CanvasCard[] };
 
 export function canvasView(events: readonly SlimEvent[]): CanvasView {
   const state = fold(events);
-  return { state, cards: caseCards(events, state) };
+  const { docked, pinned, discarded } = state.board;
+  const named = new Set([...docked, ...pinned, ...discarded].map((entry) => entry.cardId));
+  const cards = caseCards(events, state).filter((card) => !(card.kind === "excerpt" && card.latent) || named.has(card.cardId));
+  return { state, cards };
 }

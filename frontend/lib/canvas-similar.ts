@@ -3,7 +3,10 @@ import {
   type CardId,
   type Citation,
   ErrorResponse,
+  excerptCardId,
   FIND_SIMILAR_STEP,
+  INSTANT_NEIGHBOURS,
+  nearestStatements,
   type RunStepRequest,
   type SeedableStep,
   SlimEvent,
@@ -13,7 +16,12 @@ import type { CanvasView } from "./canvas-source";
 import { errorMessage } from "./errors";
 import recordedRuns from "./similar-recorded.json";
 
-// Find similar (#57): from a card, a seeded re-run of extract over the documents (#64), whose passages come
+// Find similar, in two parts. A press of Similar first brings the card's nearest neighbours among the
+// statements the case's extract run already holds (#60): no model, at once, and nothing stored but the
+// press itself (card.similar_requested), from which the shared fold reads them back as cards
+// (caseCards' neighbourOf). Once pressed, the card offers Look further, the model's run below.
+//
+// Look further (#57): from a card, a seeded re-run of extract over the documents (#64), whose passages come
 // back as candidate cards (canvasView's candidateOf). A card of either kind re-runs extract, seeded with the
 // passage it shows — a finding card with its own citation (#66), an excerpt card with its passage — because
 // that is what the press means: more passages like the one on this card. The request is a card event
@@ -31,6 +39,33 @@ export function planSimilar(view: CanvasView, cardId: CardId): { plan: SimilarPl
   const seed = card.kind === "excerpt" ? card.citation : card.finding.citation;
   // extract reads the documents, so it consumes no earlier run.
   return { plan: { step: FIND_SIMILAR_STEP, seed, inputRunId: null } };
+}
+
+// What a press of Similar brings at once, read from the log as it stands: the neighbours' cards, in rank
+// order, and which of them are not on the canvas yet. The rest already have a card, which is not drawn twice.
+export type InstantSimilar = { neighbours: CardId[]; fresh: CardId[] };
+
+export function instantSimilar(view: CanvasView, events: readonly SlimEvent[], cardId: CardId): InstantSimilar | { refused: string } {
+  const planned = planSimilar(view, cardId);
+  if ("refused" in planned) return planned;
+  const neighbours = nearestStatements(events, planned.plan.seed, INSTANT_NEIGHBOURS).map((n) => excerptCardId(n.citation));
+  const shown = new Set(view.cards.map((c) => c.cardId));
+  return { neighbours, fresh: neighbours.filter((id) => !shown.has(id)) };
+}
+
+// Whether Similar has been pressed on this card, so its button now looks further, with the model.
+export function asked(view: CanvasView, cardId: CardId): boolean {
+  return view.state.board.similarRequests.some((r) => r.cardId === cardId);
+}
+
+// What a press came to, in a line.
+export function instantSaid(found: InstantSimilar): string {
+  const { neighbours, fresh } = found;
+  if (neighbours.length === 0) return "Nothing the documents' extracted statements say is like it. Look further asks the model.";
+  const had = neighbours.length - fresh.length;
+  const added = fresh.length === 0 ? "" : `${fresh.length} added, marked Similar · instant`;
+  const kept = had === 0 ? "" : `${had} already on the canvas, highlighted`;
+  return `${neighbours.length} similar passage${neighbours.length === 1 ? "" : "s"} from the extracted statements: ${[added, kept].filter(Boolean).join("; ")}. Look further asks the model for more.`;
 }
 
 // The run's request, under a new run id: each press is a run of its own.

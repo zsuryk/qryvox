@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import { StepFailureError } from "../lib/api";
 import { cardModel } from "../lib/canvas-cards";
 import { canvasView, fixtureEvents } from "../lib/canvas-source";
-import { candidatesOf, hasRecording, planSimilar, playback, similarFailure, similarRequest } from "../lib/canvas-similar";
+import { asked, candidatesOf, hasRecording, instantSaid, instantSimilar, planSimilar, playback, similarFailure, similarRequest } from "../lib/canvas-similar";
+import { appendOp } from "../lib/canvas-store";
+import { statusLines } from "../lib/canvas-status";
 import recordings from "../lib/similar-recorded.json";
 
 // Find similar (#57): what a press on Similar runs, the fixture's recorded runs, and the words a failure
@@ -99,6 +101,51 @@ describe("the fixture's recorded runs", () => {
   it("plays nothing back for a plan with no recording", () => {
     const plan = { step: "extract" as const, seed: { document_id: "ppm", page: 9, quote: "not recorded" }, inputRunId: null };
     expect(playback(fixtureEvents(), plan, "run", "2026-10-03T12:00:00.000Z")).toBeNull();
+  });
+});
+
+describe("Similar, at once (#60)", () => {
+  const press = (events: readonly SlimEvent[], cardId: string) =>
+    appendOp(events, { type: "card.similar_requested", payload: { card_id: cardId, step_kind: "extract" } }, { eventId: "0b8e6a8c-2f7d-4c1e-9a3b-5d6f7e8a9b0c", at: "2026-10-03T12:00:00.000Z" });
+
+  it("on the recorded case finds neighbours with no model, every one already a card, which it lights rather than draws twice", () => {
+    const events = fixtureEvents();
+    const found = instantSimilar(view, events, findingCard.cardId);
+    if ("refused" in found) throw new Error("expected neighbours");
+    expect(found.neighbours.length).toBeGreaterThan(0);
+    expect(found.fresh).toEqual([]);
+    expect(instantSaid(found)).toMatch(/already on the canvas, highlighted\. Look further asks the model/);
+
+    const after = canvasView(press(events, findingCard.cardId));
+    expect(after.cards.map((c) => c.cardId)).toEqual(view.cards.map((c) => c.cardId));
+    expect(asked(view, findingCard.cardId)).toBe(false);
+    expect(asked(after, findingCard.cardId)).toBe(true);
+  });
+
+  it("draws a neighbour no card had, marked instant with the passage it was found from, and says the press in the status panel", () => {
+    // A later extract run holding a passage no finding cites: latent, and not drawn, until a press brings it.
+    const waiver = { document_id: findingCard.kind === "finding" ? findingCard.finding.citation.document_id : "", page: 1, quote: "The management fee is waived for the first year" };
+    const base = fixtureEvents();
+    const run = { step: "extract", model: "fake", prompt_version: "extract@1", input_run_id: null };
+    const statements = [waiver, ...(findingCard.kind === "finding" ? [findingCard.finding.citation] : [])];
+    const last = base.at(-1)!;
+    const extracted = [
+      ...base,
+      ...(["step.started", "step.completed"] as const).map((type, i) =>
+        SlimEvent.parse({ ...last, seq: last.seq + 1 + i, event_id: `00000000-0000-4000-9000-00000000000${i}`, step_run_id: "later-extract", type, payload: type === "step.started" ? run : { ...run, output: { statements } } }),
+      ),
+    ];
+    const before = canvasView(extracted);
+    expect(before.cards.map((c) => c.cardId)).toEqual(view.cards.map((c) => c.cardId));
+    const found = instantSimilar(before, extracted, findingCard.cardId);
+    if ("refused" in found) throw new Error("expected neighbours");
+    expect(found.fresh).toHaveLength(1);
+
+    const pressed = press(extracted, findingCard.cardId);
+    const after = canvasView(pressed);
+    const neighbour = after.cards.find((c) => c.cardId === found.fresh[0])!;
+    expect(cardModel(neighbour, after.state)).toMatchObject({ kind: "excerpt", candidate: true, instant: true, similarTo: expect.stringMatching(/^Similar to “/) });
+    expect(statusLines(pressed).at(-1)).toMatchObject({ kind: "card", text: "Similar · instant: 1 like it among the extracted statements, 1 new to the canvas" });
   });
 });
 

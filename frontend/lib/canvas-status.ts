@@ -1,10 +1,13 @@
 import {
   type CardId,
+  type CaseCard,
+  caseCards,
   type CaseState,
   findingCardId,
   findingIdOfCard,
   fold,
   ParseOutput,
+  similarNeighbours,
   type SlimEvent,
   type StepRun,
   type StepRunStatus,
@@ -44,7 +47,8 @@ export type StatusLine = RunLine | CardLine;
 export function statusLines(events: readonly SlimEvent[]): StatusLine[] {
   const state = fold(events);
   const runs = [...state.stepRuns, ...state.seededRuns].map((run) => runLine(run, events));
-  const cards = events.flatMap((event) => cardLine(event, state));
+  const shown = events.some((e) => e.type === "card.similar_requested") ? caseCards(events, state) : [];
+  const cards = events.flatMap((event) => cardLine(event, state, events, shown));
   return [...runs, ...cards].sort((a, b) => a.seq - b.seq);
 }
 
@@ -68,7 +72,7 @@ function runLine(run: StepRun, events: readonly SlimEvent[]): RunLine {
     kind: "run",
     seq: run.startedAtSeq,
     runId: run.stepRunId,
-    label: run.seed ? `Find similar · ${STEP_LABELS[run.step]}` : STEP_LABELS[run.step],
+    label: run.seed ? `Look further · ${STEP_LABELS[run.step]}` : STEP_LABELS[run.step],
     status: run.status,
     error: run.status === "failed" ? run.error : null,
     failedAttempts: Math.max(0, failedBefore),
@@ -79,7 +83,7 @@ function runLine(run: StepRun, events: readonly SlimEvent[]): RunLine {
   };
 }
 
-function cardLine(event: SlimEvent, state: CaseState): CardLine[] {
+function cardLine(event: SlimEvent, state: CaseState, events: readonly SlimEvent[], shown: readonly CaseCard[]): CardLine[] {
   const line = (text: string, cardId: CardId): CardLine[] => [{ kind: "card", seq: event.seq, text, card: cardName(cardId, state) }];
   switch (event.type) {
     case "card.docked": {
@@ -96,8 +100,9 @@ function cardLine(event: SlimEvent, state: CaseState): CardLine[] {
       return line("Discarded to the bin", event.payload.card_id);
     case "card.restored":
       return line("Restored from the bin", event.payload.card_id);
+    // A press of Similar is an operation, not a run (#60): what it found at once, read back from the log.
     case "card.similar_requested":
-      return line(`Asked for more like it (${STEP_LABELS[event.payload.step_kind].toLowerCase()})`, event.payload.card_id);
+      return line(instantLine(event.payload.card_id, event.seq, state, events, shown), event.payload.card_id);
     // A decision is not a card operation, but on the canvas it is made from a card (#59), so it is on the
     // record the panel shows as well.
     case "disposition.changed":
@@ -105,6 +110,18 @@ function cardLine(event: SlimEvent, state: CaseState): CardLine[] {
     default:
       return [];
   }
+}
+
+function instantLine(cardId: CardId, seq: number, state: CaseState, events: readonly SlimEvent[], shown: readonly CaseCard[]): string {
+  const findingId = findingIdOfCard(cardId);
+  const card = shown.find((c) => c.cardId === cardId);
+  const seed =
+    findingId !== null ? state.findings.find((f) => f.finding_id === findingId)?.citation : card?.kind === "excerpt" ? card.citation : undefined;
+  if (!seed) return "Similar · instant";
+  const found = similarNeighbours(events, seed, seq).length;
+  if (found === 0) return "Similar · instant: nothing already extracted is like it";
+  const added = shown.filter((c) => c.kind === "excerpt" && c.neighbourOf?.atSeq === seq).length;
+  return `Similar · instant: ${found} like it among the extracted statements, ${added === 0 ? "all already on the canvas" : `${added} new to the canvas`}`;
 }
 
 // A card as a person would name it: its finding's sentence, or the passage's document and page.
