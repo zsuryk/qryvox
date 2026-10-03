@@ -39,6 +39,10 @@
         {
           "rule": "S4",
           "effect": "blocks"
+        },
+        {
+          "rule": "S7",
+          "effect": "meets"
         }
       ],
       "expected_disclosures": [
@@ -75,6 +79,10 @@
         {
           "rule": "S5",
           "effect": "meets"
+        },
+        {
+          "rule": "S7",
+          "effect": "warns"
         }
       ],
       "expected_disclosures": [
@@ -104,6 +112,10 @@
         },
         {
           "rule": "S2",
+          "effect": "meets"
+        },
+        {
+          "rule": "S7",
           "effect": "meets"
         }
       ],

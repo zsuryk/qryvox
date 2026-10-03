@@ -227,6 +227,9 @@ export function factLines(attributes: ProductAttributes): { label: string; value
       where: where(a.exit_charge_within_months.citation),
     },
     { label: "Derivatives", value: a.derivatives_use.value === "none" ? "Not used" : `For ${a.derivatives_use.value}`, where: where(a.derivatives_use.citation) },
+    ...(a.primary_objective
+      ? [{ label: "Built mainly for", value: GOAL[a.primary_objective.value], where: where(a.primary_objective.citation) }]
+      : []),
     ...a.exclusion_screens.map((s) => ({
       label: `Excludes ${EXCLUSION[s.exclusion].toLowerCase()}`,
       value: s.backed_by_ppm ? "Stated in the PPM" : "Claimed in marketing only",
