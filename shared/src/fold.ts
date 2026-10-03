@@ -51,9 +51,10 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
     case "step.started": {
       // A retry reuses its run id: it restarts that run instead of adding another, and a run that
       // already completed stays completed (a concurrent duplicate may log its start late).
-      const existing = state.stepRuns.find((r) => r.stepRunId === event.step_run_id);
-      if (existing?.status === "completed") return next;
       const p = event.payload;
+      const list = p.seed ? "seededRuns" : "stepRuns";
+      const existing = state[list].find((r) => r.stepRunId === event.step_run_id);
+      if (existing?.status === "completed") return next;
       const run: StepRun = {
         stepRunId: event.step_run_id,
         step: p.step,
@@ -64,8 +65,9 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
         startedAtSeq: event.seq,
         settledAtSeq: null,
         error: null,
+        ...(p.seed && { seed: p.seed }),
       };
-      return { ...next, stepRuns: existing ? state.stepRuns.map((r) => (r === existing ? run : r)) : [...state.stepRuns, run] };
+      return { ...next, [list]: existing ? state[list].map((r) => (r === existing ? run : r)) : [...state[list], run] };
     }
     case "finding.created":
       return {
@@ -203,9 +205,8 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
     case "step.completed":
     case "step.failed": {
       const completed = event.type === "step.completed";
-      return {
-        ...next,
-        stepRuns: state.stepRuns.map((r) =>
+      const settle = (runs: StepRun[]): StepRun[] =>
+        runs.map((r) =>
           r.stepRunId !== event.step_run_id || r.status === "completed"
             ? r
             : {
@@ -214,8 +215,8 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
                 settledAtSeq: event.seq,
                 error: completed ? null : event.payload.error,
               },
-        ),
-      };
+        );
+      return { ...next, stepRuns: settle(state.stepRuns), seededRuns: settle(state.seededRuns) };
     }
   }
 }

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { Advice, AdviceDecision, DecisionConfirmation, RejectionReason, SupersedeCause } from "./advice.js";
 import { CardId, PlanSlot, WorldPos } from "./card.js";
 import { ClientProfile, KnowledgeLevel } from "./client.js";
-import { Disposition, Finding } from "./finding.js";
+import { Citation, Disposition, Finding } from "./finding.js";
 
 // Envelope fields carried by every event, named as in ADR-0002.
 // seq is per case: 1, 2, 3… with no gaps, assigned inside the append transaction.
@@ -79,6 +79,9 @@ const stepRun = {
   // A parse run's input: the analyst's words, recorded on the run so the log stays the step's only input
   // (#51). Absent on every other step, and on every event written before it.
   intent: z.string().min(1).optional(),
+  // A find-similar run's seed (#64): the passage the analyst picked, which the run looks for more of. Only
+  // extract and contradictions take one. Absent on every unseeded run, and on every event written before it.
+  seed: Citation.optional(),
 };
 
 // Step events always carry the run's step_run_id in the envelope.

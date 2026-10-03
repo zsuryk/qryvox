@@ -2,7 +2,7 @@ import type { Advice, AdviceDecision, DecisionConfirmation, RejectionReason, Sup
 import { AUTHORITY_ORDER, type CardId, type PlanSlot, type WorldPos } from "./card.js";
 import type { ClientProfile, KnowledgeLevel } from "./client.js";
 import type { DocumentKind, StepName } from "./events.js";
-import { type Disposition, type Finding, FindingCategory } from "./finding.js";
+import { type Citation, type Disposition, type Finding, FindingCategory } from "./finding.js";
 
 export type CaseDocument = {
   documentId: string;
@@ -27,6 +27,8 @@ export type StepRun = {
   // Seq of the step.completed / latest step.failed; null while running.
   settledAtSeq: number | null;
   error: string | null;
+  // The passage a find-similar run was seeded with (#64); absent on every other run.
+  seed?: Citation;
 };
 
 export type CaseFinding = Finding & {
@@ -99,6 +101,10 @@ export type CaseState = {
   documents: CaseDocument[];
   // In the order they started. A retried run keeps its id: a failure followed by a completion is completed.
   stepRuns: StepRun[];
+  // Find-similar runs (#64), kept apart from stepRuns so that nothing reading the pipeline's runs (the run
+  // panel, resume, the latest run of a step) can pick one up as a step's input: a seeded run only ever
+  // offers candidate cards to the canvas. In the order they started.
+  seededRuns: StepRun[];
   // Every finding ever created, in creation order; see activeFindings() for the board.
   findings: CaseFinding[];
   // The latest disposition per finding that has one, in the order it was first decided. A finding with no
@@ -121,6 +127,7 @@ export function emptyCaseState(): CaseState {
     openedAt: null,
     documents: [],
     stepRuns: [],
+    seededRuns: [],
     findings: [],
     dispositions: [],
     clients: [],
