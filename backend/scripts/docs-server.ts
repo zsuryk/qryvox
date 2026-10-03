@@ -23,6 +23,7 @@ import {
   OpenCaseRequest,
   OpenCaseResponse,
   RecordProfileRequest,
+  RecordReadingRequest,
   RunStepRequest,
   StepFailure,
   StepResult,
@@ -102,6 +103,12 @@ const TEXT = {
       "Idempotent by event_id: a retry of a recorded decision returns it even after the advice was superseded.",
     noAdvice: "Unknown case, or the case has no such advice",
     adviceSuperseded: "The advice was superseded by a newer profile or attributes run",
+    reading: "Record the depth a client chose",
+    readingDesc:
+      "Appends client.read, with the client's pseudonymous id as the actor. Sent only once the client has switched on " +
+      "sharing on their own page. Three choices in a row of another depth suggest the adviser asks again; nothing " +
+      "changes a profile by itself.",
+    noClient: "Unknown case, or the case has no such client",
     payload: "One event's full payload, heavy fields included",
     payloadOk: "Full payload",
     noEvent: "No such event",
@@ -164,6 +171,11 @@ const TEXT = {
       "以 event_id 確保冪等：已記錄的決定重送時會回傳原結果，即使建議之後已被取代。",
     noAdvice: "找不到此案件，或此案件沒有這筆建議",
     adviceSuperseded: "這筆建議已被較新的客戶檔案或 attributes 執行取代",
+    reading: "記錄客戶選擇的說明深度",
+    readingDesc:
+      "追加一筆 client.read，以客戶的化名 ID 為行動者。只有客戶在自己的頁面開啟分享後才會送出。" +
+      "連續三次選擇另一種深度時，會提示顧問重新詢問；系統不會自行修改客戶檔案。",
+    noClient: "找不到此案件，或此案件沒有這位客戶",
     payload: "單一事件的完整內容，包含大型欄位",
     payloadOk: "完整內容",
     noEvent: "找不到此事件",
@@ -185,6 +197,7 @@ const schemas = {
   StepFailure,
   ChangeDispositionRequest,
   RecordProfileRequest,
+  RecordReadingRequest,
   DraftAdviceRequest,
   DecideAdviceRequest,
   ErrorResponse,
@@ -281,6 +294,15 @@ function openapi(lang: Lang) {
           parameters: [caseId],
           requestBody: body("RecordProfileRequest"),
           responses: { 201: json("AppendResponse", t.profiled), 400: error(t.profileInvalid), 404: error(t.unknownCase) },
+        },
+      },
+      "/cases/{caseId}/clients/{clientId}/readings": {
+        post: {
+          summary: t.reading,
+          description: t.readingDesc,
+          parameters: [caseId, { name: "clientId", in: "path", required: true, schema: { type: "string" } }],
+          requestBody: body("RecordReadingRequest"),
+          responses: { 201: json("AppendResponse", t.profiled), 400: error(t.invalidBody), 404: error(t.noClient) },
         },
       },
       "/cases/{caseId}/advice": {

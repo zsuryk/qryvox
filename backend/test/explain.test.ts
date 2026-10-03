@@ -55,18 +55,19 @@ let reply: unknown = {};
 let answer: (messages: ChatMessage[]) => unknown = () => reply;
 
 // A verified Larkspur case with Mrs Chan's advice drafted; optionally a finding dismissed first.
-async function chanAdvice({ dismissExitCharge = false } = {}) {
+async function chanAdvice({ dismissExitCharge = false, compliance = false, profile = chan } = {}) {
   const t = await setup({ llm: larkspurLlm((messages) => answer(messages)) });
   const caseId = await t.openCase();
   for (const document of pack) await t.request("POST", `/cases/${caseId}/documents`, { event_id: randomUUID(), document });
   let input: string | null = null;
-  for (const step of ["extract", "decompose", "contradictions", "findings"]) input = await run(t, caseId, step, input);
+  const steps = compliance ? ["extract", "decompose", "contradictions", "compliance", "findings"] : ["extract", "decompose", "contradictions", "findings"];
+  for (const step of steps) input = await run(t, caseId, step, input);
   await run(t, caseId, "attributes", null);
   if (dismissExitCharge) {
     const exit = activeFindings(await folded(t, caseId)).find((f) => f.citation.document_id === "deck")!;
     await t.request("POST", `/cases/${caseId}/dispositions`, { event_id: randomUUID(), finding_id: exit.finding_id, disposition: "dismissed" });
   }
-  await t.request("POST", `/cases/${caseId}/clients`, { event_id: randomUUID(), profile: chan });
+  await t.request("POST", `/cases/${caseId}/clients`, { event_id: randomUUID(), profile });
   const adviceId = randomUUID();
   await t.request("POST", `/cases/${caseId}/advice`, { event_id: adviceId, client_id: "persona-chan" });
   const advice = (await folded(t, caseId)).advice.find((a) => a.adviceId === adviceId)!;
@@ -170,6 +171,21 @@ describe("explanations it refuses", () => {
 
     reply = bend(advice, (p) => (p[0]!.text = `The fund says "${quote.replace("five", "three")}".`));
     expect((await explainCall(t, caseId, adviceId)).status).toBe(422);
+  });
+
+  it("lets a disclosure name the rule its own policy gap breaks", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice({ compliance: true });
+    const gap = advice.disclosures.findIndex((d) => d.citation.quote.startsWith("7.2"));
+    expect(gap).toBeGreaterThanOrEqual(0);
+    reply = bend(advice, (p) => (p[advice.reasons.length + gap]!.text = "Under the institution's rule P3, the factsheet should list this charge."));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+  });
+
+  it("lets a passage quote the client's own answer back to them", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice({ profile: { ...chan, client_id: "persona-chan", exclusions: ["fossil_fuels"] } });
+    const s5 = advice.reasons.findIndex((r) => r.rule === "S5");
+    reply = bend(advice, (p) => (p[s5]!.text = 'You told us "fossil_fuels" are out; only the deck claims a screen.'));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
   });
 
   it("accepts the page a passage cites, written as a number", async () => {

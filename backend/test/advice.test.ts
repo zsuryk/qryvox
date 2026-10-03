@@ -221,3 +221,20 @@ describe("the client profile endpoint", () => {
     expect((await profile(t, caseId, { ...chan, client_id: "Mrs Chan" })).status).toBe(400);
   });
 });
+
+describe("a client's readings (#38)", () => {
+  it("records the depth a client chose, under their own pseudonymous id, and refuses an unknown client", async () => {
+    const { t, caseId } = await larkspurCase();
+    await profile(t, caseId, chan);
+    const adviceId = randomUUID();
+    await draft(t, caseId, "persona-chan", adviceId);
+    const reading = (clientId: string) =>
+      t.request("POST", `/cases/${caseId}/clients/${clientId}/readings`, { event_id: randomUUID(), advice_id: adviceId, depth: "informed" });
+
+    expect((await reading("persona-chan")).status).toBe(201);
+    expect((await state(t, caseId)).state.readings).toMatchObject([{ clientId: "persona-chan", depth: "informed" }]);
+    const last = (await state(t, caseId)).events.at(-1)!;
+    expect(last).toMatchObject({ type: "client.read", actor: "persona-chan" });
+    expect((await reading("persona-nobody")).status).toBe(404);
+  });
+});

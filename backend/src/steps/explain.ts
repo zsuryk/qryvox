@@ -25,7 +25,8 @@ import { StepPrecondition, type StepDefinition } from "./step.js";
 // One reason or disclosure of the advice, as the model sees it and the checks hold it to.
 type Item = {
   ref: string;
-  rule: string;
+  // The rules it may name: its own, and for a disclosure of a policy gap, the product rule the gap breaks.
+  rules: string[];
   // The documents and quotes it rests on: one for a reason (none when nothing speaks to it), both sides of
   // the finding for a disclosure.
   documents: string[];
@@ -118,7 +119,7 @@ function check(depth: string, text: ExplanationDepth, items: Item[], documents: 
   }
 
   const cited = new Set(items.flatMap((i) => i.documents));
-  const rules = new Set(items.map((i) => i.rule));
+  const rules = new Set(items.flatMap((i) => i.rules));
   for (const passage of text.passages) {
     const item = items.find((i) => i.ref === passage.ref);
     if (!item) continue;
@@ -163,9 +164,10 @@ function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttrib
     const productLevel = reason.rule === "S2" ? productRiskLevel(attributes) : null;
     return {
       ref: `r${i}`,
-      rule: reason.rule,
+      rules: [reason.rule],
       documents: reason.citation ? [reason.citation.document_id] : [],
-      quotes: reason.citation ? [reason.citation.quote] : [],
+      // The client's own answer may be quoted back to them as well as the document.
+      quotes: [...(reason.citation ? [reason.citation.quote] : []), ...(Array.isArray(answer) ? answer.map(String) : [String(answer)])],
       numbers: numbersIn(
         reason.citation?.quote ?? null,
         reason.citation?.page ?? null,
@@ -191,7 +193,7 @@ function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttrib
     const unique = sides.filter((c, j) => sides.findIndex((o) => o.quote === c.quote) === j);
     return {
       ref: `d${i}`,
-      rule: d.rule,
+      rules: [d.rule, ...(finding?.rule ? [finding.rule] : [])],
       documents: unique.map((c) => c.document_id),
       quotes: unique.map((c) => c.quote),
       numbers: numbersIn(...unique.flatMap((c) => [c.quote, c.page])),

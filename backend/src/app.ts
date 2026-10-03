@@ -12,6 +12,7 @@ import {
   OpenCaseRequest,
   type OpenCaseResponse,
   RecordProfileRequest,
+  RecordReadingRequest,
   RunStepRequest,
   SlimEvent,
 } from "@qryvox/shared";
@@ -29,6 +30,7 @@ import {
   EventIdConflict,
   findByEventId,
   findingStatus,
+  foldCase,
   getEvent,
   listEvents,
   toWire,
@@ -164,6 +166,28 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
     if (!(await caseExists(db, caseId))) return notFound(c, caseId);
 
     const row = await recordProfile(db, caseId, body.data.event_id, body.data.profile);
+    return c.json({ seq: row.seq } satisfies AppendResponse, 201);
+  });
+
+  // The depth a client chose to read at, shared by them from their own page (#38). It informs a suggestion
+  // to the adviser and changes nothing itself.
+  app.post("/cases/:caseId/clients/:clientId/readings", async (c) => {
+    const caseId = c.req.param("caseId");
+    const clientId = c.req.param("clientId");
+    const body = RecordReadingRequest.safeParse(await readJson(c));
+    if (!body.success) return badRequest(c, body.error);
+    if (!(await caseExists(db, caseId))) return notFound(c, caseId);
+    const state = await foldCase(db, caseId);
+    if (!state.clients.some((client) => client.clientId === clientId)) {
+      return c.json({ error: `client ${clientId} not found in case ${caseId}` }, 404);
+    }
+    const row = await appendOnce(db, caseId, {
+      eventId: body.data.event_id,
+      type: "client.read",
+      v: 1,
+      actor: clientId,
+      payload: { client_id: clientId, advice_id: body.data.advice_id, depth: body.data.depth },
+    });
     return c.json({ seq: row.seq } satisfies AppendResponse, 201);
   });
 
