@@ -9,6 +9,7 @@ import { CONTRADICTIONS_SYSTEM_PROMPT } from "../src/steps/contradictions";
 import { DECOMPOSE_SYSTEM_PROMPT } from "../src/steps/decompose";
 import { EXTRACT_SYSTEM_PROMPT } from "../src/steps/extract";
 import { FINDINGS_SYSTEM_PROMPT } from "../src/steps/findings";
+import { RATIONALE_SYSTEM_PROMPT } from "../src/steps/rationale";
 import type { ChatMessage } from "../src/llm";
 import { FakeLlm } from "./helpers";
 
@@ -107,7 +108,7 @@ const PIPELINE = {
     ],
   },
   attributes: ATTRIBUTES_REPLY,
-} satisfies Record<Exclude<StepName, "explain" | "parse">, unknown>;
+} satisfies Record<Exclude<StepName, "explain" | "parse" | "rationale">, unknown>;
 
 const PROMPTS: [string, Exclude<StepName, "parse">][] = [
   [EXTRACT_SYSTEM_PROMPT, "extract"],
@@ -117,14 +118,16 @@ const PROMPTS: [string, Exclude<StepName, "parse">][] = [
   [COMPLIANCE_SYSTEM_PROMPT, "compliance"],
   [ATTRIBUTES_SYSTEM_PROMPT, "attributes"],
   [EXPLAIN_SYSTEM_PROMPT, "explain"],
+  [RATIONALE_SYSTEM_PROMPT, "rationale"],
 ];
 
-// An explanation depends on the advice it explains, so a test that runs explain says how to answer.
-export function larkspurLlm(explain: (messages: ChatMessage[]) => unknown = () => ({})) {
+// An explanation depends on the advice it explains, and a rationale on the findings it words, so a test that
+// runs explain or rationale says how to answer.
+export function larkspurLlm(answer: (messages: ChatMessage[]) => unknown = () => ({})) {
   return new FakeLlm((messages) => {
     // By its start: a step's system prompt may carry a note after it (the client's language, #43).
     const step = PROMPTS.find(([prompt]) => messages[0]?.content.startsWith(prompt))?.[1];
     if (!step) throw new Error("unknown prompt");
-    return JSON.stringify(step === "explain" ? explain(messages) : PIPELINE[step]);
+    return JSON.stringify(step === "explain" || step === "rationale" ? answer(messages) : PIPELINE[step]);
   });
 }

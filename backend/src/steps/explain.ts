@@ -16,7 +16,7 @@ import {
 import { z } from "zod";
 import { attributesOf } from "../advice.js";
 import { foldCase } from "../log.js";
-import { normalize } from "./inputs.js";
+import { normalize, numbersIn, quotations, quotedFrom, statedNumbers, value } from "./inputs.js";
 import { StepPrecondition, type StepDefinition } from "./step.js";
 
 // explain@1 — words one advice's verdict at the three knowledge depths (#30). The rules decided the
@@ -140,7 +140,7 @@ function check(depth: string, text: ExplanationDepth, items: Item[], documents: 
   for (const ref of refs) if (!items.some((i) => i.ref === ref)) problems.push(`${depth}: ${ref} is not in the advice`);
   // The summary may state a number only if some item of the advice may: a quote, a page, a client's answer.
   const grounded = new Set(items.flatMap((i) => [...i.numbers]));
-  for (const n of text.summary.replace(/\b[PS]\d+\b/g, "").match(/\d+(?:\.\d+)?/g) ?? []) {
+  for (const n of statedNumbers(text.summary)) {
     if (!grounded.has(value(n))) problems.push(`${depth}: the summary states ${n}, which nothing in the advice holds`);
   }
 
@@ -151,7 +151,7 @@ function check(depth: string, text: ExplanationDepth, items: Item[], documents: 
     if (!item) continue;
     const where = `${depth} ${passage.ref}`;
     for (const quoted of quotations(passage.text)) {
-      if (!item.quotes.some((q) => normalize(q).toLowerCase().includes(normalize(quoted).toLowerCase()))) {
+      if (!quotedFrom(quoted, item.quotes)) {
         problems.push(`${where} quotes "${quoted}", which its citation does not say`);
       }
     }
@@ -163,8 +163,7 @@ function check(depth: string, text: ExplanationDepth, items: Item[], documents: 
         problems.push(`${where} names ${d.documentId}, which the advice does not cite`);
       }
     }
-    // Rule ids (S1, P4) are names, not stated numbers.
-    for (const n of passage.text.replace(/\b[PS]\d+\b/g, "").match(/\d+(?:\.\d+)?/g) ?? []) {
+    for (const n of statedNumbers(passage.text)) {
       if (!item.numbers.has(value(n))) problems.push(`${where} states ${n}, which is neither in its quote nor the client's answer`);
     }
   }
@@ -186,21 +185,6 @@ function firstSentence(text: string): string {
 }
 
 const sentence = (text: string) => normalize(text).replace(/[\s.!?。！？]+$/u, "").toLowerCase();
-
-// Spans in double quotes, straight or curly, long enough to be a quotation rather than a word.
-// Punctuation at the very ends is the sentence's, not the source's: a model writes "…of the Fund," with its
-// own comma inside the quotation marks, or adds a full stop a table cell never had (Kimi K3 did both). Only
-// the ends are trimmed; anything that changes the words inside still fails.
-function quotations(text: string): string[] {
-  return [...text.matchAll(/["“]([^"”]{8,})["”]/g)].map((m) => m[1]!.replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g, ""));
-}
-
-// Numbers by value, not by spelling: "2.00%" in the source and "2%" in an explanation are the same charge.
-const value = (n: string) => String(Number(n));
-
-function numbersIn(...texts: (string | number | null)[]): Set<string> {
-  return new Set(texts.flatMap((t) => (t === null ? [] : (String(t).match(/\d+(?:\.\d+)?/g) ?? []).map(value))));
-}
 
 function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttributes, findings: readonly CaseFinding[]): Item[] {
   const reasons = advice.reasons.map((reason, i): Item => {

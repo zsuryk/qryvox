@@ -71,7 +71,11 @@ const TEXT = {
       "the findings on the board never change. " +
       "parse (input_run_id null) needs intent, the analyst's own words (up to 500 characters, any language), and " +
       "returns them as intent chips: a category, a document kind and a step from their fixed lists, or [] when " +
-      "the words name none. intent is refused on every other step.",
+      "the words name none. intent is refused on every other step. " +
+      "rationale (input_run_id: a completed findings run still on the board) is optional: one model call writes a " +
+      "plain-language sentence on why each of that run's findings matters, as {rationales: [{finding_id, text}]}. " +
+      "Whatever a sentence quotes must be verbatim in its finding's citation or counterpart, and every number it " +
+      "states must be in them; a sentence that does not hold is dropped, and the run fails only if none holds.",
     stepOk: "Completed, now or earlier",
     stepInvalid:
       "Invalid body: intent missing on parse or sent on another step, a seed on a step that takes none, or a seed " +
@@ -161,7 +165,10 @@ const TEXT = {
       "seed（僅限 extract 與 contradictions）代表「找相似」執行：一筆引文，其引文內容必須出現在所標示的頁面上；" +
       "此執行只回傳與該段落同一主題的陳述或問題，且不會被任何步驟讀取，因此看板上的發現不會改變。" +
       "parse（input_run_id 為 null）需要 intent，即分析師自己輸入的文字（最多 500 字，任何語言皆可），" +
-      "並將其轉為意圖標籤：各自從固定清單中選出的類別、文件種類與步驟；文字未提及任何一項時回傳 []。其他步驟不接受 intent。",
+      "並將其轉為意圖標籤：各自從固定清單中選出的類別、文件種類與步驟；文字未提及任何一項時回傳 []。其他步驟不接受 intent。" +
+      "rationale（input_run_id 為仍在看板上的已完成 findings 執行）為選用步驟：以一次模型呼叫，為該次執行的每一筆發現" +
+      "寫一句白話說明其對投資者的影響，格式為 {rationales: [{finding_id, text}]}。句中引用的文字必須與該發現的引文或對照引文" +
+      "完全一致，所提及的數字也必須出現在其中；不符合的句子會被捨棄，只有全部都不符合時，執行才會失敗。",
     stepOk: "已完成（本次或先前）",
     stepInvalid:
       "請求內容不正確：parse 缺少 intent 或其他步驟送出 intent、對不接受 seed 的步驟送出 seed，或 seed 的引文不在所標示的頁面上",

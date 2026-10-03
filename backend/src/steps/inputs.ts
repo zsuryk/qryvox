@@ -96,3 +96,30 @@ export function seedPassage(documents: readonly IngestedDocument[], seed: Citati
   const kind = documents.find((d) => d.document_id === seed.document_id)?.kind;
   return `document_id: ${seed.document_id} (${kind}), page ${seed.page}\n"${seed.quote}"`;
 }
+
+// --- Checks on text a model writes about grounded passages (explain, rationale) ---
+
+// Spans in double quotes, straight or curly, long enough to be a quotation rather than a word.
+// Punctuation at the very ends is the sentence's, not the source's: a model writes "…of the Fund," with its
+// own comma inside the quotation marks, or adds a full stop a table cell never had (Kimi K3 did both). Only
+// the ends are trimmed; anything that changes the words inside still fails.
+export function quotations(text: string): string[] {
+  return [...text.matchAll(/["“]([^"”]{8,})["”]/g)].map((m) => m[1]!.replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g, ""));
+}
+
+// Whether a quotation is in one of the passages it may come from, ignoring whitespace and case.
+export function quotedFrom(quoted: string, sources: readonly string[]): boolean {
+  return sources.some((q) => normalize(q).toLowerCase().includes(normalize(quoted).toLowerCase()));
+}
+
+// Numbers by value, not by spelling: "2.00%" in the source and "2%" in an explanation are the same charge.
+export const value = (n: string) => String(Number(n));
+
+export function numbersIn(...texts: (string | number | null)[]): Set<string> {
+  return new Set(texts.flatMap((t) => (t === null ? [] : (String(t).match(/\d+(?:\.\d+)?/g) ?? []).map(value))));
+}
+
+// The numbers a text states, as written. Rule ids (S1, P4) are names, not stated numbers.
+export function statedNumbers(text: string): string[] {
+  return text.replace(/\b[PS]\d+\b/g, "").match(/\d+(?:\.\d+)?/g) ?? [];
+}

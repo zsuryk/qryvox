@@ -14,9 +14,10 @@ import { extract } from "./extract.js";
 import { findings } from "./findings.js";
 import { groundCitation } from "./inputs.js";
 import { parse } from "./parse.js";
+import { rationale } from "./rationale.js";
 import type { AnyStep } from "./step.js";
 
-const STEPS: Record<StepName, AnyStep> = { extract, decompose, contradictions, compliance, findings, attributes, explain, parse };
+const STEPS: Record<StepName, AnyStep> = { extract, decompose, contradictions, compliance, findings, attributes, explain, parse, rationale };
 
 // A find-similar seed (#64) the server will not run: on a step that takes none, or quoting a passage that is
 // not on the page it cites. Refused before anything is appended or any model is called.

@@ -11,6 +11,7 @@ import { DECOMPOSE_SYSTEM_PROMPT } from "../src/steps/decompose";
 import { EXTRACT_SYSTEM_PROMPT } from "../src/steps/extract";
 import { FINDINGS_SYSTEM_PROMPT } from "../src/steps/findings";
 import { PARSE_SYSTEM_PROMPT } from "../src/steps/parse";
+import { RATIONALE_SYSTEM_PROMPT } from "../src/steps/rationale";
 import type { ChatMessage } from "../src/llm";
 import { FakeLlm, sampleDocument, type TestApp } from "./helpers";
 
@@ -53,6 +54,8 @@ export const REPLIES = {
   explain: {},
   // Not part of the pipeline: the analyst's words, here naming nothing in the chip vocabulary.
   parse: { chips: [] },
+  // Optional, after findings (#62): why the one finding matters, quoting its citation.
+  rationale: { rationales: [{ finding: "f1", text: 'An investor could pay more than the "0.85% per annum" the factsheet shows.' }] },
 } satisfies Record<StepName, unknown>;
 
 const PROMPTS: [string, StepName][] = [
@@ -64,6 +67,7 @@ const PROMPTS: [string, StepName][] = [
   [ATTRIBUTES_SYSTEM_PROMPT, "attributes"],
   [EXPLAIN_SYSTEM_PROMPT, "explain"],
   [PARSE_SYSTEM_PROMPT, "parse"],
+  [RATIONALE_SYSTEM_PROMPT, "rationale"],
 ];
 
 // A seeded run (#64) appends a section to its step's prompt, so a prompt is matched by how it begins.
