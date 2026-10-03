@@ -2,7 +2,7 @@ import { fold, type Sha256, type SlimEvent } from "@qryvox/shared";
 import type { BoardCitation } from "./board";
 import { errorMessage } from "./errors";
 import { sha256Hex, type DocumentBytes } from "./intake";
-import { fetchPackFile } from "./pack";
+import { fetchAnyPackFile } from "./pack";
 
 // The evidence pane's half that no DOM touches, so a test can drive the whole decision the pane makes:
 // which of the two paths is in use, and why. The other half — the canvas, the text layer and the divs a
@@ -232,7 +232,7 @@ export type VerifiedDocument =
 export async function fetchVerifiedDocument(document: EvidenceDocument): Promise<VerifiedDocument> {
   let bytes: DocumentBytes;
   try {
-    bytes = await fetchPackFile(document.filename);
+    bytes = await fetchAnyPackFile(document.filename);
   } catch (cause) {
     return { verdict: "rejected", event: { type: "document.fetch-failed", detail: errorMessage(cause) } };
   }

@@ -18,10 +18,8 @@ import {
 } from "../lib/advice";
 import { decideAdvice, draftAdvice, fetchEvents, recordProfile, runStep } from "../lib/api";
 import { errorMessage } from "../lib/errors";
-import { evidenceDocument } from "../lib/evidence";
-import { EvidencePane } from "./evidence";
+import CitationSheet from "./citation-sheet";
 import Questionnaire from "./questionnaire";
-import { Sheet } from "./ui";
 
 // The Advice section: the product as read, and each client with the advice the rules drafted for them,
 // waiting for the adviser (#32, #33). The adviser decides; nothing here approves anything by itself, and
@@ -393,22 +391,5 @@ function Quote({ citation, onOpen }: { citation: Citation; onOpen: () => void })
         </button>
       </figcaption>
     </figure>
-  );
-}
-
-// The source document in a sheet over the dimmed page: the same pane the board opens beside a finding.
-function CitationSheet({ events, citation, label, onClose }: { events: readonly SlimEvent[]; citation: Citation; label: string; onClose: () => void }) {
-  const source = evidenceDocument(events, citation.document_id);
-  return (
-    <Sheet title={label} onClose={onClose}>
-      {source === null ? (
-        <p className="t-callout">This case&apos;s log names no document {citation.document_id}. The passage is quoted in full on the card.</p>
-      ) : (
-        <EvidencePane
-          document={source}
-          citation={{ documentId: citation.document_id, documentName: source.filename, page: citation.page, quote: citation.quote }}
-        />
-      )}
-    </Sheet>
   );
 }

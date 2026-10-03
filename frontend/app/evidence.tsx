@@ -327,7 +327,10 @@ function markPassage(divs: readonly HTMLElement[], match: QuoteMatch | null): vo
     const div = divs[at];
     if (!div) continue;
     div.dataset.citedPassage = "true";
-    div.style.background = "#fde68a";
+    // Translucent and multiplied onto the page, as a highlighter is: the runs sit above the drawn page, so
+    // an opaque fill would hide the very words it marks.
+    div.style.background = "rgba(250, 204, 21, 0.4)";
+    div.style.mixBlendMode = "multiply";
     div.style.outline = "2px solid #b45309";
     div.style.outlineOffset = "0";
   }

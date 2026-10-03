@@ -12,6 +12,8 @@ const PLACES = [
 
 export default function SiteNav() {
   const path = usePathname();
+  // A client's own page carries none of the analyst's places: it is theirs, and only theirs.
+  if (path.startsWith("/clients/")) return null;
   return (
     <nav className="nav" aria-label="Main">
       {PLACES.map((place) => (
