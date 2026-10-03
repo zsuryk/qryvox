@@ -1,6 +1,6 @@
 import type { Persona } from "../src";
 
-// Three fabricated clients and the advice rules@1 should give each on the Larkspur pack (#20). Like the
+// Three fabricated clients and the advice the rules (rules@2) should give each on the Larkspur pack (#20). Like the
 // product, none of them exists. Every fees and terms finding is open, so all three are told the same four
 // things (S6), the factsheet's missing exit charge among them; what differs is the verdict.
 const DISCLOSED = ["fees-management-fee", "fees-exit-charge", "terms-dealing-frequency", "policy-factsheet-exit-charge"];
@@ -30,7 +30,8 @@ export const PERSONAS: Persona[] = [
       // Monthly dealing, 30 days' notice, 2.00% within 24 months (PPM 7.3, 7.4, 7.2).
       { rule: "S4", effect: "blocks" },
       { rule: "S4", effect: "blocks" },
-      { rule: "S4", effect: "blocks" },
+      { rule: "S4", effect: "blocks" },      // Income, which is what Larkspur is built for (PPM 3.1).
+      { rule: "S7", effect: "meets" },
     ],
     expected_disclosures: DISCLOSED,
   },
@@ -52,7 +53,8 @@ export const PERSONAS: Persona[] = [
       { rule: "S1", effect: "meets" },
       { rule: "S2", effect: "meets" },
       // The fossil fuel screen is only in the deck; the PPM does not back it.
-      { rule: "S5", effect: "conditional" },
+      { rule: "S5", effect: "conditional" },      // Growth, where Larkspur is built mainly for income: told, not blocked.
+      { rule: "S7", effect: "warns" },
     ],
     expected_disclosures: DISCLOSED,
   },
@@ -72,7 +74,7 @@ export const PERSONAS: Persona[] = [
     expected_verdict: "suitable",
     expected_reasons: [
       { rule: "S1", effect: "meets" },
-      { rule: "S2", effect: "meets" },
+      { rule: "S2", effect: "meets" },      { rule: "S7", effect: "meets" },
     ],
     expected_disclosures: DISCLOSED,
   },

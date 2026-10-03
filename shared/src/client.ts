@@ -67,6 +67,9 @@ export const ProductAttributes = z.object({
   // Screens the documents claim, and whether the PPM backs each one. A screen only marketing claims is
   // recorded unbacked, citing the marketing passage, so S5 can make the advice conditional on it.
   exclusion_screens: z.array(z.object({ exclusion: Exclusion, backed_by_ppm: z.boolean(), citation: Citation })),
+  // What the product is built mainly for, as the PPM states its objective (#41): S7 compares it with the
+  // client's goal. Optional so runs recorded before rules@2 still parse; the attributes step now requires it.
+  primary_objective: cited(ClientGoal).optional(),
   // The product's name as a document states it: how the shelf tells products apart (#39). Optional, so a
   // run that could not quote it still reads everything suitability needs; such a product is not offered
   // as an alternative.
@@ -80,7 +83,7 @@ export type ProductAttributes = z.infer<typeof ProductAttributes>;
 //   2  not capital protected, otherwise as 1
 //   3  a sub-investment-grade allowance of up to 50%
 //   4  more than 50% sub-investment-grade, or derivatives used for investment
-// 5 is reserved for what rules@1 does not describe (e.g. leverage) and is never mapped to.
+// 5 is reserved for what the rules do not describe (e.g. leverage) and is never mapped to.
 export function productRiskLevel(attributes: ProductAttributes): 1 | 2 | 3 | 4 {
   const subIg = attributes.sub_investment_grade_max_pct.value;
   if (subIg > 50 || attributes.derivatives_use.value === "investment") return 4;

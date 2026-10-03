@@ -5,7 +5,9 @@ import { z } from "zod";
 // product to go on the shelf; the compliance step checks them, and a breach is a policy_gap finding.
 // Suitability rules decide whether a shelved product fits a client; a pure function applies them, never a
 // model. Every event that applies a rule records RULES_VERSION, as step events record their prompt version.
-export const RULES_VERSION = "rules@1";
+// rules@2 (#41) adds S7: the same inputs can now give a further reason, so the version moves. Advice
+// records the version it was drafted under, so advice drafted under rules@1 says so for ever.
+export const RULES_VERSION = "rules@2";
 
 export const RuleGroup = z.enum(["product", "suitability"]);
 export type RuleGroup = z.infer<typeof RuleGroup>;
@@ -13,7 +15,7 @@ export type RuleGroup = z.infer<typeof RuleGroup>;
 export const ProductRuleId = z.enum(["P1", "P2", "P3", "P4"]);
 export type ProductRuleId = z.infer<typeof ProductRuleId>;
 
-export const SuitabilityRuleId = z.enum(["S1", "S2", "S3", "S4", "S5", "S6"]);
+export const SuitabilityRuleId = z.enum(["S1", "S2", "S3", "S4", "S5", "S6", "S7"]);
 export type SuitabilityRuleId = z.infer<typeof SuitabilityRuleId>;
 
 export type Rule = {
@@ -90,6 +92,14 @@ export const RULES = [
     group: "suitability",
     title: "Open findings are disclosed",
     text: "Every fees or terms finding on the product that the analyst has not dismissed is disclosed to the client.",
+  },
+  {
+    id: "S7",
+    group: "suitability",
+    title: "Built for what you want",
+    text:
+      "The product's primary objective, as its PPM states it, is the client's goal; when it is not, the client is " +
+      "told what the product is built for.",
   },
 ] as const satisfies readonly Rule[];
 

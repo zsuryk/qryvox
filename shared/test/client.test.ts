@@ -67,7 +67,7 @@ const draft = (profileSeq: number): Advice => ({
   verdict: "not_suitable",
   reasons: [horizonBlocks],
   disclosures: [],
-  rules_version: "rules@1",
+  rules_version: "rules@2",
 });
 
 describe("the client profile", () => {

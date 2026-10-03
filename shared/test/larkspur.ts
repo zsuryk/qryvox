@@ -37,6 +37,10 @@ export const larkspurAttributes = ProductAttributes.parse({
     value: "hedging",
     citation: ppm(1, "3.5 The Fund may use derivatives for hedging purposes only."),
   },
+  primary_objective: {
+    value: "income",
+    citation: ppm(1, "3.1 The Fund aims to provide a regular income with the potential for modest capital growth over at least five years."),
+  },
   exclusion_screens: [
     {
       exclusion: "fossil_fuels",
@@ -68,6 +72,7 @@ export const wrenfieldAttributes = ProductAttributes.parse({
   redemption_notice_days: { value: 0, citation: ppm(3, "6.3 Redemption requests received by 12:00 are dealt the same day.") },
   exit_charge_within_months: { value: 0, citation: ppm(3, "6.4 No redemption charge applies.") },
   derivatives_use: { value: "none", citation: ppm(1, "2.3 The Fund does not use derivatives.") },
+  primary_objective: { value: "preservation", citation: ppm(1, "2.1 The Fund aims to preserve capital and provide income over a period of at least one year.") },
   exclusion_screens: [],
   product_name: { value: "Wrenfield Short Duration Fund", citation: ppm(1, "Wrenfield Short Duration Fund - issued by Ashcombe Investment Partners Ltd") },
 });

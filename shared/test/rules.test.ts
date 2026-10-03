@@ -32,15 +32,15 @@ function policyGap(extra: Record<string, unknown> = {}) {
   };
 }
 
-describe("rules@1", () => {
+describe("the rules", () => {
   it("is one versioned set: unique ids, each in the group its prefix names", () => {
-    expect(RULES_VERSION).toBe("rules@1");
+    expect(RULES_VERSION).toBe("rules@2");
     expect(new Set(RULES.map((r) => r.id)).size).toBe(RULES.length);
     for (const rule of RULES) {
       expect(rule.group).toBe(rule.id.startsWith("P") ? "product" : "suitability");
     }
     expect(RULES.filter((r) => r.group === "product").map((r) => r.id)).toEqual(["P1", "P2", "P3", "P4"]);
-    expect(RULES.filter((r) => r.group === "suitability").map((r) => r.id)).toEqual(["S1", "S2", "S3", "S4", "S5", "S6"]);
+    expect(RULES.filter((r) => r.group === "suitability").map((r) => r.id)).toEqual(["S1", "S2", "S3", "S4", "S5", "S6", "S7"]);
   });
 
   it("looks a rule up by id", () => {

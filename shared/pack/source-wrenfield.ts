@@ -138,6 +138,8 @@ const EXPECTED: Record<string, Pick<Persona, "expected_verdict" | "expected_reas
       { rule: "S2", effect: "meets" },
       { rule: "S3", effect: "meets" },
       { rule: "S4", effect: "meets" },
+      // Income, where Wrenfield is built first to keep capital safe (PPM 2.1): told, not blocked.
+      { rule: "S7", effect: "warns" },
     ],
   },
   // Nothing in the pack screens out fossil fuels.
@@ -147,13 +149,14 @@ const EXPECTED: Record<string, Pick<Persona, "expected_verdict" | "expected_reas
       { rule: "S1", effect: "meets" },
       { rule: "S2", effect: "meets" },
       { rule: "S5", effect: "blocks" },
+      { rule: "S7", effect: "warns" },
     ],
   },
   "persona-wong": {
     expected_verdict: "suitable",
     expected_reasons: [
       { rule: "S1", effect: "meets" },
-      { rule: "S2", effect: "meets" },
+      { rule: "S2", effect: "meets" },      { rule: "S7", effect: "warns" },
     ],
   },
 };

@@ -2,7 +2,7 @@ import { type Disclosure, type Reason, verdictFor, type Verdict } from "./advice
 import { type ClientProfile, type DealingFrequency, type ProductAttributes, productRiskLevel } from "./client.js";
 import type { Citation, Finding } from "./finding.js";
 
-// The suitability rules of rules@1, applied. A pure function, beside fold: the server drafts advice with
+// The suitability rules (rules.ts), applied. A pure function, beside fold: the server drafts advice with
 // it and the browser's replay recomputes the same verdict, because nothing here calls a model, reads the
 // clock or computes a return. Every comparison is between a client's answer and a value the documents
 // state.
@@ -26,6 +26,7 @@ export function assessSuitability(
     ...income(profile, attributes),
     ...cashAtShortNotice(profile, attributes),
     ...exclusions(profile, attributes),
+    ...goal(profile, attributes),
   ];
   return { verdict: verdictFor(reasons), reasons, disclosures: disclose(findings) };
 }
@@ -99,6 +100,21 @@ function exclusions(profile: ClientProfile, a: ProductAttributes): Reason[] {
       citation: screen?.citation ?? null,
     };
   });
+}
+
+// S7 (#41): the client's goal against what the product is built for. A mismatch is a warning, never a
+// block: an income fund is not unsuitable for a growth investor on that alone, but they are told plainly.
+// Silent when the attributes predate it (no primary objective read).
+function goal(profile: ClientProfile, a: ProductAttributes): Reason[] {
+  if (!a.primary_objective) return [];
+  return [
+    {
+      rule: "S7",
+      effect: a.primary_objective.value === profile.goal ? "meets" : "warns",
+      profile_field: "goal",
+      citation: a.primary_objective.citation,
+    },
+  ];
 }
 
 // S6: every fees or terms finding still open is disclosed, citing the more authoritative side — the
