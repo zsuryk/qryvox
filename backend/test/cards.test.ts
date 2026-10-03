@@ -60,6 +60,9 @@ describe("a card operation", () => {
       ["card.discarded", { card_id: card }],
       ["card.restored", { card_id: card }],
       ["card.similar_requested", { card_id: card, step_kind: "contradictions" }],
+      // Extract is what the canvas re-runs for a finding card (#66); contradictions is what it re-ran
+      // before, and what the API can still be seeded with.
+      ["card.similar_requested", { card_id: card, step_kind: "extract" }],
     ];
     for (const [type, payload] of ops) {
       const res = await cardOp(t, caseId, type, payload);
@@ -72,7 +75,10 @@ describe("a card operation", () => {
 
     const { state } = await board(t, caseId);
     expect(state.board).toMatchObject({ docked: [], pinned: [], discarded: [] });
-    expect(state.board.similarRequests).toEqual([expect.objectContaining({ cardId: card, stepKind: "contradictions", actor: "demo-analyst" })]);
+    expect(state.board.similarRequests).toEqual([
+      expect.objectContaining({ cardId: card, stepKind: "contradictions", actor: "demo-analyst" }),
+      expect.objectContaining({ cardId: card, stepKind: "extract", actor: "demo-analyst" }),
+    ]);
     // Nothing touched the finding.
     expect(activeFindings(state)).toEqual([finding]);
     expect(state.dispositions).toEqual([]);
@@ -186,13 +192,12 @@ describe("a dock into the wrong place", () => {
 });
 
 describe("a request that is not a card operation", () => {
-  it("is 400 for another event type, a malformed card id, or find similar naming the wrong step", async () => {
+  it("is 400 for another event type, a malformed card id, or find similar naming a step that takes no seed", async () => {
     const { t, caseId, finding } = await caseWithFinding();
     const card = findingCardId(finding.finding_id);
 
     expect((await cardOp(t, caseId, "disposition.changed", { finding_id: finding.finding_id, disposition: "approved" })).status).toBe(400);
     expect((await cardOp(t, caseId, "card.discarded", { card_id: finding.finding_id })).status).toBe(400);
-    expect((await cardOp(t, caseId, "card.similar_requested", { card_id: card, step_kind: "extract" })).status).toBe(400);
     expect((await cardOp(t, caseId, "card.similar_requested", { card_id: card, step_kind: "findings" })).status).toBe(400);
     expect(await cardEvents(t, caseId)).toEqual([]);
   });

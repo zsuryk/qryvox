@@ -101,11 +101,11 @@ const TEXT = {
     cardDesc:
       "Appends one card event, attributed to the analyst: card.docked (into a plan slot), card.undocked, card.pinned " +
       "(at a world position), card.unpinned, card.discarded, card.restored, or card.similar_requested (step_kind " +
-      "contradictions for a finding card, extract for an excerpt card; the seeded run itself is a separate call to " +
-      "/steps). Nothing touches a finding: discarding a finding card is not dismissing it. Idempotent by event_id. " +
-      "Answers with the event appended.",
+      "extract, whichever card it is pressed from; any seedable step is admitted, so contradictions can still " +
+      "be seeded; the seeded run itself is a separate call to /steps). Nothing touches a finding: discarding a " +
+      "finding card is not dismissing it. Idempotent by event_id. Answers with the event appended.",
     cardRecorded: "Recorded; the card event as appended",
-    cardInvalid: "Invalid body: not a card event, a malformed card id, or find similar naming a step other than the card's",
+    cardInvalid: "Invalid body: not a card event, a malformed card id, or find similar naming a step that takes no seed",
     cardRefused:
       "The case has no such card (a finding not on the board, or a passage no active finding cites and no completed " +
       "find-similar run returned), a dock into a slot of another category, or the event_id used by another event",
@@ -192,11 +192,11 @@ const TEXT = {
     card: "記錄畫布上的卡片操作",
     cardDesc:
       "追加一筆卡片事件，記錄為分析師所做：card.docked（放入計畫區的某一格）、card.undocked、card.pinned（固定在畫布座標）、" +
-      "card.unpinned、card.discarded、card.restored，或 card.similar_requested（發現卡片的 step_kind 為 contradictions，" +
-      "摘錄卡片為 extract；帶種子的重新執行本身另外呼叫 /steps）。不會改動任何發現：丟棄發現卡片不等於駁回該發現。" +
-      "以 event_id 確保冪等。回傳所追加的事件。",
+      "card.unpinned、card.discarded、card.restored，或 card.similar_requested（不論從哪一種卡片按出，step_kind 都是 " +
+      "extract；任何可接受種子的步驟都允許，因此仍可帶種子執行 contradictions；帶種子的重新執行本身另外呼叫 /steps）。" +
+      "不會改動任何發現：丟棄發現卡片不等於駁回該發現。以 event_id 確保冪等。回傳所追加的事件。",
     cardRecorded: "已記錄；回傳所追加的卡片事件",
-    cardInvalid: "請求內容不正確：不是卡片事件、卡片 ID 格式錯誤，或「找相似」指定的步驟與卡片種類不符",
+    cardInvalid: "請求內容不正確：不是卡片事件、卡片 ID 格式錯誤，或「找相似」指定了不接受種子的步驟",
     cardRefused:
       "此案件沒有這張卡片（發現不在看板上，或摘錄既未被任何有效發現引用、也不是已完成的「找相似」執行所回傳），" +
       "放入其他類別的格子，或 event_id 已被其他事件使用",

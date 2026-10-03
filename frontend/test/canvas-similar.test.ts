@@ -15,10 +15,9 @@ const excerptCard = view.cards.find((c) => c.kind === "excerpt")!;
 const decompose = view.state.stepRuns.filter((r) => r.step === "decompose" && r.status === "completed").at(-1)!;
 
 describe("what Similar runs", () => {
-  it("re-runs contradictions for a finding card, seeded with its citation, over the latest completed decompose run", () => {
-    const planned = planSimilar(view, findingCard.cardId);
-    expect(planned).toEqual({
-      plan: { step: "contradictions", seed: findingCard.kind === "finding" && findingCard.finding.citation, inputRunId: decompose.stepRunId },
+  it("re-runs extract for a finding card, seeded with its citation, over the documents (#66)", () => {
+    expect(planSimilar(view, findingCard.cardId)).toEqual({
+      plan: { step: "extract", seed: findingCard.kind === "finding" && findingCard.finding.citation, inputRunId: null },
     });
   });
 
@@ -34,12 +33,12 @@ describe("what Similar runs", () => {
     expect(similarRequest(planned.plan, "run-1")).toEqual({ step_run_id: "run-1", step: "extract", input_run_id: null, seed: planned.plan.seed });
   });
 
-  it("says why not for a finding card on a case with no completed decompose run, or a card no longer there", () => {
-    // The recorded case with its decompose run's completion taken out: its findings stand, but there is
-    // no completed decompose run left to look through.
+  it("plans a finding card the same without a completed decompose run, and says why not for a card no longer there", () => {
+    // The recorded case with its decompose run's completion taken out: extract reads the documents, so a
+    // finding card still has a run to make, where re-running contradictions needed claims to look through.
     const events = SlimEvent.array().parse(recorded);
     const noDecompose = canvasView(events.filter((e) => !(e.step_run_id === decompose.stepRunId && e.type === "step.completed")).map((e, i) => ({ ...e, seq: i + 1 })));
-    expect(planSimilar(noDecompose, findingCard.cardId)).toEqual({ refused: expect.stringContaining("no completed decompose run") });
+    expect(planSimilar(noDecompose, findingCard.cardId)).toEqual({ plan: { step: "extract", seed: findingCard.kind === "finding" && findingCard.finding.citation, inputRunId: null } });
     expect(planSimilar(view, "finding:gone")).toEqual({ refused: expect.stringContaining("no longer") });
   });
 });
@@ -61,12 +60,15 @@ describe("the fixture's recorded runs", () => {
       [events.length + 2, "step.completed", "5e2a9c47-1d3b-4f60-8a7e-0c9b6d2f4e18"],
     ]);
     const after = canvasView([...events, ...played]);
-    expect(after.state.seededRuns).toEqual([expect.objectContaining({ step: "contradictions", status: "completed", seed: planned.plan.seed })]);
+    expect(after.state.seededRuns).toEqual([expect.objectContaining({ step: "extract", status: "completed", seed: planned.plan.seed })]);
     // The board is untouched: the same findings, and the pipeline's runs as they were.
     expect(after.state.findings).toEqual(view.state.findings);
     expect(after.state.stepRuns).toEqual(view.state.stepRuns);
-    // Every candidate is a card the canvas did not have.
+    // Every candidate is a card the canvas did not have, and a press on a finding card brings at least one:
+    // the recorded run it now replays returned a passage no card had, where the contradictions run it
+    // replaced returned the passage the finding was cited on (#57, #66).
     const added = candidatesOf(after, "5e2a9c47-1d3b-4f60-8a7e-0c9b6d2f4e18");
+    expect(added.length).toBeGreaterThan(0);
     expect(added.every((id) => !view.cards.some((c) => c.cardId === id))).toBe(true);
   });
 
@@ -77,6 +79,21 @@ describe("the fixture's recorded runs", () => {
     const [candidate] = candidatesOf(after, "run-x");
     const model = cardModel(after.cards.find((c) => c.cardId === candidate)!, after.state);
     expect(model).toMatchObject({ kind: "excerpt", candidate: true, similarTo: expect.stringMatching(/^Similar to “.+”, .+ page \d+$/) });
+  });
+
+  it("marks a candidate from a finding card with that finding's claim, as one from an excerpt card is (#66)", () => {
+    const planned = planSimilar(view, findingCard.cardId);
+    if (!("plan" in planned)) throw new Error("expected a plan");
+    const after = canvasView([...fixtureEvents(), ...playback(fixtureEvents(), planned.plan, "run-x", "2026-10-03T12:00:00.000Z")!]);
+    const claim = planned.plan.seed;
+    // The document named as the finding's own card names it, which is how the line reads it.
+    const named = cardModel(findingCard, view.state).citation.documentName;
+    const candidates = candidatesOf(after, "run-x");
+    expect(candidates.length).toBeGreaterThan(0);
+    for (const candidate of candidates) {
+      const model = cardModel(after.cards.find((c) => c.cardId === candidate)!, after.state);
+      expect(model).toMatchObject({ candidate: true, similarTo: `Similar to “${claim.quote}”, ${named} page ${claim.page}` });
+    }
   });
 
   it("plays nothing back for a plan with no recording", () => {

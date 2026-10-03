@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CardId, findingIdOfCard } from "./card.js";
+import { CardId } from "./card.js";
 import {
   CardDiscarded,
   CardDocked,
@@ -128,8 +128,9 @@ export const RunStepRequest = z
   });
 export type RunStepRequest = z.infer<typeof RunStepRequest>;
 
-// The steps find-similar can re-run: the one that produced an excerpt card and the one that produced a
-// finding card's issue. findings itself never takes a seed, since it is the only step that writes findings.
+// The steps a seeded re-run may name, on POST /steps and on a card's find similar (#64): the one that reads
+// the documents, and the one that looks for claims that disagree. findings itself never takes a seed, since
+// it is the only step that writes findings.
 export const SEEDABLE_STEPS = ["extract", "contradictions"] as const satisfies readonly StepName[];
 export type SeedableStep = (typeof SEEDABLE_STEPS)[number];
 
@@ -140,30 +141,26 @@ export function isSeedable(step: StepName): step is SeedableStep {
 // POST /cases/:caseId/cards — one card operation on a live case's canvas (#65): a card event as the
 // browser makes it, without the envelope, which the server supplies (the analyst as actor, the next seq).
 // event_id is the browser's, so a retry appends nothing. The server answers with the event it appended.
-// Find similar names the step it re-runs, which follows from the card: a finding card's issue came from
-// contradictions, an excerpt card's passage from extract (#57).
-export const CardOperationRequest = z
-  .discriminatedUnion("type", [
-    CardDocked.pick({ event_id: true, type: true, payload: true }),
-    CardUndocked.pick({ event_id: true, type: true, payload: true }),
-    CardPinned.pick({ event_id: true, type: true, payload: true }),
-    CardUnpinned.pick({ event_id: true, type: true, payload: true }),
-    CardDiscarded.pick({ event_id: true, type: true, payload: true }),
-    CardRestored.pick({ event_id: true, type: true, payload: true }),
-    CardSimilarRequested.pick({ event_id: true, type: true }).extend({
-      payload: z.object({ card_id: CardId, step_kind: z.enum(SEEDABLE_STEPS) }),
-    }),
-  ])
-  .refine((r) => r.type !== "card.similar_requested" || r.payload.step_kind === similarStep(r.payload.card_id), {
-    message: "find similar re-runs contradictions for a finding card and extract for an excerpt card",
-    path: ["payload", "step_kind"],
-  });
+// Find similar names the step it re-runs, which the canvas takes to be FIND_SIMILAR_STEP whatever the card;
+// any seedable step is still admitted, since contradictions can be seeded through this endpoint (#64, #66).
+export const CardOperationRequest = z.discriminatedUnion("type", [
+  CardDocked.pick({ event_id: true, type: true, payload: true }),
+  CardUndocked.pick({ event_id: true, type: true, payload: true }),
+  CardPinned.pick({ event_id: true, type: true, payload: true }),
+  CardUnpinned.pick({ event_id: true, type: true, payload: true }),
+  CardDiscarded.pick({ event_id: true, type: true, payload: true }),
+  CardRestored.pick({ event_id: true, type: true, payload: true }),
+  CardSimilarRequested.pick({ event_id: true, type: true }).extend({
+    payload: z.object({ card_id: CardId, step_kind: z.enum(SEEDABLE_STEPS) }),
+  }),
+]);
 export type CardOperationRequest = z.infer<typeof CardOperationRequest>;
 
-// The step find-similar re-runs for a card: the one that produced what the card shows.
-export function similarStep(cardId: CardId): SeedableStep {
-  return findingIdOfCard(cardId) === null ? "extract" : "contradictions";
-}
+// The step find-similar re-runs, whichever card it is pressed from: extract, seeded with the passage the
+// card shows (#66). A finding card used to re-run contradictions, which returned the very passage its own
+// citation already had a card for, so a press on it found nothing. Contradictions stays seedable through the
+// API for a caller that wants it; only the canvas has stopped asking for it.
+export const FIND_SIMILAR_STEP = "extract" as const satisfies SeedableStep;
 
 // 201: the card event as appended (or, for a retried event_id, as appended the first time).
 export const CardOperationResponse = CardEvent;

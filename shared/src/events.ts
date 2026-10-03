@@ -273,8 +273,9 @@ export const CardRestored = z.object({
   payload: z.object({ card_id: CardId }),
 });
 
-// The analyst asked for more like this card: a seeded re-run of the step that produced it (#57). The
-// request is recorded here; the run it leads to is an ordinary step run with its own events.
+// The analyst asked for more like this card: a seeded re-run, extract from the documents wherever it is
+// pressed from (#57, #66). The request is recorded here; the run it leads to is an ordinary step run with
+// its own events.
 export const CardSimilarRequested = z.object({
   ...envelope,
   type: z.literal("card.similar_requested"),

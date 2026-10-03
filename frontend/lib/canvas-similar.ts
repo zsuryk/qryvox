@@ -3,9 +3,9 @@ import {
   type CardId,
   type Citation,
   ErrorResponse,
+  FIND_SIMILAR_STEP,
   type RunStepRequest,
   type SeedableStep,
-  similarStep,
   SlimEvent,
 } from "@qryvox/shared";
 import { StepFailureError } from "./api";
@@ -13,12 +13,13 @@ import type { CanvasView } from "./canvas-source";
 import { errorMessage } from "./errors";
 import recordedRuns from "./similar-recorded.json";
 
-// Find similar (#57): from a card, a seeded re-run of the step that produced it (#64), whose passages come
-// back as candidate cards (canvasView's candidateOf). A finding card re-runs contradictions over the latest
-// completed decompose run, seeded with the passage the finding is cited on; an excerpt card re-runs extract
-// over the documents, seeded with its own passage. The request is a card event (card.similar_requested) and
-// the run an ordinary step run with a new step_run_id, so both are on the record like anything else, and a
-// seeded run never becomes another step's input, so the findings on the board never change.
+// Find similar (#57): from a card, a seeded re-run of extract over the documents (#64), whose passages come
+// back as candidate cards (canvasView's candidateOf). A card of either kind re-runs extract, seeded with the
+// passage it shows — a finding card with its own citation (#66), an excerpt card with its passage — because
+// that is what the press means: more passages like the one on this card. The request is a card event
+// (card.similar_requested) and the run an ordinary step run with a new step_run_id, so both are on the record
+// like anything else, and a seeded run never becomes another step's input, so the findings on the board never
+// change.
 
 export type SimilarPlan = { step: SeedableStep; seed: Citation; inputRunId: string | null };
 
@@ -26,13 +27,10 @@ export type SimilarPlan = { step: SeedableStep; seed: Citation; inputRunId: stri
 export function planSimilar(view: CanvasView, cardId: CardId): { plan: SimilarPlan } | { refused: string } {
   const card = view.cards.find((c) => c.cardId === cardId);
   if (!card) return { refused: "This card is no longer on the canvas." };
-  const step = similarStep(cardId);
-  if (card.kind === "excerpt") return { plan: { step, seed: card.citation, inputRunId: null } };
-  // The latest completed decompose run of the pipeline: seeded runs are kept apart in the fold, so this is
-  // never one of them.
-  const decompose = view.state.stepRuns.filter((r) => r.step === "decompose" && r.status === "completed").at(-1);
-  if (!decompose) return { refused: "There are no claims to look through: this case has no completed decompose run." };
-  return { plan: { step, seed: card.finding.citation, inputRunId: decompose.stepRunId } };
+  // The passage the card shows: the finding's own citation, or the excerpt's.
+  const seed = card.kind === "excerpt" ? card.citation : card.finding.citation;
+  // extract reads the documents, so it consumes no earlier run.
+  return { plan: { step: FIND_SIMILAR_STEP, seed, inputRunId: null } };
 }
 
 // The run's request, under a new run id: each press is a run of its own.

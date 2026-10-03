@@ -7,9 +7,9 @@ import {
   caseCards,
   excerptCardId,
   findingCardId,
+  FIND_SIMILAR_STEP,
   fold,
   seededPassages,
-  similarStep,
   SlimEvent,
 } from "../src";
 import recorded from "../fixtures/case-recorded.json";
@@ -57,17 +57,18 @@ describe("the card operation request", () => {
     expect(CardOperationRequest.safeParse({ type: "card.discarded", payload: { card_id: "finding:f-1" } }).success).toBe(false);
   });
 
-  it("re-runs contradictions for a finding card and extract for an excerpt card, and nothing else", () => {
+  it("re-runs extract for a card of either kind, and still takes a request recorded with contradictions", () => {
     const similar = (card_id: string, step_kind: string) =>
       CardOperationRequest.safeParse({ event_id: id, type: "card.similar_requested", payload: { card_id, step_kind } }).success;
     const excerpt = excerptCardId(feeSeed);
-    expect(similarStep("finding:f-1")).toBe("contradictions");
-    expect(similarStep(excerpt)).toBe("extract");
+    expect(similar("finding:f-1", FIND_SIMILAR_STEP)).toBe(true);
+    expect(similar(excerpt, FIND_SIMILAR_STEP)).toBe(true);
+    // A finding card re-ran contradictions before #66, and contradictions can still be seeded through the
+    // API, so a request naming it is still a card operation rather than a refusal.
     expect(similar("finding:f-1", "contradictions")).toBe(true);
-    expect(similar(excerpt, "extract")).toBe(true);
-    expect(similar("finding:f-1", "extract")).toBe(false);
-    expect(similar(excerpt, "contradictions")).toBe(false);
+    expect(similar(excerpt, "contradictions")).toBe(true);
     expect(similar("finding:f-1", "findings")).toBe(false);
+    expect(similar(excerpt, "findings")).toBe(false);
   });
 
   it("answers with a card event, and only a card event", () => {
