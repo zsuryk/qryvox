@@ -113,6 +113,17 @@ describe("fit to content", () => {
     expect(toScreen(v, { x: 100, y: 100 })).toEqual({ x: 40, y: 40 });
   });
 
+  it("can be asked to stay readable: no smaller than minZoom, from the top-left when that does not fit", () => {
+    const bounds = { x: 0, y: 0, w: 1300, h: 1400 };
+    expect(fitTo(bounds, size).zoom).toBeLessThan(0.7);
+    const v = fitTo(bounds, size, { padding: 40, minZoom: 0.7 });
+    expect(v.zoom).toBe(0.7);
+    // Too tall at 0.7, so it starts at the top; wide enough to centre across.
+    const corner = toScreen(v, { x: 0, y: 0 });
+    expect(corner.y).toBe(40);
+    expect(corner.x).toBeCloseTo((size.width - 1300 * 0.7) / 2, 9);
+  });
+
   it("bounds a set of rectangles, and nothing for none", () => {
     expect(boundsOf([])).toBeNull();
     expect(

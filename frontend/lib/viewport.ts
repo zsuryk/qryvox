@@ -65,11 +65,15 @@ export function boundsOf(rects: readonly Rect[]): Rect | null {
 
 // The viewport that shows all of `bounds` inside a screen of `size`, centred, with `padding` screen pixels
 // clear on every side. It never zooms past maxZoom to fill the screen (a lone card is not blown up), and
-// never below MIN_ZOOM: content too big for that is shown from its top-left corner rather than shrunk
-// into something nobody can read.
-export function fitTo(bounds: Rect, size: Size, { padding = 48, maxZoom = 1 }: { padding?: number; maxZoom?: number } = {}): Viewport {
+// never below minZoom (MIN_ZOOM unless asked for more): content too big for that is shown from its
+// top-left corner rather than shrunk into something nobody can read.
+export function fitTo(
+  bounds: Rect,
+  size: Size,
+  { padding = 48, maxZoom = 1, minZoom = MIN_ZOOM }: { padding?: number; maxZoom?: number; minZoom?: number } = {},
+): Viewport {
   const room = { width: Math.max(1, size.width - 2 * padding), height: Math.max(1, size.height - 2 * padding) };
-  const zoom = clampZoom(Math.min(maxZoom, room.width / Math.max(1, bounds.w), room.height / Math.max(1, bounds.h)));
+  const zoom = clampZoom(Math.max(minZoom, Math.min(maxZoom, room.width / Math.max(1, bounds.w), room.height / Math.max(1, bounds.h))));
   const centred = (screen: number, start: number, extent: number) => {
     const slack = screen - extent * zoom;
     return slack >= 2 * padding ? slack / 2 - start * zoom : padding - start * zoom;

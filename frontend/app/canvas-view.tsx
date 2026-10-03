@@ -1,11 +1,14 @@
 "use client";
 
 import { type KeyboardEvent, type PointerEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { SlimEvent } from "@qryvox/shared";
-import { type CanvasMode, type CanvasView as View, canvasView } from "../lib/canvas-source";
+import type { CardId, SlimEvent } from "@qryvox/shared";
+import { type CardCitation, cardModel, naturalSlot } from "../lib/canvas-cards";
 import { canvasLayout } from "../lib/canvas-layout";
+import { type CanvasMode, type CanvasView as View, canvasView } from "../lib/canvas-source";
+import { appendOp, type CardOp, operations } from "../lib/canvas-store";
 import { errorMessage } from "../lib/errors";
 import {
+  centreOn,
   fitTo,
   glide,
   gridStyle,
@@ -16,11 +19,14 @@ import {
   type Rect,
   type Size,
   type Viewport,
+  visibleWorld,
   wheelFactor,
   worldTransform,
   zoomAt,
   zoomBy,
 } from "../lib/viewport";
+import { Card, type CardActions } from "./canvas-card";
+import CitationSheet from "./citation-sheet";
 
 // The canvas (#48): the case's findings and the passages they cite, laid out as cards on a board that pans
 // and zooms without end. It is a view over the case's log and nothing else: the cards are folded from the
@@ -37,41 +43,97 @@ const KEY_PAN = 64;
 export type CanvasViewProps = { events: readonly SlimEvent[]; mode: CanvasMode };
 
 export default function CanvasView({ events, mode }: CanvasViewProps) {
+  // The store: the log, and card operations appended to it (lib/canvas-store.ts). Only the fixture
+  // appends here; on a live case the operations are disabled until the backend can record them.
+  const [log, setLog] = useState<readonly SlimEvent[]>(events);
+  const allowed = operations(mode);
+  const dispatch = useCallback(
+    (op: CardOp) => {
+      if (!allowed.enabled) return;
+      setLog((current) => appendOp(current, op, { eventId: crypto.randomUUID(), at: new Date().toISOString() }));
+    },
+    [allowed.enabled],
+  );
+
   // A gap in the log is a hard error, not a half-built canvas (ADR-0002), so it is said, not drawn.
   const folded = useMemo((): { view: View } | { error: string } => {
     try {
-      return { view: canvasView(events) };
+      return { view: canvasView(log) };
     } catch (cause) {
       return { error: errorMessage(cause) };
     }
-  }, [events]);
+  }, [log]);
   if ("error" in folded) {
     return <p className="notice notice--negative t-callout">This canvas cannot be built from the case&apos;s log: {folded.error}</p>;
   }
-  return <Canvas view={folded.view} mode={mode} />;
+  return <Canvas view={folded.view} log={log} mode={mode} readOnly={allowed.enabled ? null : allowed.reason} dispatch={dispatch} />;
 }
 
-function Canvas({ view, mode }: { view: View; mode: CanvasMode }) {
+type CanvasProps = {
+  view: View;
+  log: readonly SlimEvent[];
+  mode: CanvasMode;
+  readOnly: string | null;
+  dispatch: (op: CardOp) => void;
+};
+
+function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
   const layout = useMemo(() => canvasLayout(view), [view]);
-  const bounds = layout.bounds;
   const frame = useRef<HTMLDivElement | null>(null);
-  const { viewport, ready, fit, zoom, reset, gestures } = useViewport(frame, bounds);
+  const { viewport, ready, fit, zoom, reset, reveal, gestures } = useViewport(frame, layout.bounds);
+  const [sheet, setSheet] = useState<{ citation: CardCitation; label: string } | null>(null);
   const hint = "canvas-hint";
   const board = view.state.board;
   const pinned = layout.flow.filter((p) => p.pinned).length;
+  const models = useMemo(() => new Map(view.cards.map((card) => [card.cardId, cardModel(card, view.state)])), [view]);
+
+  // The cards' actions read the latest layout through a ref, so they keep one identity across renders and
+  // a pan, which re-renders the canvas every frame, never re-renders a card.
+  const latest = useRef({ view, layout });
+  useEffect(() => {
+    latest.current = { view, layout };
+  }, [view, layout]);
+  const actions = useMemo((): CardActions => {
+    const cardOf = (id: CardId) => latest.current.view.cards.find((c) => c.cardId === id);
+    return {
+      dock(id) {
+        const card = cardOf(id);
+        const slot = card ? naturalSlot(card, latest.current.view.state) : null;
+        if (slot) dispatch({ type: "card.docked", payload: { card_id: id, plan_slot: slot } });
+      },
+      undock: (id) => dispatch({ type: "card.undocked", payload: { card_id: id } }),
+      // Pinned where it stands: the button is the keyboard's way to do what dropping the card does.
+      pin(id) {
+        const rect = latest.current.layout.flow.find((p) => p.card.cardId === id)?.rect;
+        if (rect) dispatch({ type: "card.pinned", payload: { card_id: id, world_pos: { x: rect.x, y: rect.y } } });
+      },
+      discard: (id) => dispatch({ type: "card.discarded", payload: { card_id: id } }),
+      restore: (id) => dispatch({ type: "card.restored", payload: { card_id: id } }),
+      openCitation: (citation, label) => setSheet({ citation, label }),
+      reveal(id) {
+        const rect = latest.current.layout.flow.find((p) => p.card.cardId === id)?.rect;
+        if (rect) reveal(rect);
+      },
+    };
+  }, [dispatch, reveal]);
 
   return (
     <section className="section canvas-section" aria-label="Canvas">
-      <p className="t-footnote muted canvas-summary" aria-live="polite">
-        {[
-          counted(layout.flow.length, "card on the canvas", "cards on the canvas"),
-          pinned > 0 ? `${pinned} pinned` : null,
-          board.docked.length > 0 ? `${board.docked.length} docked to the plan` : null,
-          board.discarded.length > 0 ? `${board.discarded.length} discarded` : null,
-        ]
-          .filter((part) => part !== null)
-          .join(" · ")}
-      </p>
+      <div className="row spread canvas-summary">
+        <p className="t-footnote muted" aria-live="polite">
+          {[
+            counted(layout.flow.length, "card on the canvas", "cards on the canvas"),
+            pinned > 0 ? `${pinned} pinned` : null,
+            board.docked.length > 0 ? `${board.docked.length} docked to the plan` : null,
+            board.discarded.length > 0 ? `${board.discarded.length} discarded` : null,
+          ]
+            .filter((part) => part !== null)
+            .join(" · ")}
+        </p>
+        <p className="t-footnote faint">
+          {readOnly ?? (mode.kind === "fixture" ? "Card operations stay in this tab: a reload starts the recorded case over." : null)}
+        </p>
+      </div>
       <div
         ref={frame}
         className="canvas"
@@ -86,16 +148,30 @@ function Canvas({ view, mode }: { view: View; mode: CanvasMode }) {
         <div className="canvas__world" style={{ transform: worldTransform(viewport) }}>
           {/* Nothing is dealt until the frame has a size and the world is fitted to it, so the cards
               arrive where they will stay instead of arriving and then jumping to fit. */}
-          {ready && layout.flow.map(({ card, rect }, index) => (
-            <div key={card.cardId} className="canvas-item" style={{ transform: placeAt(rect), width: rect.w, height: rect.h }}>
-              {/* The spawn is on the card inside, so it never fights the slot's own transform: a card
-                  arrives in its slot, and later moves between slots, as two separate motions. */}
-              <div className="card canvas-stub canvas-item__body" style={{ "--spawn-delay": `${Math.min(index, 10) * 35}ms` } as React.CSSProperties}>
-                <p className="t-caption faint">{card.kind === "finding" ? "Finding" : "Excerpt"}</p>
-                <p className="t-callout">{card.kind === "finding" ? card.finding.claim : card.citation.quote}</p>
+          {ready &&
+            layout.flow.map(({ card, rect, pinned }, index) => (
+              <div
+                key={card.cardId}
+                className="canvas-item"
+                style={{ transform: placeAt(rect), width: rect.w, height: rect.h }}
+                // A card is a thing of its own: pressing it never pans the background behind it.
+                onPointerDown={(event) => event.stopPropagation()}
+                // Tabbing onto a card off screen brings it into view; a click on one already in view does not.
+                onFocus={(event) => event.target.matches(":focus-visible") && reveal(rect)}
+              >
+                {/* The spawn is on the card inside, so it never fights the slot's own transform: a card
+                    arrives in its slot, and later moves between slots, as two separate motions. */}
+                <div className="canvas-item__body" style={{ "--spawn-delay": `${Math.min(index, 10) * 35}ms` } as React.CSSProperties}>
+                  <Card
+                    model={models.get(card.cardId)!}
+                    state={{ docked: false, pinned, discarded: false }}
+                    readOnly={readOnly}
+                    undockable={naturalSlot(card, view.state) ? null : "No finding cites this passage, so it has no place in the plan"}
+                    actions={actions}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
 
         <div className="canvas__toolbar" role="toolbar" aria-label="Zoom" onPointerDown={(event) => event.stopPropagation()}>
@@ -117,6 +193,7 @@ function Canvas({ view, mode }: { view: View; mode: CanvasMode }) {
         Drag the background to move around. Scroll to pan; hold ⌘ or Ctrl and scroll, or pinch, to zoom. With the canvas
         focused, the arrow keys pan, + and − zoom, 0 fits everything and 1 is actual size.
       </p>
+      {sheet && <CitationSheet events={log} citation={sheet.citation.citation} label={sheet.label} onClose={() => setSheet(null)} />}
     </section>
   );
 }
@@ -152,6 +229,15 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
     if (rect && size.current.width > 0) setViewport(fitTo(rect, size.current, { padding: 48, maxZoom: 1 }));
   }, []);
 
+  // Bring a world rectangle into view if any of it is off screen, centred, at the zoom already chosen.
+  const reveal = useCallback((rect: Rect) => {
+    setViewport((v) => {
+      const seen = visibleWorld(v, size.current);
+      const inside = rect.x >= seen.x && rect.y >= seen.y && rect.x + rect.w <= seen.x + seen.w && rect.y + rect.h <= seen.y + seen.h;
+      return inside || size.current.width === 0 ? v : centreOn(v, rect, size.current);
+    });
+  }, []);
+
   const centre = () => ({ x: size.current.width / 2, y: size.current.height / 2 });
   const zoom = (factor: number) => {
     stopGlide();
@@ -169,9 +255,12 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
     const observer = new ResizeObserver(([entry]) => {
       if (!entry) return;
       size.current = { width: entry.contentRect.width, height: entry.contentRect.height };
+      // The first view fits the canvas, but no smaller than a card can be read at: a big case opens
+      // readable from its top-left corner, and Fit is one press away for the whole of it.
       if (!fitted.current) {
         fitted.current = true;
-        fit();
+        const rect = content.current;
+        if (rect) setViewport(fitTo(rect, size.current, { padding: 48, maxZoom: 1, minZoom: 0.7 }));
         setReady(true);
       }
     });
@@ -273,5 +362,5 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Rect | nul
     },
   };
 
-  return { viewport, ready, fit, zoom, reset, gestures };
+  return { viewport, ready, fit, zoom, reset, reveal, gestures };
 }

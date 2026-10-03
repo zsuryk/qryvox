@@ -32,9 +32,9 @@ export const categoryLabel = (category: FindingCategory) => CATEGORY_LABELS[cate
 
 const SEVERITIES = ["high", "medium", "low"] as const satisfies readonly Severity[];
 
-const SEVERITY_LABELS: Record<Severity, string> = { high: "High", medium: "Medium", low: "Low" };
+export const SEVERITY_LABELS: Record<Severity, string> = { high: "High", medium: "Medium", low: "Low" };
 
-const KIND_LABELS: Record<FindingKind, string> = {
+export const KIND_LABELS: Record<FindingKind, string> = {
   contradiction: "Contradiction",
   unsupported_claim: "Unsupported claim",
   disclosure_gap: "Disclosure gap",
@@ -138,8 +138,9 @@ function card(finding: CaseFinding, documents: readonly CaseDocument[]): BoardCa
 }
 
 // One line saying why this is a finding, in this finding's own terms: which document the claim comes from
-// and which document it runs into. The kind only decides the shape of the sentence.
-function rationale(finding: CaseFinding): string {
+// and which document it runs into. The kind only decides the shape of the sentence. The canvas's cards
+// reuse it, so a finding reads the same on both surfaces and no model is asked for it.
+export function rationale(finding: CaseFinding): string {
   const from = finding.citation.document_id;
   const against = finding.counterpart?.document_id;
   switch (finding.kind) {
