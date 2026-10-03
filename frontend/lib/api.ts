@@ -1,6 +1,8 @@
 import {
+  type AdviceDecision,
   AppendResponse,
   ChangeDispositionRequest,
+  type ClientProfile,
   EventPage,
   type IngestedDocument,
   OpenCaseResponse,
@@ -97,4 +99,22 @@ export async function runStep(caseId: string, req: RunStepRequest): Promise<Step
 // and a retry with the same event_id appends nothing (spec decision 34, ADR-0002).
 export async function changeDisposition(caseId: string, req: ChangeDispositionRequest): Promise<AppendResponse> {
   return AppendResponse.parse(await post(`/cases/${caseId}/dispositions`, req));
+}
+
+// --- The client layer (stage 2). Each is an append the browser names by event_id, so a retry after a lost
+// response returns the event already written rather than writing a second (ADR-0002).
+
+// A new version of a client's answers. The server supersedes advice drafted on the old version.
+export async function recordProfile(caseId: string, eventId: string, profile: ClientProfile): Promise<AppendResponse> {
+  return AppendResponse.parse(await post(`/cases/${caseId}/clients`, { event_id: eventId, profile }));
+}
+
+// Advice drafted by the suitability rules, never a model; the advice's id is this event_id.
+export async function draftAdvice(caseId: string, eventId: string, clientId: string): Promise<AppendResponse> {
+  return AppendResponse.parse(await post(`/cases/${caseId}/advice`, { event_id: eventId, client_id: clientId }));
+}
+
+// The adviser's sign-off. Nothing reaches a client without it.
+export async function decideAdvice(caseId: string, adviceId: string, eventId: string, decision: AdviceDecision): Promise<AppendResponse> {
+  return AppendResponse.parse(await post(`/cases/${caseId}/advice/${adviceId}/decision`, { event_id: eventId, decision }));
 }
