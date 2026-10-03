@@ -1,4 +1,4 @@
-import { activeFindings, findingCardId, fold, isDiscarded, pinOf, planGroups, SlimEvent } from "@qryvox/shared";
+import { activeFindings, excerptCardId, findingCardId, fold, isDiscarded, pinOf, planGroups, SlimEvent } from "@qryvox/shared";
 import recorded from "@qryvox/shared/case-recorded.json";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { canvasMode, canvasView, fixtureEvents, loadCanvasEvents } from "../lib/canvas-source";
@@ -65,6 +65,71 @@ describe("the fixture source", () => {
       expect.objectContaining({ kind: "excerpt", citation: expect.objectContaining({ document_id: "fee-table" }) }),
     ]);
     expect(cards.every((c) => c.kind === "finding" || /^excerpt:/.test(c.cardId))).toBe(true);
+  });
+});
+
+// A find-similar run (#64) as the backend records it: step.started and step.completed under one run id,
+// with its seed on both, appended after the given log.
+const SEEDED = "5e2a9c47-1d3b-4f60-8a7e-0c9b6d2f4e18";
+const feeSeed = { document_id: "factsheet", page: 1, quote: "Annual management fee: 0.85% per annum" };
+
+function withSeededRun(log: readonly SlimEvent[], step: "extract" | "contradictions", inputRunId: string | null, output: object) {
+  const run = { step, model: "recorded-fake-model", prompt_version: `${step}@1`, input_run_id: inputRunId, seed: feeSeed };
+  const event = (type: "step.started" | "step.completed", payload: object) => {
+    const seq = log.length + (type === "step.started" ? 1 : 2);
+    return SlimEvent.parse({
+      seq,
+      event_id: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
+      case_id: log[0]!.case_id,
+      actor: "demo-analyst",
+      at: log.at(-1)!.at,
+      step_run_id: SEEDED,
+      type,
+      v: 1,
+      payload,
+    });
+  };
+  return [...log, event("step.started", run), event("step.completed", { ...run, output })];
+}
+
+describe("find-similar candidates", () => {
+  const minimum = { document_id: "factsheet", page: 1, quote: "Minimum initial investment: USD 1,000" };
+
+  it("turns a seeded extract's statements into excerpt cards after the board's, naming the run", () => {
+    const base = canvasView(fixtureEvents());
+    const { state, cards } = canvasView(withSeededRun(fixtureEvents(), "extract", null, { statements: [feeSeed, minimum] }));
+
+    // The seed's own passage already has a card; only the new passage is added, as a candidate.
+    expect(cards.slice(0, base.cards.length)).toEqual(base.cards);
+    expect(cards.slice(base.cards.length)).toEqual([
+      { cardId: excerptCardId(minimum), kind: "excerpt", citation: minimum, candidateOf: SEEDED },
+    ]);
+    // The board is untouched: the same findings, and no step's latest run is the seeded one.
+    expect(activeFindings(state)).toEqual(activeFindings(base.state));
+    expect(state.stepRuns).toEqual(base.state.stepRuns);
+  });
+
+  it("turns a seeded contradictions run's issues into excerpt cards for the claims they point at", () => {
+    // The recorded case as it stood after decompose, before any finding: every card is a candidate.
+    const decomposed = recordedEvents.slice(0, 11);
+    const decompose = fold(decomposed).stepRuns.find((r) => r.step === "decompose")!;
+    const issues = [{ kind: "contradiction", category: "fees", claim_id: "c1", counterpart_claim_id: "c2", explanation: "0.85% against 1.25%." }];
+
+    const { cards } = canvasView(withSeededRun(decomposed, "contradictions", decompose.stepRunId, { issues }));
+
+    expect(cards).toEqual([
+      { cardId: excerptCardId(feeSeed), kind: "excerpt", citation: feeSeed, candidateOf: SEEDED },
+      expect.objectContaining({
+        kind: "excerpt",
+        citation: { document_id: "fee-table", page: 1, quote: "Annual management fee: 1.25% of net asset value" },
+        candidateOf: SEEDED,
+      }),
+    ]);
+  });
+
+  it("offers nothing from a seeded run that has not completed", () => {
+    const log = withSeededRun(fixtureEvents(), "extract", null, { statements: [minimum] }).slice(0, -1);
+    expect(canvasView(log).cards).toEqual(canvasView(fixtureEvents()).cards);
   });
 });
 
