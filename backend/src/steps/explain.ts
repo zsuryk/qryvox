@@ -30,7 +30,8 @@ type Item = {
   // the finding for a disclosure.
   documents: string[];
   quotes: string[];
-  // Numbers this passage may state: those in its quote, plus the client's answer it compares against.
+  // Numbers this passage may state: those in its quote, the pages it cites, and the client's answer it
+  // compares against.
   numbers: Set<string>;
   // What the model is told about it.
   brief: string;
@@ -158,7 +159,12 @@ function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttrib
       rule: reason.rule,
       documents: reason.citation ? [reason.citation.document_id] : [],
       quotes: reason.citation ? [reason.citation.quote] : [],
-      numbers: numbersIn(reason.citation?.quote ?? null, Array.isArray(answer) ? answer.join(" ") : String(answer), productLevel),
+      numbers: numbersIn(
+        reason.citation?.quote ?? null,
+        reason.citation?.page ?? null,
+        Array.isArray(answer) ? answer.join(" ") : String(answer),
+        productLevel,
+      ),
       brief: [
         `- r${i}: rule ${reason.rule} "${rule.title}": ${rule.text}`,
         `  outcome: ${reason.effect}`,
@@ -181,7 +187,7 @@ function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttrib
       rule: d.rule,
       documents: unique.map((c) => c.document_id),
       quotes: unique.map((c) => c.quote),
-      numbers: numbersIn(...unique.map((c) => c.quote)),
+      numbers: numbersIn(...unique.flatMap((c) => [c.quote, c.page])),
       brief: [
         `- d${i}: disclosure under rule ${d.rule}: ${finding?.claim ?? d.finding_id}`,
         ...unique.map((c) => `  quote (${c.document_id}, page ${c.page}): "${c.quote}"`),

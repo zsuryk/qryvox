@@ -88,9 +88,41 @@ export function extractJson(content: string): unknown {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end < start) return undefined;
+  const body = text.slice(start, end + 1);
   try {
-    return JSON.parse(text.slice(start, end + 1));
+    return JSON.parse(body);
   } catch {
-    return undefined;
+    // Models sometimes stop one closing bracket short of a long object (Kimi K3 did, on an explanation).
+    // The repair is narrow on purpose: close what is still open, and nothing else — no bracket is removed
+    // and no value touched, so a reply that was wrong in any other way still fails, and whatever parses is
+    // still checked against the step's schema and grounded like any other reply.
+    const closed = closeBrackets(body);
+    if (closed === null) return undefined;
+    try {
+      return JSON.parse(closed);
+    } catch {
+      return undefined;
+    }
   }
+}
+
+// The text with every bracket still open at its end closed, in order; null when the text closes a bracket
+// it never opened, or ends inside a string, since then it is not merely short.
+function closeBrackets(text: string): string | null {
+  const open: string[] = [];
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i]!;
+    if (inString) {
+      if (c === "\\") i += 1;
+      else if (c === '"') inString = false;
+    } else if (c === '"') inString = true;
+    else if (c === "{") open.push("}");
+    else if (c === "[") open.push("]");
+    else if (c === "}" || c === "]") {
+      if (open.pop() !== c) return null;
+    }
+  }
+  if (inString || open.length === 0) return null;
+  return text + open.reverse().join("");
 }

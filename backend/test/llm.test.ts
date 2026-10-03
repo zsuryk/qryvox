@@ -70,4 +70,19 @@ describe("extractJson", () => {
     expect(extractJson("No statements found.")).toBeUndefined();
     expect(extractJson("{ not json }")).toBeUndefined();
   });
+
+  it("closes brackets a model left open at the end of a long reply, and nothing else", () => {
+    // Kimi K3, on an explanation: the reply was whole but for its last brace.
+    expect(extractJson('{"depths":{"novice":{"summary":"ok","passages":[{"ref":"r0","text":"a } and a ] inside"}]}}')).toEqual({
+      depths: { novice: { summary: "ok", passages: [{ ref: "r0", text: "a } and a ] inside" }] } },
+    });
+    expect(extractJson('{"a":[1,2,{"b":"c"}')).toEqual({ a: [1, 2, { b: "c" }] });
+  });
+
+  it("does not repair a reply that is wrong in any other way", () => {
+    // A bracket closed that was never opened, a reply cut off inside a string, a missing comma.
+    expect(extractJson('{"a":1]}')).toBeUndefined();
+    expect(extractJson('{"a":"cut off')).toBeUndefined();
+    expect(extractJson('{"a":1 "b":2}')).toBeUndefined();
+  });
 });

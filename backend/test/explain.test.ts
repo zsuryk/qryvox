@@ -161,6 +161,12 @@ describe("explanations it refuses", () => {
     expect(await refused((p) => (p[0]!.text = "Under S5 this fails."))).toMatch(/names rule S5/);
   });
 
+  it("accepts the page a passage cites, written as a number", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    reply = bend(advice, (p) => (p[0]!.text = `The PPM, p.${advice.reasons[0]!.citation!.page}, sets the minimum.`));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+  });
+
   it("one that states a number neither its quote nor the client's answer holds", async () => {
     expect(await refused((p) => (p[0]!.text = "You would need to hold it for 7 years."))).toMatch(/r0 states 7/);
   });
