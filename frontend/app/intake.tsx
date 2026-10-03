@@ -154,16 +154,16 @@ export default function Intake() {
 
       {caseId && (
         <>
-          {/* The case page is where the run lives, so it says which way is onward rather than leaving the
-              analyst to find it: the steps in order, and the board they fill. */}
+          {/* A case opens on its Canvas (#59); the run lives on Review, so this says which way is onward
+              rather than leaving the analyst to find it: the steps in order, and the cards they bring. */}
           <div className="card notice--tint materialize stack" style={{ "--stack-gap": "0.5rem", marginTop: "1.5rem" } as React.CSSProperties}>
             <p className="t-eyebrow">Case opened</p>
             <p className="t-callout">
-              Run the steps in order — {PIPELINE_STEPS.map((step) => STEP_LABELS[step]).join(" → ")} — and the claim board
-              fills as they go.
+              The case opens on its canvas. Run the steps in order from Review —{" "}
+              {PIPELINE_STEPS.map((step) => STEP_LABELS[step]).join(" → ")} — and each finding arrives on the canvas as a card.
             </p>
             <div className="row">
-              <Link href={`/cases/${caseId}`} className="btn btn--primary">
+              <Link href={`/cases/${caseId}/canvas`} className="btn btn--primary">
                 Open the case →
               </Link>
               <button type="button" className="btn btn--plain" onClick={reset}>

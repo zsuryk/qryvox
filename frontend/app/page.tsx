@@ -15,7 +15,7 @@ export default function Home() {
           step is on the record.
         </p>
         <p className="t-footnote muted">
-          Just looking? <Link href="/board">Open a case already reviewed →</Link>
+          Just looking? <Link href="/canvas">Open a case already reviewed →</Link>
         </p>
       </div>
       <Intake />

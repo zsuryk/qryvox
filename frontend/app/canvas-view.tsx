@@ -1,7 +1,19 @@
 "use client";
 
 import { type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type CardId, CardOperationRequest, type FindingCategory, type PlanGroup, type SlimEvent, type WorldPos } from "@qryvox/shared";
+import {
+  activeFindings,
+  type CardId,
+  CardOperationRequest,
+  type Disposition,
+  dispositionOf,
+  type FindingCategory,
+  findingIdOfCard,
+  type PlanGroup,
+  type SlimEvent,
+  type WorldPos,
+} from "@qryvox/shared";
+import Link from "next/link";
 import { categoryLabel } from "../lib/board";
 import { type CardCitation, type CardModel, cardModel, dockableCategories, DOCUMENT_KIND_LABELS, naturalSlot } from "../lib/canvas-cards";
 import { type DropTarget, resolveDrop } from "../lib/canvas-drop";
@@ -11,7 +23,8 @@ import { type PlanLayout, planHit } from "../lib/plan-region";
 import { type CanvasMode, type CanvasView as View, canvasView } from "../lib/canvas-source";
 import { candidatesOf, hasRecording, planSimilar, playback, similarFailure, similarRequest } from "../lib/canvas-similar";
 import { appendOp, type CanvasLog, canvasLog, type CardOp, reread, rolledBack, sent, settled, shownLog } from "../lib/canvas-store";
-import { fetchEvents, recordCardOperation, runStep } from "../lib/api";
+import { changeDisposition, fetchEvents, recordCardOperation, runStep } from "../lib/api";
+import { DISPOSITION_LABEL, keyIntent } from "../lib/disposition";
 import { errorMessage } from "../lib/errors";
 import {
   centreOn,
@@ -205,6 +218,45 @@ function useFindSimilar(view: View, mode: CanvasMode, store: Store, say: (words:
   return { similar, searching, arrived };
 }
 
+// The analyst's decision on a finding, made from its card (#59). The same decision as the Review console's:
+// on a live case it is posted to the dispositions endpoint and the log is read again, so what the card then
+// shows is what the log records; on the fixture it is appended in this tab, like a card operation. The event
+// id is kept for a decision that did not arrive, so pressing again is a retry that appends nothing twice.
+function useDecide(mode: CanvasMode, store: Store, say: (words: string) => void, claimOf: (findingId: string) => string) {
+  const [deciding, setDeciding] = useState<ReadonlySet<CardId>>(new Set());
+  const unsent = useRef(new Map<string, string>());
+  const { update, refresh } = store;
+  const decide = useCallback(
+    async (cardId: CardId, disposition: Disposition) => {
+      const findingId = findingIdOfCard(cardId);
+      if (findingId === null) return;
+      const key = `${findingId}:${disposition}`;
+      const eventId = unsent.current.get(key) ?? crypto.randomUUID();
+      unsent.current.set(key, eventId);
+      setDeciding((s) => new Set(s).add(cardId));
+      try {
+        if (mode.kind === "fixture") {
+          const op = { type: "disposition.changed", payload: { finding_id: findingId, disposition } } as const;
+          update((log) => ({ ...log, confirmed: appendOp(log.confirmed, op, { eventId, at: new Date().toISOString() }) }));
+        } else {
+          await changeDisposition(mode.caseId, { event_id: eventId, finding_id: findingId, disposition });
+          await refresh();
+        }
+        unsent.current.delete(key);
+        say(`${DISPOSITION_LABEL[disposition]} — ${claimOf(findingId)}`);
+      } catch (cause) {
+        // A refusal usually means the log moved on (a later run superseded the finding): read it again.
+        say(`Not recorded: ${errorMessage(cause)}`);
+        await refresh().catch(() => undefined);
+      } finally {
+        setDeciding((s) => new Set([...s].filter((id) => id !== cardId)));
+      }
+    },
+    [mode, update, refresh, say, claimOf],
+  );
+  return { decide, deciding };
+}
+
 type CanvasProps = {
   view: View;
   log: readonly SlimEvent[];
@@ -247,6 +299,17 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
   useEffect(() => {
     latest.current = { view, layout };
   }, [view, layout]);
+  const claimOf = useCallback((findingId: string) => latest.current.view.state.findings.find((f) => f.finding_id === findingId)?.claim ?? "the finding", []);
+  const { decide, deciding } = useDecide(mode, store, say, claimOf);
+  // The board's decisions, counted as the Review console counts them: every finding in play, decided or not.
+  const decisions = useMemo(() => {
+    const decided = activeFindings(view.state).map((f) => dispositionOf(view.state, f.finding_id)?.disposition ?? null);
+    return {
+      approved: decided.filter((d) => d === "approved").length,
+      dismissed: decided.filter((d) => d === "dismissed").length,
+      undecided: decided.filter((d) => d === null).length,
+    };
+  }, [view]);
   const actions = useMemo((): CardActions => {
     const cardOf = (id: CardId) => latest.current.view.cards.find((c) => c.cardId === id);
     const rectOf = (id: CardId) => [...latest.current.layout.docked, ...latest.current.layout.flow].find((p) => p.card.cardId === id)?.rect;
@@ -270,20 +333,21 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
       },
       discard(id) {
         dispatch({ type: "card.discarded", payload: { card_id: id } });
-        say("Discarded. It is in the bin, and can be restored.");
+        say("Discarded from the canvas. The finding is not dismissed; restore the card from the bin.");
       },
       restore(id) {
         dispatch({ type: "card.restored", payload: { card_id: id } });
         say("Restored to the canvas.");
       },
       similar: (id) => void similar(id),
+      decide: (id, disposition) => void decide(id, disposition),
       openCitation: (citation, label) => setSheet({ citation, label }),
       reveal(id) {
         const rect = rectOf(id);
         if (rect) reveal(rect);
       },
     };
-  }, [dispatch, reveal, say, similar]);
+  }, [decide, dispatch, reveal, say, similar]);
 
   // A find-similar run's candidates, once laid out, are brought into view: the first of them, centred if
   // it landed off screen, so the analyst sees what the press came to.
@@ -349,6 +413,25 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
     const card = view.cards.find((c) => c.cardId === id);
     return card ? dockableCategories(card, view) : [];
   };
+  // The Review console's keys, on the finding card in focus (#59, lib/disposition.ts): A approves, D
+  // dismisses, J and K (or ↓ and ↑) move to the next or previous finding card, in the order they are laid
+  // out. A key typed into a field is the field's, and an excerpt card has no finding to decide.
+  const cardKey = (event: KeyboardEvent<HTMLDivElement>, id: CardId) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName))) return;
+    if (findingIdOfCard(id) === null) return;
+    const intent = keyIntent({ key: event.key, ctrl: event.ctrlKey, meta: event.metaKey, alt: event.altKey });
+    if (!intent) return;
+    event.preventDefault();
+    if (intent === "approve" || intent === "dismiss") return actions.decide(id, intent === "approve" ? "approved" : "dismissed");
+    const order = [...(narrow ? [] : layout.docked), ...layout.flow].filter((p) => p.card.kind === "finding");
+    const at = order.findIndex((p) => p.card.cardId === id);
+    if (at < 0 || order.length === 0) return;
+    const next = order[(at + (intent === "next" ? 1 : -1) + order.length) % order.length]!;
+    event.currentTarget.closest(".canvas")?.querySelector<HTMLElement>(`[data-finding-card="${CSS.escape(next.card.cardId)}"]`)?.focus({ preventScroll: true });
+    reveal(next.rect);
+  };
+
   const cardGesture = (id: CardId, rect: Rect) => ({
     onPointerDown(event: PointerEvent<HTMLDivElement>) {
       const touch = event.pointerType === "touch";
@@ -442,6 +525,9 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
       press.current = null;
       setDrag(null);
     },
+    onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+      cardKey(event, id);
+    },
     // A finger held on a card is picking it up, not asking for the page's menu.
     onContextMenu(event: MouseEvent<HTMLDivElement>) {
       if (press.current?.touch) event.preventDefault();
@@ -457,14 +543,24 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
             pinnedCount > 0 ? `${pinnedCount} pinned` : null,
             dockedCount > 0 ? `${dockedCount} docked to the plan` : null,
             board.discarded.length > 0 ? `${board.discarded.length} discarded` : null,
+            `${decisions.approved} approved · ${decisions.dismissed} dismissed · ${decisions.undecided} undecided`,
           ]
             .filter((part) => part !== null)
             .join(" · ")}
         </p>
         <p className={`t-footnote ${said ? "" : "faint"}`} role="status">
-          {said ?? (mode.kind === "fixture" ? "Card operations stay in this tab: a reload starts the recorded case over." : null)}
+          {said ?? (mode.kind === "fixture" ? "Card operations and decisions stay in this tab: a reload starts the recorded case over." : null)}
         </p>
       </div>
+      {/* A case opens here (#59), before anything has run on it: the steps are run from Review. */}
+      {view.cards.length === 0 && mode.kind === "live" && (
+        <div className="notice notice--tint canvas-empty">
+          <p className="t-callout">
+            No findings on this case yet. Run the steps on Review, and each finding arrives here as a card, with the passages it
+            cites. <Link href={`/cases/${mode.caseId}`}>Run the steps on Review →</Link>
+          </p>
+        </div>
+      )}
       <div
         ref={frame}
         className="canvas"
@@ -506,6 +602,7 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
                         undockable={naturalSlot(card, view) ? null : NO_SLOT}
                         searching={searching.has(card.cardId)}
                         similarOff={similarOff.get(card.cardId) ?? null}
+                        deciding={deciding.has(card.cardId)}
                         actions={actions}
                       />
                     </div>
@@ -570,7 +667,10 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
                 ))}
               </ul>
             )}
-            <p className="t-caption faint">Discarding rejects a card from the canvas. The finding it shows is untouched.</p>
+            <p className="t-caption faint">
+              Discarding only tidies the canvas: the finding is not dismissed, and its decision stays as it was. To dismiss a
+              finding, press Dismiss on its card.
+            </p>
           </div>
         )}
 
@@ -613,7 +713,10 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
         Drag the background to move around, or one finger anywhere. Scroll to pan; hold ⌘ or Ctrl and scroll, or pinch with
         two fingers, to zoom. With the canvas focused, the arrow keys pan, + and − zoom, 0 fits everything and 1 is actual
         size. Drag a card (on a touch screen, hold it a moment first) to pin it somewhere, onto the bin to discard it, or
-        onto the plan to dock it; each card&apos;s buttons do the same.
+        onto the plan to dock it; each card&apos;s buttons do the same. Approve and Dismiss on a finding card are your
+        decision on the finding, recorded on the case as on Review; with a finding card focused, A approves, D dismisses,
+        and J or K (↓ or ↑) move to the next or previous finding. Discard is different: it only takes a card off the
+        canvas, and decides nothing.
       </p>
       {planOpen && <PlanSheet groups={layouts.wide.groups} models={models} onUndock={actions.undock} onClose={() => setPlanOpen(false)} />}
       {sheet && <CitationSheet events={log} citation={sheet.citation.citation} label={sheet.label} onClose={() => setSheet(null)} />}

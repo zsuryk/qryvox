@@ -1,13 +1,16 @@
 "use client";
 
 import { memo } from "react";
-import type { CardId, Severity } from "@qryvox/shared";
+import type { CardId, Disposition, Severity } from "@qryvox/shared";
 import type { CardCitation, CardModel } from "../lib/canvas-cards";
 
 // The canvas's one card (#54). Two kinds, one anatomy and one height, so the flow can be arithmetic:
 //   finding — severity, category and authority badges, the finding in a sentence, the one line on why it
 //             counts (the claim board's own rationale), and the passage it is cited on;
 //   excerpt — the document and its kind, the page, the passage verbatim, and the findings that cite it.
+// A finding card also carries the analyst's decision on its finding (#59): Approve and Dismiss, the same
+// decision and the same keys (A, D) as the Review console, recorded on the case. That is a judgement on the
+// finding; Discard, in the action row, is only housekeeping on the canvas and decides nothing.
 // The same action row closes both. Every operation a hand can do by dragging a card is a button here too,
 // so the canvas works from the keyboard and with a screen reader, and a disabled one says why.
 
@@ -21,6 +24,8 @@ export type CardActions = {
   discard: (cardId: CardId) => void;
   restore: (cardId: CardId) => void;
   similar: (cardId: CardId) => void;
+  // The analyst's decision on a finding card's finding (#59).
+  decide: (cardId: CardId, disposition: Disposition) => void;
   openCitation: (citation: CardCitation, label: string) => void;
   reveal: (cardId: CardId) => void;
 };
@@ -37,22 +42,44 @@ export type CardProps = {
   searching: boolean;
   // Why find similar cannot run from this card, or null when it can.
   similarOff: string | null;
+  // A decision on this card's finding is on its way to the log.
+  deciding: boolean;
   actions: CardActions;
 };
 
-export const Card = memo(function Card({ model, docked, pinned, discarded, undockable, searching, similarOff, actions }: CardProps) {
+export const Card = memo(function Card({ model, docked, pinned, discarded, undockable, searching, similarOff, deciding, actions }: CardProps) {
   const state = { docked, pinned, discarded };
-  const what = model.kind === "finding" ? `Finding: ${model.title}` : `Excerpt from ${model.documentName}, page ${model.page}`;
+  const what =
+    model.kind === "finding"
+      ? `Finding, ${model.disposition ? DECIDED[model.disposition].toLowerCase() : "undecided"}: ${model.title}`
+      : `Excerpt from ${model.documentName}, page ${model.page}`;
   const label = `${what}${docked ? " (in the plan)" : pinned ? " (pinned)" : ""}`;
+  const dismissed = model.kind === "finding" && model.disposition === "dismissed";
   return (
-    <article className={`card canvas-card${state.pinned ? " canvas-card--pinned" : ""}`} aria-label={label}>
-      {model.kind === "finding" ? <FindingBody model={model} actions={actions} /> : <ExcerptBody model={model} actions={actions} />}
+    // A finding card is focusable as a whole, so the keyboard can stand on it and decide it as on Review.
+    <article
+      className={`card canvas-card${state.pinned ? " canvas-card--pinned" : ""}${dismissed ? " canvas-card--dismissed" : ""}`}
+      aria-label={label}
+      tabIndex={model.kind === "finding" ? 0 : undefined}
+      data-finding-card={model.kind === "finding" ? model.cardId : undefined}
+    >
+      {model.kind === "finding" ? <FindingBody model={model} deciding={deciding} actions={actions} /> : <ExcerptBody model={model} actions={actions} />}
       <ActionRow cardId={model.cardId} state={state} undockable={undockable} searching={searching} similarOff={similarOff} actions={actions} />
     </article>
   );
 });
 
-function FindingBody({ model, actions }: { model: Extract<CardModel, { kind: "finding" }>; actions: CardActions }) {
+const DECIDED: Record<Disposition, string> = { approved: "Approved", dismissed: "Dismissed" };
+const DECIDE: Record<Disposition, { label: string; tone: string; title: string }> = {
+  approved: { label: "Approve", tone: "btn--positive", title: "Approve the finding: your decision, recorded on the case as on Review (A)" },
+  dismissed: {
+    label: "Dismiss",
+    tone: "btn--caution",
+    title: "Dismiss the finding: your decision, recorded on the case as on Review (D). Not Discard, which only tidies the canvas",
+  },
+};
+
+function FindingBody({ model, deciding, actions }: { model: Extract<CardModel, { kind: "finding" }>; deciding: boolean; actions: CardActions }) {
   const chip = `${model.citation.documentName} · page ${model.citation.citation.page}`;
   return (
     <>
@@ -63,11 +90,6 @@ function FindingBody({ model, actions }: { model: Extract<CardModel, { kind: "fi
         </span>
         <span className="badge">{model.category}</span>
         {model.authority && <span className="badge">{model.authority}</span>}
-        {model.disposition && (
-          <span className={`badge ${model.disposition === "approved" ? "badge--positive" : ""}`}>
-            {model.disposition === "approved" ? "Approved" : "Dismissed"}
-          </span>
-        )}
       </div>
       <h3 className="t-callout strong canvas-card__title">{model.title}</h3>
       <p className="t-caption muted canvas-card__line" title={model.rationale}>
@@ -77,6 +99,27 @@ function FindingBody({ model, actions }: { model: Extract<CardModel, { kind: "fi
         <button type="button" className="chip chip--link canvas-card__chip" title="Open the page this is cited on" onClick={() => actions.openCitation(model.citation, chip)}>
           {chip}
         </button>
+        {/* The decision, in words as well as by the pressed button: undecided is a state of its own. */}
+        <div className="canvas-card__decide" role="group" aria-label="Decision on this finding">
+          {(["approved", "dismissed"] as const).map((disposition) => {
+            const on = model.disposition === disposition;
+            return (
+              <button
+                key={disposition}
+                type="button"
+                className={`btn btn--small ${DECIDE[disposition].tone}`}
+                // Not a toggle: pressing again is a further decision, as on the Review console.
+                aria-pressed={on}
+                disabled={deciding}
+                aria-busy={deciding}
+                title={DECIDE[disposition].title}
+                onClick={() => actions.decide(model.cardId, disposition)}
+              >
+                {on ? DECIDED[disposition] : DECIDE[disposition].label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </>
   );
@@ -161,7 +204,12 @@ function ActionRow({
           Restore
         </button>
       ) : (
-        <button type="button" className="btn btn--small" title="Reject it to the discard bin; nothing is deleted" onClick={() => actions.discard(cardId)}>
+        <button
+          type="button"
+          className="btn btn--small"
+          title="Take the card off the canvas into the bin. Housekeeping only: the finding is not dismissed, and nothing is deleted"
+          onClick={() => actions.discard(cardId)}
+        >
           Discard
         </button>
       )}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ANALYST_ACTOR, dispositionOf, fold, type Disposition, SlimEvent } from "@qryvox/shared";
 import recorded from "@qryvox/shared/case-recorded.json";
-import { dispositionConsole, keyAction, KEY_BINDINGS, type ConsoleState } from "../lib/disposition";
+import { dispositionConsole, keyAction, keyIntent, KEY_BINDINGS, type ConsoleState } from "../lib/disposition";
 
 // The console on the recorded case, folded in the browser exactly as it folds it: no model call, no store,
 // nothing but the log (ADR-0002). The fixture is a whole pipeline run — extract failing once and retried,
@@ -268,5 +268,17 @@ describe("the keyboard", () => {
     for (const key of KEY_BINDINGS.flatMap((binding) => binding.keys)) {
       expect(keyAction(nothing, { key }, empty), key).toEqual({ kind: "ignore" });
     }
+  });
+});
+
+describe("the keys, read on their own (the canvas's finding cards, #59)", () => {
+  it("mean what they mean on the console, and nothing under a modifier or with Shift", () => {
+    expect(keyIntent({ key: "a" })).toBe("approve");
+    expect(keyIntent({ key: "d" })).toBe("dismiss");
+    expect(keyIntent({ key: "j" })).toBe("next");
+    expect(keyIntent({ key: "ArrowUp" })).toBe("previous");
+    expect(keyIntent({ key: "A" })).toBeNull();
+    expect(keyIntent({ key: "a", meta: true })).toBeNull();
+    expect(keyIntent({ key: "x" })).toBeNull();
   });
 });

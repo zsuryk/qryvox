@@ -156,6 +156,12 @@ export function keyAction(
   }
 }
 
+// What a keystroke means, with no console behind it: the canvas (#59) binds the same keys to the finding
+// card in focus, from this same table, so the two surfaces cannot drift apart.
+export function keyIntent(press: KeyPress): KeyIntent | null {
+  return bindingFor(press)?.intent ?? null;
+}
+
 function bindingFor(press: KeyPress): KeyBinding | undefined {
   // A modified keystroke is somebody else's shortcut, whatever letter it spells: approving under Ctrl
   // would be a decision the analyst never asked for, which is the one thing this console must not do.

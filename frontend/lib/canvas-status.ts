@@ -1,6 +1,7 @@
 import {
   type CardId,
   type CaseState,
+  findingCardId,
   findingIdOfCard,
   fold,
   ParseOutput,
@@ -97,6 +98,10 @@ function cardLine(event: SlimEvent, state: CaseState): CardLine[] {
       return line("Restored from the bin", event.payload.card_id);
     case "card.similar_requested":
       return line(`Asked for more like it (${STEP_LABELS[event.payload.step_kind].toLowerCase()})`, event.payload.card_id);
+    // A decision is not a card operation, but on the canvas it is made from a card (#59), so it is on the
+    // record the panel shows as well.
+    case "disposition.changed":
+      return line(event.payload.disposition === "approved" ? "Approved the finding" : "Dismissed the finding", findingCardId(event.payload.finding_id));
     default:
       return [];
   }

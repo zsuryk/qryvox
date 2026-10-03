@@ -15,11 +15,15 @@ import { ANALYST_ACTOR, type CardEvent, SlimEvent } from "@qryvox/shared";
 // One card operation: a card event without its envelope, which the store supplies.
 export type CardOp = { [T in CardEvent["type"]]: Pick<Extract<CardEvent, { type: T }>, "type" | "payload"> }[CardEvent["type"]];
 
+// The analyst's decision on a finding, made from its card (#59). Not a card operation: on a live case it
+// goes to the dispositions endpoint as on Review. On the fixture it is appended here like one.
+export type DispositionOp = Pick<Extract<SlimEvent, { type: "disposition.changed" }>, "type" | "payload">;
+
 export type Envelope = { eventId: string; at: string; actor?: string };
 
 // The log with `op` appended at the next seq, checked against the event contract like any event the
 // backend returns, so a card operation the contract refuses never reaches the fold.
-export function appendOp(events: readonly SlimEvent[], op: CardOp, envelope: Envelope): SlimEvent[] {
+export function appendOp(events: readonly SlimEvent[], op: CardOp | DispositionOp, envelope: Envelope): SlimEvent[] {
   const last = events.at(-1);
   if (!last) throw new Error("a card operation needs a case: the log is empty");
   const event = SlimEvent.parse({

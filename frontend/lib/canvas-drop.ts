@@ -45,7 +45,7 @@ export function resolveDrop(cardId: CardId, target: DropTarget, context: DropCon
     case "bin":
       return context.discarded
         ? { returned: "It is already in the discard bin." }
-        : { ops: [{ type: "card.discarded", payload: { card_id: cardId } }], said: "Discarded. It is in the bin, and can be restored." };
+        : { ops: [{ type: "card.discarded", payload: { card_id: cardId } }], said: "Discarded from the canvas. The finding is not dismissed; restore the card from the bin." };
     case "outside":
       return { returned: `${BACK}: it was let go off the canvas.` };
     case "plan":

@@ -1280,6 +1280,34 @@ details[open] > summary::before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A finding card's decision (#59), at the end of its citation row: the citation gives way to it. */
+.canvas-card__chips > .canvas-card__chip {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.canvas-card__decide {
+  display: flex;
+  flex: none;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+.canvas-card__decide .btn {
+  font-size: 0.75rem;
+  min-height: 1.625rem;
+  padding: 0.25rem 0.625rem;
+}
+/* A dismissed finding stays on the canvas, marked: its words step back, its decision stays legible. */
+.canvas-card--dismissed .canvas-card__title,
+.canvas-card--dismissed .canvas-card__line {
+  color: var(--label-3);
+}
+.canvas-card:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: 2px;
+}
+.canvas-empty {
+  margin-bottom: 0.75rem;
+}
 /* The same row on both kinds, always at the foot of the card. */
 .canvas-card__actions {
   border-top: 0.5px solid var(--separator);
@@ -1719,10 +1747,12 @@ details[open] > summary::before {
    each button's target reaches past its edges into the padding around the row, so the press lands where
    the finger does. The floating controls simply grow. */
 @media (pointer: coarse) {
-  .canvas-card__actions .btn {
+  .canvas-card__actions .btn,
+  .canvas-card__decide .btn {
     position: relative;
   }
-  .canvas-card__actions .btn::after {
+  .canvas-card__actions .btn::after,
+  .canvas-card__decide .btn::after {
     content: "";
     inset: -9px -2px;
     position: absolute;

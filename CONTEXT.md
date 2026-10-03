@@ -135,7 +135,8 @@ leaves the board but stays in the log, with any disposition it was given.
 **Disposition** — the analyst's explicit decision on one finding: `approved` or `dismissed`, appended as
 `disposition.changed`. Only a person decides; no step ever approves or dismisses, and a finding with no
 disposition is *undecided*, not dismissed. Deciding again replaces the decision on the board; the log
-keeps both. A superseded finding cannot be decided (409).
+keeps both. A superseded finding cannot be decided (409). Made on Review's console or on a finding card on
+the canvas (#59): the same event, the same endpoint and the same keys (A, D).
 
 **Analyst / actor** — the analyst is the licensed human accountable for decisions. The actor is who an
 event records as having acted. In stage 1 every event's actor is one fixed identity, `demo-analyst`
@@ -144,10 +145,11 @@ event records as having acted. In stage 1 every event's actor is one fixed ident
 ## The canvas (#48)
 
 **Canvas** — the case's findings and the passages they cite, laid out as cards on an open, infinite view
-that pans and zooms. A fourth case section beside Review, Advice and Record (`/cases/<id>/canvas`), and,
-with no case, the recorded Larkspur case at `/canvas` (the fixture, `canvas-source.ts`). It is a fold of
+that pans and zooms. The case's first section and where a case opens (`/cases/<id>/canvas`, #59), before
+Review (the list view and the run, still at `/cases/<id>`), Advice and Record; and, with no case, the recorded Larkspur case at `/canvas` (the fixture, `canvas-source.ts`). It is a fold of
 the log like everything else: nothing on it is stored anywhere but in events.
-*Not* the board (the findings in play, which the canvas shows), and not a replacement for Review in v1.
+*Not* the board (the findings in play, which the canvas shows), and not a replacement for Review, which keeps
+the run and the list.
 
 **World coordinates** — where things are on the canvas: cards, the plan region and pinned positions are all
 world positions (`WorldPos`), and only the viewport (`frontend/lib/viewport.ts`) maps them to the screen,

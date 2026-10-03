@@ -6,8 +6,9 @@ import { productName, when } from "../../../lib/case";
 import CaseNav from "./case-nav";
 
 // What every section of a case shares: which product this is, the state of its chain, and the four places
-// to go — Review (the run, the board, the decisions), Canvas (the same findings as cards on an open board),
-// Advice (clients and the adviser's sign-off) and Record (the documents and the log it all folds from).
+// to go — Canvas (the findings as cards on an open board, and where a case opens, #59), Review (the run,
+// the board as a list, the decisions), Advice (clients and the adviser's sign-off) and Record (the
+// documents and the log it all folds from).
 export default async function CaseLayout({ children, params }: { children: ReactNode; params: Promise<{ caseId: string }> }) {
   const { caseId } = await params;
   const [events, verify] = await Promise.all([fetchEvents(caseId), fetchVerify(caseId)]).catch((err: unknown) => {

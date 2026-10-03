@@ -25,7 +25,7 @@ export default async function CanvasPage({ searchParams }: { searchParams: Promi
             </>
           ) : (
             <>
-              {events.length} events · <Link href={`/cases/${mode.caseId}`}>open the case →</Link>
+              {events.length} events · <Link href={`/cases/${mode.caseId}/canvas`}>open the case →</Link>
             </>
           )}
         </p>

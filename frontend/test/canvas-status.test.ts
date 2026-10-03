@@ -55,6 +55,24 @@ describe("the status panel", () => {
     expect(cards[0]!.card).toMatch(/^The factsheet states a 0.85% management fee/);
   });
 
+  it("puts a decision made from a finding card on a line too, naming the finding (#59)", () => {
+    const finding = base.find((e) => e.type === "finding.created")!;
+    if (finding.type !== "finding.created") throw new Error("no finding");
+    const seq = base.length + 1;
+    const decided = SlimEvent.parse({
+      seq,
+      event_id: `00000000-0000-4000-8000-${String(seq).padStart(12, "5")}`,
+      case_id: caseId,
+      actor: "demo-analyst",
+      at: "2026-10-03T12:00:00.000Z",
+      step_run_id: null,
+      v: 1,
+      type: "disposition.changed",
+      payload: { finding_id: finding.payload.finding_id, disposition: "dismissed" },
+    });
+    expect(statusLines([...base, decided]).at(-1)).toMatchObject({ kind: "card", seq, text: "Dismissed the finding", card: finding.payload.claim });
+  });
+
   it("shows a parse run as a visible step, with the analyst's words and what they came to", () => {
     const lines = runs(
       statusLines(
