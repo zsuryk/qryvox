@@ -11,7 +11,7 @@ import { cardRect } from "../lib/tiling";
 
 const card = findingCardId("dragged");
 const other = { cardId: findingCardId("pinned"), rect: cardRect({ x: 0, y: 0 }) };
-const context = { pinned: [other], obstacles: [{ x: -400, y: 0, w: 360, h: 600 }], discarded: false };
+const context = { pinned: [other], obstacles: [{ x: -400, y: 0, w: 360, h: 600 }], discarded: false, docked: null, categories: ["fees" as const] };
 
 describe("a drop", () => {
   it("on the bin discards the card", () => {

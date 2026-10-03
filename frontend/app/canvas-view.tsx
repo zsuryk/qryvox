@@ -1,10 +1,12 @@
 "use client";
 
 import { type KeyboardEvent, type PointerEvent, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CardId, SlimEvent, WorldPos } from "@qryvox/shared";
-import { type CardCitation, cardModel, naturalSlot } from "../lib/canvas-cards";
+import type { CardId, FindingCategory, SlimEvent, WorldPos } from "@qryvox/shared";
+import { categoryLabel } from "../lib/board";
+import { type CardCitation, cardModel, dockableCategories, DOCUMENT_KIND_LABELS, naturalSlot } from "../lib/canvas-cards";
 import { type DropTarget, resolveDrop } from "../lib/canvas-drop";
 import { canvasLayout } from "../lib/canvas-layout";
+import { type PlanLayout, planHit } from "../lib/plan-region";
 import { type CanvasMode, type CanvasView as View, canvasView } from "../lib/canvas-source";
 import { appendOp, type CardOp, operations } from "../lib/canvas-store";
 import { errorMessage } from "../lib/errors";
@@ -112,7 +114,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
   }, [view, layout]);
   const actions = useMemo((): CardActions => {
     const cardOf = (id: CardId) => latest.current.view.cards.find((c) => c.cardId === id);
-    const rectOf = (id: CardId) => latest.current.layout.flow.find((p) => p.card.cardId === id)?.rect;
+    const rectOf = (id: CardId) => [...latest.current.layout.docked, ...latest.current.layout.flow].find((p) => p.card.cardId === id)?.rect;
     return {
       dock(id) {
         const card = cardOf(id);
@@ -149,20 +151,24 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
 
   // Dragging a card. It follows the pointer 1:1 from where it was grabbed, in world units, lifted above
   // the rest; let go, and the drop is decided by lib/canvas-drop.ts: the bin discards it, open canvas pins
-  // it there, and anything else sends it back to where it came from, on the same curve it would have
+  // it there, a slot of the plan region in the card's category docks it there, and anything else sends it back to where it came from, on the same curve it would have
   // settled on. A press only becomes a drag after a few pixels, so a click on a card is still a click.
-  const [drag, setDrag] = useState<{ id: CardId; at: WorldPos; over: DropTarget["kind"] } | null>(null);
+  const [drag, setDrag] = useState<{ id: CardId; at: WorldPos; target: DropTarget; categories: readonly FindingCategory[] } | null>(null);
   const press = useRef<{ id: CardId; pointer: number; start: Point; grab: Point; moving: boolean } | null>(null);
   const local = (event: PointerEvent) => {
     const box = frame.current!.getBoundingClientRect();
     return toWorld(viewport, { x: event.clientX - box.left, y: event.clientY - box.top });
   };
-  const over = (event: PointerEvent): DropTarget["kind"] => {
+  // What the pointer is over: the bin, a slot of the plan or the plan between slots, open canvas (where
+  // the card's own corner is what would be pinned), or none of the canvas at all.
+  const targetOf = (event: PointerEvent, corner: WorldPos): DropTarget => {
     const inside = (el: Element | null) => {
       const box = el?.getBoundingClientRect();
       return !!box && event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
     };
-    return inside(bin.current) ? "bin" : inside(frame.current) ? "canvas" : "outside";
+    if (inside(bin.current)) return { kind: "bin" };
+    if (!inside(frame.current)) return { kind: "outside" };
+    return planHit(layout.plan, local(event)) ?? { kind: "canvas", at: corner };
   };
   const cardGesture = (id: CardId, rect: Rect) => ({
     onPointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -181,17 +187,20 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
       if (!p.moving && Math.hypot(event.clientX - p.start.x, event.clientY - p.start.y) < 6) return;
       p.moving = true;
       const at = local(event);
-      setDrag({ id, at: { x: at.x - p.grab.x, y: at.y - p.grab.y }, over: over(event) });
+      const corner = { x: at.x - p.grab.x, y: at.y - p.grab.y };
+      const card = view.cards.find((c) => c.cardId === id);
+      setDrag({ id, at: corner, target: targetOf(event, corner), categories: card ? dockableCategories(card, view.state) : [] });
     },
     onPointerUp() {
       const p = press.current;
       press.current = null;
       if (!p || !p.moving || !drag) return setDrag(null);
-      const target: DropTarget = drag.over === "canvas" ? { kind: "canvas", at: drag.at } : { kind: drag.over };
-      const outcome = resolveDrop(id, target, {
+      const outcome = resolveDrop(id, drag.target, {
         pinned: layout.flow.filter((placed) => placed.pinned).map((placed) => ({ cardId: placed.card.cardId, rect: placed.rect })),
-        obstacles: [],
+        obstacles: [layout.plan.bounds],
         discarded: false,
+        docked: view.state.board.docked.find((d) => d.cardId === id)?.slot ?? null,
+        categories: drag.categories,
       });
       setDrag(null);
       if ("ops" in outcome) {
@@ -237,34 +246,37 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
         <div className="canvas__world" style={{ transform: worldTransform(viewport) }}>
           {/* Nothing is dealt until the frame has a size and the world is fitted to it, so the cards
               arrive where they will stay instead of arriving and then jumping to fit. */}
+          {ready && <PlanRegion plan={layout.plan} drag={drag} />}
           {ready &&
-            layout.flow.map(({ card, rect, pinned }, index) => {
-              const lifted = drag?.id === card.cardId;
-              return (
-                <div
-                  key={card.cardId}
-                  className={`canvas-item${lifted ? " canvas-item--lifted" : ""}${readOnly === null ? " canvas-item--movable" : ""}`}
-                  style={{ transform: placeAt(lifted ? drag.at : rect), width: rect.w, height: rect.h }}
-                  // Tabbing onto a card off screen brings it into view; a click on one already in view does not.
-                  onFocus={(event) => event.target.matches(":focus-visible") && reveal(rect)}
-                  {...cardGesture(card.cardId, rect)}
-                >
-                  {/* The spawn is on the card inside, so it never fights the slot's own transform: a card
-                      arrives in its slot, and later moves between slots, as two separate motions. */}
-                  <div className="canvas-item__body" style={{ "--spawn-delay": `${Math.min(index, 10) * 35}ms` } as React.CSSProperties}>
-                    <Card
-                      model={models.get(card.cardId)!}
-                      docked={false}
-                      pinned={pinned}
-                      discarded={false}
-                      readOnly={readOnly}
-                      undockable={naturalSlot(card, view.state) ? null : NO_SLOT}
-                      actions={actions}
-                    />
+            [...layout.docked.map((p) => ({ ...p, docked: true })), ...layout.flow.map((p) => ({ ...p, docked: false }))].map(
+              ({ card, rect, pinned, docked }, index) => {
+                const lifted = drag?.id === card.cardId;
+                return (
+                  <div
+                    key={card.cardId}
+                    className={`canvas-item${lifted ? " canvas-item--lifted" : ""}${readOnly === null ? " canvas-item--movable" : ""}`}
+                    style={{ transform: placeAt(lifted ? drag.at : rect), width: rect.w, height: rect.h }}
+                    // Tabbing onto a card off screen brings it into view; a click on one already in view does not.
+                    onFocus={(event) => event.target.matches(":focus-visible") && reveal(rect)}
+                    {...cardGesture(card.cardId, rect)}
+                  >
+                    {/* The spawn is on the card inside, so it never fights the slot's own transform: a card
+                        arrives in its slot, and later moves between slots, as two separate motions. */}
+                    <div className="canvas-item__body" style={{ "--spawn-delay": `${Math.min(index, 10) * 35}ms` } as React.CSSProperties}>
+                      <Card
+                        model={models.get(card.cardId)!}
+                        docked={docked}
+                        pinned={pinned}
+                        discarded={false}
+                        readOnly={readOnly}
+                        undockable={naturalSlot(card, view.state) ? null : NO_SLOT}
+                        actions={actions}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              },
+            )}
         </div>
 
         {/* The discard bin: always in the same corner whatever the pan, so a card can always be thrown
@@ -272,7 +284,7 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
         <button
           ref={bin}
           type="button"
-          className={`canvas-bin${drag ? " canvas-bin--armed" : ""}${drag?.over === "bin" ? " canvas-bin--over" : ""}`}
+          className={`canvas-bin${drag ? " canvas-bin--armed" : ""}${drag?.target.kind === "bin" ? " canvas-bin--over" : ""}`}
           aria-expanded={trayOpen}
           aria-controls="canvas-tray"
           onPointerDown={(event) => event.stopPropagation()}
@@ -346,6 +358,49 @@ function Canvas({ view, log, mode, readOnly, dispatch }: CanvasProps) {
       </p>
       {sheet && <CitationSheet events={log} citation={sheet.citation.citation} label={sheet.label} onClose={() => setSheet(null)} />}
     </section>
+  );
+}
+
+// The plan region's frame: its heading, a heading per category, a target per authority, and a label over
+// each group of docked cards. All placed in world coordinates from lib/plan-region.ts; the cards in it are
+// the canvas's own cards, so docking one moves the very card into its slot rather than drawing a copy.
+// While a card is held, the slots it may go in light up, and the one under the pointer is marked.
+function PlanRegion({ plan, drag }: { plan: PlanLayout; drag: { target: DropTarget; categories: readonly FindingCategory[] } | null }) {
+  const docked = plan.cards.size;
+  const at = (r: Rect) => ({ transform: placeAt(r), width: r.w, height: r.h });
+  return (
+    <>
+      <section className="plan" style={at(plan.bounds)} aria-label="Plan: the reportable set">
+        <div className="plan__head">
+          <h2 className="t-headline">Plan</h2>
+          <p className="t-caption muted">{docked === 0 ? "Drop or dock cards here to report them." : `The reportable set · ${docked} card${docked === 1 ? "" : "s"}`}</p>
+        </div>
+      </section>
+      {plan.categories.map(({ category, heading }) => (
+        <p key={category} className="t-eyebrow plan__category" style={at(heading)}>
+          {categoryLabel(category)}
+        </p>
+      ))}
+      {plan.slots.map(({ slot, target, group, count }) => {
+        const key = `${slot.category}:${slot.authority}`;
+        const valid = drag !== null && drag.categories.includes(slot.category);
+        const over = drag?.target.kind === "slot" && drag.target.slot.category === slot.category && drag.target.slot.authority === slot.authority;
+        const state = over ? (valid ? " plan__target--over" : " plan__target--refused") : valid ? " plan__target--open" : "";
+        return (
+          <div key={key} aria-hidden>
+            <div className={`plan__target${count > 0 ? " plan__target--filled" : ""}${state}`} style={at(target)}>
+              {DOCUMENT_KIND_LABELS[slot.authority]}
+              {count > 0 && <span className="plan__count">{count}</span>}
+            </div>
+            {group && (
+              <p className="t-caption strong plan__group" style={at({ ...group, h: 20 })}>
+                {DOCUMENT_KIND_LABELS[slot.authority]}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </>
   );
 }
 

@@ -115,12 +115,15 @@ describe("on the fixtures", () => {
 
   it("lays out the fixture's open cards: the pinned one at its pin, the docked and discarded ones off the flow", () => {
     const view = canvasView(fixtureEvents());
-    const { flow, bounds } = canvasLayout(view);
+    const { flow, docked: inPlan, plan, bounds } = canvasLayout(view);
     const [docked, pinned, discarded] = view.cards.filter((c) => c.kind === "finding").map((c) => c.cardId);
 
     expect(flow.find((p) => p.card.cardId === pinned)).toMatchObject({ pinned: true, rect: cardRect({ x: 0, y: 0 }) });
     expect(flow.some((p) => p.card.cardId === docked || p.card.cardId === discarded)).toBe(false);
     expect(flow).toHaveLength(view.cards.length - 2);
-    expect(bounds).toMatchObject({ x: 0, y: 0 });
+    // The docked card is in the plan region, to the left of the flow, which keeps clear of it.
+    expect(inPlan.map((p) => p.card.cardId)).toEqual([docked]);
+    expect(plan.bounds.x + plan.bounds.w).toBeLessThan(0);
+    expect(bounds).toMatchObject({ x: plan.bounds.x, y: 0 });
   });
 });

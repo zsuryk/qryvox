@@ -39,7 +39,8 @@ export type CardProps = {
 
 export const Card = memo(function Card({ model, docked, pinned, discarded, readOnly, undockable, actions }: CardProps) {
   const state = { docked, pinned, discarded };
-  const label = model.kind === "finding" ? `Finding: ${model.title}` : `Excerpt from ${model.documentName}, page ${model.page}`;
+  const what = model.kind === "finding" ? `Finding: ${model.title}` : `Excerpt from ${model.documentName}, page ${model.page}`;
+  const label = `${what}${docked ? " (in the plan)" : pinned ? " (pinned)" : ""}`;
   return (
     <article className={`card canvas-card${state.pinned ? " canvas-card--pinned" : ""}`} aria-label={label}>
       {model.kind === "finding" ? <FindingBody model={model} actions={actions} /> : <ExcerptBody model={model} actions={actions} />}

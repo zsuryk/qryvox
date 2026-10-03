@@ -163,7 +163,9 @@ moves cards whenever the flow changes; a pin never moves.
 
 **Plan region** — the area of the canvas where docked cards form the reportable set, grouped by category ×
 authority (PPM, fee table, factsheet, deck — the order of `AUTHORITY_ORDER`). Each docked card names its
-group (`plan_slot`) on the event that docked it (`planGroups`).
+group (`plan_slot`) on the event that docked it (`planGroups`). On the canvas it is a column left of the
+flow with one slot per category × authority (`frontend/lib/plan-region.ts`); a card may be dropped on any
+slot of its own category (an excerpt card: of a finding that cites it), and anywhere else in it is refused.
 
 **Canvas state** — what the analyst has done to cards, folded from the card events into `CaseState.board`
 (the field keeps its name): the docked set, pinned positions, the discard bin and the find-similar history.
