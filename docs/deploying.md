@@ -83,3 +83,10 @@ intact. A fresh case and fresh ids every run, so it is safe to re-run after any 
   burn credits. This is the real backstop behind the three app-level guards.
 - **`LLM_MODEL` may be a steerable or stealth model.** Those get deprecated with little notice;
   keep a fallback model in mind or the analysis steps will 503 mid-demo.
+- **One step must finish inside one function call.** `backend/vercel.json` sets the function's
+  `maxDuration` to 300 s (Hobby's ceiling on Fluid compute), and `LLM_TIMEOUT_MS` (240 s by default)
+  stays under it, so a slow model fails as a clean `step.failed` rather than a killed function. Every
+  number in `docs/scalability.md` was measured on **Kimi K3 with `LLM_REASONING_EFFORT=low`** (about
+  10–55 s a step). A slower model, or K3 without `low`, can run past the limit on the large grounded
+  steps (`compliance`, `decompose`): in production the stealth model took about 12 minutes and timed
+  out at `compliance` every time (#17). Use the measured configuration for the demo.
