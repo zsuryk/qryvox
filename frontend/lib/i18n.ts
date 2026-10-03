@@ -1,4 +1,14 @@
-import type { ClientGoal, ClientLanguage, ClientProfile, Exclusion, KnowledgeLevel, ReasonEffect, SuitabilityRuleId, Verdict } from "@qryvox/shared";
+import {
+  type ClientGoal,
+  type ClientLanguage,
+  type ClientProfile,
+  type Exclusion,
+  type KnowledgeLevel,
+  type ReasonEffect,
+  type SuitabilityRuleId,
+  type Verdict,
+  VERDICT_HEADLINE,
+} from "@qryvox/shared";
 
 // Everything a client reads, in English and in Traditional Chinese as used in Hong Kong (#43). One table,
 // so a string cannot exist in one language and not the other: the type checker holds them in step. The
@@ -90,11 +100,8 @@ export const WORDS: Record<Lang, Words> = {
     knowledge: { novice: "New to investing", informed: "Some experience", expert: "Experienced" },
     exclusion: { fossil_fuels: "Fossil fuels", tobacco: "Tobacco", weapons: "Weapons" },
     effect: { meets: "Meets", warns: "Warning", conditional: "Needs confirmation", blocks: "Fails" },
-    verdict: {
-      suitable: "This product suits you.",
-      conditional: "This product may suit you, once your adviser confirms one thing.",
-      not_suitable: "This product does not suit you.",
-    },
+    // The headline above the explanation, in shared so the explain step can refuse a summary repeating it (#67).
+    verdict: VERDICT_HEADLINE.en,
     depth: { novice: "Simple", informed: "Detailed", expert: "In full" },
     rule: {
       S1: "Long enough horizon",
@@ -190,11 +197,7 @@ export const WORDS: Record<Lang, Words> = {
     knowledge: { novice: "投資新手", informed: "有一些經驗", expert: "經驗豐富" },
     exclusion: { fossil_fuels: "化石燃料", tobacco: "煙草", weapons: "武器" },
     effect: { meets: "符合", warns: "提醒", conditional: "待確認", blocks: "不符合" },
-    verdict: {
-      suitable: "這個產品適合你。",
-      conditional: "這個產品可能適合你，需待你的顧問確認一點。",
-      not_suitable: "這個產品不適合你。",
-    },
+    verdict: VERDICT_HEADLINE["zh-Hant"],
     depth: { novice: "簡單", informed: "詳細", expert: "完整" },
     rule: {
       S1: "投資期是否足夠",
