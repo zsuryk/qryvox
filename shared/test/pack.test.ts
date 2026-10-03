@@ -33,9 +33,14 @@ describe("the committed pack", () => {
 describe("the ground truth", () => {
   const entries = groundTruth.entries;
 
-  it("plants six findings covering fees, strategy, risk and terms", () => {
-    expect(entries).toHaveLength(6);
+  it("plants six findings across fees, strategy, risk and terms, and four policy gaps", () => {
+    expect(entries.filter((e) => e.kind !== "policy_gap")).toHaveLength(6);
+    expect(entries.filter((e) => e.kind === "policy_gap").map((e) => e.rule)).toEqual(["P1", "P1", "P2", "P3"]);
     expect(new Set(entries.map((e) => e.category))).toEqual(new Set(["fees", "strategy", "risk", "terms"]));
+  });
+
+  it("names a rule on every policy gap and on nothing else", () => {
+    for (const e of entries) expect(e.rule !== undefined).toBe(e.kind === "policy_gap");
   });
 
   it("includes the three named cases", () => {

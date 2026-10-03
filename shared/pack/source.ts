@@ -206,4 +206,54 @@ export const GROUND_TRUTH: GroundTruthEntry[] = [
       quote: "7.3 Redemptions are processed monthly, on the last business day of each month.",
     },
   },
+
+  // Policy gaps (#25): where a document falls short of the institution's product rules (rules@1), one
+  // entry per document per rule. Cited like a disclosure gap: the passage where the missing text belongs,
+  // and the PPM passage it should have carried. P4 also applies to the deck's income promise, but that
+  // passage is already the planted disclosure gap above; the compliance step raises no second finding on
+  // a claim already raised, so P4 adds no entry of its own.
+  {
+    id: "policy-factsheet-credit-risk",
+    category: "risk",
+    kind: "policy_gap",
+    rule: "P1",
+    summary: "The factsheet's risk section names interest-rate and currency risk but not the credit risk the PPM lists.",
+    citation: { document_id: "factsheet", page: 2, quote: "Bond prices generally fall when interest rates rise." },
+    counterpart: { document_id: "ppm", page: 2, quote: "5.4 The Fund is exposed to interest rate, credit and currency risk." },
+  },
+  {
+    id: "policy-deck-risk-types",
+    category: "risk",
+    kind: "policy_gap",
+    rule: "P1",
+    summary: "The deck names none of the interest-rate, credit and currency risks the PPM lists.",
+    citation: { document_id: "deck", page: 1, quote: "A diversified portfolio of government and corporate bonds." },
+    counterpart: { document_id: "ppm", page: 2, quote: "5.4 The Fund is exposed to interest rate, credit and currency risk." },
+  },
+  {
+    id: "policy-factsheet-capital-protection",
+    category: "risk",
+    kind: "policy_gap",
+    rule: "P2",
+    summary: "The factsheet does not say the fund is not capital protected, as the PPM does.",
+    citation: { document_id: "factsheet", page: 2, quote: "The value of investments and the income from them can fall as well as rise." },
+    counterpart: {
+      document_id: "ppm",
+      page: 2,
+      quote: "5.1 The Fund is not capital protected. Investors may lose some or all of the amount invested.",
+    },
+  },
+  {
+    id: "policy-factsheet-exit-charge",
+    category: "fees",
+    kind: "policy_gap",
+    rule: "P3",
+    summary: "The factsheet's key facts list no exit charge, though the PPM charges 2.00% on redemptions within 24 months.",
+    citation: { document_id: "factsheet", page: 1, quote: "Minimum initial investment: USD 1,000" },
+    counterpart: {
+      document_id: "ppm",
+      page: 3,
+      quote: "7.2 A redemption charge of 2.00% applies to units redeemed within 24 months of purchase.",
+    },
+  },
 ];

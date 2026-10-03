@@ -3,6 +3,7 @@ import { ReasonEffect, Verdict } from "./advice.js";
 import { ClientProfile } from "./client.js";
 import { DocumentKind, Sha256 } from "./events.js";
 import { Citation, FindingCategory, FindingKind } from "./finding.js";
+import { ProductRuleId } from "./rules.js";
 
 // The one pdf.js build the pack is quoted from, and the one the browser parses with. Pinned to an exact
 // version, not a range: a citation is a page plus a quote, and the quote is found in pdf.js's extracted
@@ -46,6 +47,8 @@ export const GroundTruthEntry = z.object({
   summary: z.string().min(1),
   citation: PackCitation,
   counterpart: PackCitation.nullable(),
+  // For a policy_gap, the product rule it breaks.
+  rule: ProductRuleId.optional(),
 });
 export type GroundTruthEntry = z.infer<typeof GroundTruthEntry>;
 

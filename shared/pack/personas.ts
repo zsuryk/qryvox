@@ -1,9 +1,9 @@
 import type { Persona } from "../src";
 
 // Three fabricated clients and the advice rules@1 should give each on the Larkspur pack (#20). Like the
-// product, none of them exists. Every pack-wide fees and terms finding is open, so all three are told the
-// same three things (S6); what differs is the verdict.
-const DISCLOSED = ["fees-management-fee", "fees-exit-charge", "terms-dealing-frequency"];
+// product, none of them exists. Every fees and terms finding is open, so all three are told the same four
+// things (S6), the factsheet's missing exit charge among them; what differs is the verdict.
+const DISCLOSED = ["fees-management-fee", "fees-exit-charge", "terms-dealing-frequency", "policy-factsheet-exit-charge"];
 
 export const PERSONAS: Persona[] = [
   {
