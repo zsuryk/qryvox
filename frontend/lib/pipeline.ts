@@ -27,6 +27,7 @@ export const STEP_LABELS: Record<StepName, string> = {
   findings: "Raise findings",
   // Not in PIPELINE_STEPS: run for advice, after the board (#29, #31).
   attributes: "Read product facts",
+  explain: "Explain advice",
 };
 
 // pending is the fold's "no run for this step", kept as its own word so the panel can say a step has not
