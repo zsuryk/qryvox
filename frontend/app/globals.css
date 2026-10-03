@@ -1265,6 +1265,22 @@ details[open] > summary::before {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A model-written rationale (#62) gets two lines, which the title gives back by taking one fewer. */
+.canvas-card--written .canvas-card__title {
+  -webkit-line-clamp: 2;
+}
+.canvas-card__line--written {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  display: -webkit-box;
+  white-space: normal;
+}
+.canvas-card__why {
+  color: var(--label-3);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-right: 0.125rem;
+}
 .canvas-card__quote {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;

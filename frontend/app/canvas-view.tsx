@@ -26,6 +26,7 @@ import { asked, candidatesOf, hasRecording, instantSaid, instantSimilar, planSim
 import { appendOp, type CanvasLog, canvasLog, type CardOp, reread, rolledBack, sent, settled, shownLog } from "../lib/canvas-store";
 import { changeDisposition, fetchEvents, recordCardOperation, runStep } from "../lib/api";
 import { DISPOSITION_LABEL, keyIntent } from "../lib/disposition";
+import { rationaleRequest, unwordedFindingsRun } from "../lib/pipeline";
 import { errorMessage } from "../lib/errors";
 import {
   centreOn,
@@ -242,6 +243,36 @@ function useFindSimilar(view: View, mode: CanvasMode, store: Store, say: (words:
   return { similar, further, searching, arrived, lit };
 }
 
+// Card rationales on a case analysed before the step ran after findings (#62): offered once, quietly, and
+// only when asked for, never on page load. One awaited run under a new run id through the steps endpoint,
+// like any other, with the log read again every couple of seconds so the status panel shows it running.
+// When it completes the cards take its lines through the fold; a failure is a failed run in the status
+// panel and a line here, and the cards keep the line they derive.
+function useRationales(log: readonly SlimEvent[], mode: CanvasMode, store: Store, say: (words: string) => void) {
+  const [writing, setWriting] = useState(false);
+  const unworded = useMemo(() => (mode.kind === "live" ? unwordedFindingsRun(log) : null), [log, mode.kind]);
+  const { refresh } = store;
+  const write = useCallback(async () => {
+    if (mode.kind !== "live" || unworded === null || writing) return;
+    setWriting(true);
+    say("Writing a line on why each finding matters…");
+    const poll = window.setInterval(() => void refresh().catch(() => undefined), 2000);
+    try {
+      const result = await runStep(mode.caseId, rationaleRequest(unworded, crypto.randomUUID()));
+      await refresh();
+      const lines = Array.isArray(result.output.rationales) ? result.output.rationales.length : 0;
+      say(`${lines} rationale${lines === 1 ? "" : "s"} written, marked Why it matters on the cards.`);
+    } catch (cause) {
+      await refresh().catch(() => undefined);
+      say(`Rationales not written: ${similarFailure(cause)} The cards keep their own line.`);
+    } finally {
+      window.clearInterval(poll);
+      setWriting(false);
+    }
+  }, [mode, refresh, say, unworded, writing]);
+  return { offer: unworded !== null, writing, write };
+}
+
 // The analyst's decision on a finding, made from its card (#59). The same decision as the Review console's:
 // on a live case it is posted to the dispositions endpoint and the log is read again, so what the card then
 // shows is what the log records; on the fixture it is appended in this tab, like a card operation. The event
@@ -293,6 +324,7 @@ type CanvasProps = {
 function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
   const dispatch = store.dispatch;
   const { similar, further, searching, arrived, lit } = useFindSimilar(view, mode, store, say);
+  const rationales = useRationales(log, mode, store, say);
   // Both layouts, wide and narrow (#61): the frame's width picks one, and the first fit has to know the
   // bounds of whichever it picks before anything is drawn.
   const layouts = useMemo(() => ({ wide: canvasLayout(view), narrow: canvasLayout(view, { narrow: true }) }), [view]);
@@ -314,7 +346,7 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
   const board = view.state.board;
   const pinnedCount = layout.flow.filter((p) => p.pinned).length;
   const dockedCount = layouts.wide.docked.length;
-  const models = useMemo(() => new Map(view.cards.map((card) => [card.cardId, cardModel(card, view.state)])), [view]);
+  const models = useMemo(() => new Map(view.cards.map((card) => [card.cardId, cardModel(card, view.state, view.rationales)])), [view]);
   const discarded = board.discarded.flatMap((d) => models.get(d.cardId) ?? []);
 
   // The cards' actions read the latest layout through a ref, so they keep one identity across renders and
@@ -568,17 +600,31 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
   return (
     <section className="section canvas-section" aria-label="Canvas">
       <div className="row spread canvas-summary">
-        <p className="t-footnote muted">
-          {[
-            counted(layout.flow.length, "card on the canvas", "cards on the canvas"),
-            pinnedCount > 0 ? `${pinnedCount} pinned` : null,
-            dockedCount > 0 ? `${dockedCount} docked to the plan` : null,
-            board.discarded.length > 0 ? `${board.discarded.length} discarded` : null,
-            `${decisions.approved} approved · ${decisions.dismissed} dismissed · ${decisions.undecided} undecided`,
-          ]
-            .filter((part) => part !== null)
-            .join(" · ")}
-        </p>
+        <div className="row">
+          <p className="t-footnote muted">
+            {[
+              counted(layout.flow.length, "card on the canvas", "cards on the canvas"),
+              pinnedCount > 0 ? `${pinnedCount} pinned` : null,
+              dockedCount > 0 ? `${dockedCount} docked to the plan` : null,
+              board.discarded.length > 0 ? `${board.discarded.length} discarded` : null,
+              `${decisions.approved} approved · ${decisions.dismissed} dismissed · ${decisions.undecided} undecided`,
+            ]
+              .filter((part) => part !== null)
+              .join(" · ")}
+          </p>
+          {rationales.offer && (
+            <button
+              type="button"
+              className="btn btn--small btn--plain"
+              disabled={rationales.writing}
+              aria-busy={rationales.writing}
+              title="Ask the model for one sentence per finding on why it matters, quoted from its passages. Until then each card shows the line derived from its finding."
+              onClick={() => void rationales.write()}
+            >
+              {rationales.writing ? "Writing rationales…" : "Write rationales"}
+            </button>
+          )}
+        </div>
         <p className={`t-footnote ${said ? "" : "faint"}`} role="status">
           {said ?? (mode.kind === "fixture" ? "Card operations and decisions stay in this tab: a reload starts the recorded case over." : null)}
         </p>

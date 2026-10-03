@@ -7,6 +7,7 @@ import {
   findingIdOfCard,
   fold,
   ParseOutput,
+  RationaleOutput,
   similarNeighbours,
   type SlimEvent,
   type StepRun,
@@ -46,13 +47,13 @@ export type StatusLine = RunLine | CardLine;
 
 export function statusLines(events: readonly SlimEvent[]): StatusLine[] {
   const state = fold(events);
-  const runs = [...state.stepRuns, ...state.seededRuns].map((run) => runLine(run, events));
+  const runs = [...state.stepRuns, ...state.seededRuns].map((run) => runLine(run, events, state));
   const shown = events.some((e) => e.type === "card.similar_requested") ? caseCards(events, state) : [];
   const cards = events.flatMap((event) => cardLine(event, state, events, shown));
   return [...runs, ...cards].sort((a, b) => a.seq - b.seq);
 }
 
-function runLine(run: StepRun, events: readonly SlimEvent[]): RunLine {
+function runLine(run: StepRun, events: readonly SlimEvent[], state: CaseState): RunLine {
   const own = events.filter((e) => e.step_run_id === run.stepRunId && e.type.startsWith("step."));
   const failures = own.flatMap((e) => (e.type === "step.failed" ? [e.payload.error] : []));
   const started = own.find((e) => e.type === "step.started");
@@ -66,6 +67,13 @@ function runLine(run: StepRun, events: readonly SlimEvent[]): RunLine {
         ? "No chips: the words map onto nothing, so the chips picked by hand stand."
         : `${parsed.data.chips.length} intent chip${parsed.data.chips.length === 1 ? "" : "s"}`
       : "Its output does not read as chips, so the chips picked by hand stand.";
+  }
+  // A rationale run (#62): how many of its findings run's findings it gave a line that held.
+  if (run.step === "rationale" && completed?.type === "step.completed") {
+    const parsed = RationaleOutput.safeParse(completed.payload.output);
+    const of = state.findings.filter((f) => f.stepRunId === run.inputRunId).length;
+    const n = parsed.success ? parsed.data.rationales.length : 0;
+    result = `${n} of ${of} finding${of === 1 ? "" : "s"} given a line on why it matters`;
   }
   const failedBefore = run.status === "failed" ? failures.length - 1 : failures.length;
   return {

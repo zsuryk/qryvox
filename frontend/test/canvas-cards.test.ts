@@ -15,6 +15,13 @@ const excerptCard = view.cards.find((c) => c.kind === "excerpt")!;
 const envelope = (n: number) => ({ eventId: `00000000-0000-4000-8000-${String(n).padStart(12, "9")}`, at: "2026-10-03T12:00:00.000Z" });
 
 describe("the card model", () => {
+  it("gives a finding card the model's rationale where a rationale run wrote one (#62), marked written", () => {
+    const f = findingCard.kind === "finding" ? findingCard.finding : null;
+    const model = cardModel(findingCard, view.state, new Map([[f!.finding_id, "An investor could pay more than they were told."]]));
+    expect(model).toMatchObject({ kind: "finding", rationale: "An investor could pay more than they were told.", written: true });
+    expect(cardModel(findingCard, view.state)).toMatchObject({ rationale: rationale(f!), written: false });
+  });
+
   it("gives a finding card its badges, its sentence, the board's rationale and the passage it is cited on", () => {
     const model = cardModel(findingCard, view.state);
     expect(model).toMatchObject({

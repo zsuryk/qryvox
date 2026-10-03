@@ -1,4 +1,4 @@
-import { fold, type RunStepRequest, type SlimEvent, type StepName, type StepResult, type StepRun } from "@qryvox/shared";
+import { activeFindings, fold, type RunStepRequest, type SlimEvent, type StepName, type StepResult, type StepRun } from "@qryvox/shared";
 import { errorMessage } from "./errors";
 
 // The run, as the browser drives it: five stateless steps, each one awaited call, in this order
@@ -38,7 +38,7 @@ export const STEP_LABELS: Record<StepName, string> = {
   // Not in PIPELINE_STEPS: reads the analyst's words into intent chips on the canvas (#51).
   parse: "Read intent",
   // Not in PIPELINE_STEPS: optional, after findings, a line per finding on why it matters (#62).
-  rationale: "Word card rationales",
+  rationale: "Write card rationales",
 };
 
 // pending is the fold's "no run for this step", kept as its own word so the panel can say a step has not
@@ -94,6 +94,9 @@ export type PipelineDeps = {
   // Called the moment a step's call goes out, so the panel shows what is running rather than waiting for
   // a fold that has not yet seen the step.started the server is about to write.
   onStep?: (step: StepName, runId: string) => void;
+  // Called once the findings step has completed in this advance, with its run id: where the browser starts
+  // the optional rationale step (#62) on its own, never awaited, so nothing it does can hold the run up.
+  onFindings?: (findingsRunId: string) => void;
 };
 
 // What the analyst asked for: one action per button on the run panel.
@@ -203,8 +206,36 @@ async function advance(deps: PipelineDeps, from: StepName | null, fresh: boolean
       const after = await deps.readLog().catch(() => events);
       return { pipeline: pipelineState(after), events: after, failure: { step: call.step, error: errorMessage(cause) } };
     }
+    if (call.step === "findings") deps.onFindings?.(call.step_run_id);
   }
   return { pipeline: pipelineState(events), events, failure: null };
+}
+
+// --- Card rationales (#62): after the chain, not in it. One run per findings run writes a line on why each
+// finding matters; a card shows it when the run held and the line the board derives otherwise, so the step
+// is optional and a failure of it is only a failed run on the record, never a stop.
+
+// The request: a new run over a completed findings run.
+export function rationaleRequest(findingsRunId: string, stepRunId: string): RunStepRequest {
+  return { step_run_id: stepRunId, step: "rationale", input_run_id: findingsRunId };
+}
+
+// Starts the rationale step and lets it go: whatever becomes of it is on the log, and nothing waits on it.
+export function writeRationales(steps: StepTransport, newRunId: RunIdSource, findingsRunId: string): void {
+  void steps(rationaleRequest(findingsRunId, newRunId())).catch(() => undefined);
+}
+
+// The findings run whose findings are on the board, when no rationale run has completed or is running over
+// it: a case analysed before the step existed, or one whose run failed. Null when there is nothing to word.
+export function unwordedFindingsRun(events: readonly SlimEvent[]): string | null {
+  const state = fold(events);
+  const onBoard = activeFindings(state);
+  if (onBoard.length === 0) return null;
+  const created = new Set(onBoard.map((f) => f.stepRunId));
+  const run = state.stepRuns.filter((r) => r.step === "findings" && r.status === "completed" && created.has(r.stepRunId)).at(-1);
+  if (!run) return null;
+  const worded = state.stepRuns.some((r) => r.step === "rationale" && r.inputRunId === run.stepRunId && r.status !== "failed");
+  return worded ? null : run.stepRunId;
 }
 
 // The calls one advance makes, in order. Two of its rules are about never spending twice, and the third

@@ -16,7 +16,8 @@ import type { CanvasCard, CanvasView } from "./canvas-source";
 
 // What a canvas card says (#54), as a pure function of the card and the folded state: the words and the
 // facts the one Card component draws, for both kinds. Nothing here calls a model: a finding card's
-// rationale is the claim board's own line (lib/board.ts), derived from the finding the log recorded.
+// rationale is the line a rationale run wrote for it (#62), read off the log, or where there is none the
+// claim board's own line (lib/board.ts), derived from the finding the log recorded.
 
 export const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
   ppm: "PPM",
@@ -33,6 +34,8 @@ export type FindingCardModel = {
   cardId: CardId;
   title: string;
   rationale: string;
+  // Whether the rationale is the model's sentence (#62) rather than the derived line.
+  written: boolean;
   category: string;
   severity: Severity;
   severityLabel: string;
@@ -63,7 +66,7 @@ export type ExcerptCardModel = {
 
 export type CardModel = FindingCardModel | ExcerptCardModel;
 
-export function cardModel(card: CanvasCard, state: CaseState): CardModel {
+export function cardModel(card: CanvasCard, state: CaseState, rationales: ReadonlyMap<string, string> = new Map()): CardModel {
   if (card.kind === "finding") {
     const f = card.finding;
     const cited = cardCitation(f.citation, state);
@@ -72,7 +75,8 @@ export function cardModel(card: CanvasCard, state: CaseState): CardModel {
       kind: "finding",
       cardId: card.cardId,
       title: f.claim,
-      rationale: rationale(f),
+      rationale: rationales.get(f.finding_id) ?? rationale(f),
+      written: rationales.has(f.finding_id),
       category: categoryLabel(f.category),
       severity: f.severity,
       severityLabel: SEVERITY_LABELS[f.severity],

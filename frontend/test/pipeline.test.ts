@@ -17,11 +17,14 @@ import {
   PIPELINE_STEPS,
   type PipelineDeps,
   pipelineState,
+  rationaleRequest,
   rerunFrom,
   resumeRun,
   retryStep,
   STEP_LABELS,
   startRun,
+  unwordedFindingsRun,
+  writeRationales,
 } from "../lib/pipeline";
 
 // The run, driven the way the browser drives it: awaited calls against a stand-in for the step endpoint,
@@ -460,5 +463,51 @@ describe("the panel's reading of a case", () => {
 
   it("reports a log with a gap as an error rather than as a run that never started", () => {
     expect(() => pipelineState(recordedLog.filter((event) => event.seq !== 7))).toThrow(/expected seq 7, got 8/);
+  });
+});
+
+describe("card rationales (#62)", () => {
+  it("are started once the findings step completes, with its run id, and never awaited by the run", async () => {
+    const { deps, calls } = stepApi(opened());
+    const worded: string[] = [];
+
+    const run = await startRun({ ...deps(), onFindings: (id) => worded.push(id) });
+
+    const findings = calls.find((call) => call.step === "findings")!;
+    expect(worded).toEqual([findings.step_run_id]);
+    expect(run.failure).toBeNull();
+    expect(rationaleRequest(findings.step_run_id, "r-1")).toEqual({ step_run_id: "r-1", step: "rationale", input_run_id: findings.step_run_id });
+  });
+
+  it("are not started by a run that stopped before its findings", async () => {
+    const { deps } = stepApi(opened(), misbehavesOn("decompose", "no"));
+    const worded: string[] = [];
+    await startRun({ ...deps(), onFindings: (id) => worded.push(id) });
+    expect(worded).toEqual([]);
+  });
+
+  it("failing is nobody's failure: the call's rejection goes nowhere", async () => {
+    const sent: RunStepRequest[] = [];
+    writeRationales(async (request) => {
+      sent.push(request);
+      throw new Error("502 the model is unreachable");
+    }, () => "r-2", "findings-run");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sent).toEqual([{ step_run_id: "r-2", step: "rationale", input_run_id: "findings-run" }]);
+  });
+
+  it("are offered on a case whose findings run has none, until one completes over it", () => {
+    const findingsRun = fold(recordedLog).stepRuns.filter((r) => r.step === "findings" && r.status === "completed").at(-1)!.stepRunId;
+    expect(unwordedFindingsRun(recordedLog)).toBe(findingsRun);
+    expect(unwordedFindingsRun(opened())).toBeNull();
+
+    const last = recordedLog.at(-1)!;
+    const run = { step: "rationale", model: "fake-model", prompt_version: PROMPT_VERSIONS.rationale, input_run_id: findingsRun };
+    const event = (n: number, type: string, payload: object) =>
+      SlimEvent.parse({ ...last, seq: last.seq + n, event_id: eventId(last.seq + n), step_run_id: "rationale-run", type, payload });
+    const failed = [...recordedLog, event(1, "step.started", run), event(2, "step.failed", { ...run, error: "no rationale holds" })];
+    expect(unwordedFindingsRun(failed)).toBe(findingsRun);
+    const done = [...recordedLog, event(1, "step.started", run), event(2, "step.completed", { ...run, output: { rationales: [] } })];
+    expect(unwordedFindingsRun(done)).toBeNull();
   });
 });

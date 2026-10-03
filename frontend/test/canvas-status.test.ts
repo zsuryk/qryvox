@@ -1,6 +1,6 @@
 import { SlimEvent } from "@qryvox/shared";
 import { describe, expect, it } from "vitest";
-import { fixtureEvents } from "../lib/canvas-source";
+import { canvasView, fixtureEvents } from "../lib/canvas-source";
 import { type RunLine, statusLines } from "../lib/canvas-status";
 
 // The status panel (#58) reads the case's own log: a line per step run, a line per card operation.
@@ -87,6 +87,21 @@ describe("the status panel", () => {
     expect(lines.at(-2)).toMatchObject({ label: "Read intent", status: "completed", detail: "“fee risks in the deck”", result: "1 intent chip" });
     // A failed step says why, from its own step.failed.
     expect(lines.at(-1)).toMatchObject({ label: "Read intent", status: "failed", error: "the model's chips did not parse", failedAttempts: 0 });
+  });
+
+  it("lists a rationale run under its own label, with how many findings it gave a line, and the cards take the lines (#62)", () => {
+    const view = canvasView(base);
+    const findingsRun = view.state.stepRuns.filter((r) => r.step === "findings" && r.status === "completed").at(-1)!.stepRunId;
+    const [first] = view.state.findings.filter((f) => f.stepRunId === findingsRun && f.supersededAtSeq === null);
+    const of = view.state.findings.filter((f) => f.stepRunId === findingsRun).length;
+    const payload = { step: "rationale", prompt_version: "rationale@1", input_run_id: findingsRun };
+    const log = withSteps(
+      { type: "step.started", run: "r1", payload },
+      { type: "step.completed", run: "r1", payload: { ...payload, output: { rationales: [{ finding_id: first!.finding_id, text: "It matters." }] } } },
+    );
+    expect(runs(statusLines(log)).at(-1)).toMatchObject({ label: "Write card rationales", status: "completed", result: `1 of ${of} findings given a line on why it matters` });
+    expect(canvasView(log).rationales).toEqual(new Map([[first!.finding_id, "It matters."]]));
+    expect(canvasView(base).rationales.size).toBe(0);
   });
 
   it("lists a find-similar run with its seed", () => {

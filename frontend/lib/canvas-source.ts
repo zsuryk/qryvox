@@ -1,4 +1,4 @@
-import { activeFindings, type CaseCard, caseCards, type CaseState, type Citation, findingCardId, fold, SlimEvent } from "@qryvox/shared";
+import { activeFindings, type CaseCard, caseCards, type CaseState, type Citation, findingCardId, fold, rationaleFor, SlimEvent } from "@qryvox/shared";
 import recorded from "@qryvox/shared/case-recorded.json";
 import { fetchEvents } from "./api";
 
@@ -81,12 +81,20 @@ function kindOf(state: CaseState, citation: Citation) {
 // Which cards are docked, pinned or discarded is the board state beside them, not a property of the card.
 export type CanvasCard = CaseCard;
 
-export type CanvasView = { state: CaseState; cards: CanvasCard[] };
+// rationales: the model-written line on why each finding on the board matters, where a rationale run
+// wrote one that held (#62, rationaleFor), by finding id. A finding without one shows the derived line.
+export type CanvasView = { state: CaseState; cards: CanvasCard[]; rationales: ReadonlyMap<string, string> };
 
 export function canvasView(events: readonly SlimEvent[]): CanvasView {
   const state = fold(events);
   const { docked, pinned, discarded } = state.board;
   const named = new Set([...docked, ...pinned, ...discarded].map((entry) => entry.cardId));
   const cards = caseCards(events, state).filter((card) => !(card.kind === "excerpt" && card.latent) || named.has(card.cardId));
-  return { state, cards };
+  const rationales = new Map(
+    activeFindings(state).flatMap((f): [string, string][] => {
+      const text = rationaleFor(events, f.finding_id);
+      return text === null ? [] : [[f.finding_id, text]];
+    }),
+  );
+  return { state, cards, rationales };
 }

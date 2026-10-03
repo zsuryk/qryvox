@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { SlimEvent, StepName } from "@qryvox/shared";
 import { fetchEvents, runStep } from "../lib/api";
 import { errorMessage } from "../lib/errors";
-import { type AttemptFailure, type PipelineAction, type PipelineDeps, runAction } from "../lib/pipeline";
+import { type AttemptFailure, type PipelineAction, type PipelineDeps, runAction, writeRationales } from "../lib/pipeline";
 import Board from "./board";
 import DispositionConsole from "./disposition";
 import { FindingsEval } from "./eval-tiles";
@@ -52,6 +52,8 @@ export default function CaseView({ events, caseId, refetch }: CaseViewProps) {
     newRunId: () => crypto.randomUUID(),
     readLog: () => fetchEvents(caseId),
     onStep: (step) => setRunning(step),
+    // The card rationales (#62), in the background: the canvas's status panel shows how they went.
+    onFindings: (findingsRunId) => writeRationales((request) => runStep(caseId, request), () => crypto.randomUUID(), findingsRunId),
   });
 
   async function drive(action: PipelineAction) {

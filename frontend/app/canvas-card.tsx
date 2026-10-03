@@ -65,7 +65,7 @@ export const Card = memo(function Card({ model, docked, pinned, discarded, undoc
   return (
     // A finding card is focusable as a whole, so the keyboard can stand on it and decide it as on Review.
     <article
-      className={`card canvas-card${state.pinned ? " canvas-card--pinned" : ""}${dismissed ? " canvas-card--dismissed" : ""}${lit ? " canvas-card--lit" : ""}`}
+      className={`card canvas-card${model.kind === "finding" && model.written ? " canvas-card--written" : ""}${state.pinned ? " canvas-card--pinned" : ""}${dismissed ? " canvas-card--dismissed" : ""}${lit ? " canvas-card--lit" : ""}`}
       aria-label={label}
       tabIndex={model.kind === "finding" ? 0 : undefined}
       data-finding-card={model.kind === "finding" ? model.cardId : undefined}
@@ -99,9 +99,16 @@ function FindingBody({ model, deciding, actions }: { model: Extract<CardModel, {
         {model.authority && <span className="badge">{model.authority}</span>}
       </div>
       <h3 className="t-callout strong canvas-card__title">{model.title}</h3>
-      <p className="t-caption muted canvas-card__line" title={model.rationale}>
-        {model.rationale}
-      </p>
+      {model.written ? (
+        // The model's sentence (#62), marked as such, quietly: the derived line needs no label.
+        <p className="t-caption muted canvas-card__line canvas-card__line--written" title={`Why it matters, written by the model: ${model.rationale}`}>
+          <span className="canvas-card__why">Why it matters</span> {model.rationale}
+        </p>
+      ) : (
+        <p className="t-caption muted canvas-card__line" title={model.rationale}>
+          {model.rationale}
+        </p>
+      )}
       <div className="canvas-card__chips">
         <button type="button" className="chip chip--link canvas-card__chip" title="Open the page this is cited on" onClick={() => actions.openCitation(model.citation, chip)}>
           {chip}
