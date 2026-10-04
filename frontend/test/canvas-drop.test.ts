@@ -4,7 +4,7 @@ import { resolveDrop } from "../lib/canvas-drop";
 import { canvasLayout } from "../lib/canvas-layout";
 import { canvasView, fixtureEvents } from "../lib/canvas-source";
 import { appendOp } from "../lib/canvas-store";
-import { cardRect } from "../lib/tiling";
+import { cardRect, CARD_W } from "../lib/tiling";
 
 // What a drop does (#56): the bin discards, open canvas pins, anything else returns the card. And what it
 // did survives a reload, because a reload is the same fold over the same log.
@@ -52,14 +52,14 @@ describe("what a drop did", () => {
     // A reload is the same fold of the same events, serialised and read back.
     const reloaded = canvasView(JSON.parse(JSON.stringify(log)));
     expect(pinOf(reloaded.state, pinned)).toEqual({ x: 1344, y: 0 });
-    expect(canvasLayout(reloaded).flow.find((p) => p.card.cardId === pinned)?.rect).toEqual(cardRect({ x: 1344, y: 0 }));
+    expect(canvasLayout(reloaded).flow.find((p) => p.card.cardId === pinned)?.rect).toMatchObject({ x: 1344, y: 0, w: CARD_W });
     expect(isDiscarded(reloaded.state, discarded)).toBe(true);
     expect(canvasLayout(reloaded).flow.some((p) => p.card.cardId === discarded)).toBe(false);
 
     const restored = canvasView(appendOp(log, { type: "card.restored", payload: { card_id: discarded } }, at(3)));
     expect(canvasLayout(restored).flow.some((p) => p.card.cardId === discarded)).toBe(true);
     // Restoring reflows the flow; the pin does not move.
-    expect(canvasLayout(restored).flow.find((p) => p.card.cardId === pinned)?.rect).toEqual(cardRect({ x: 1344, y: 0 }));
+    expect(canvasLayout(restored).flow.find((p) => p.card.cardId === pinned)?.rect).toMatchObject({ x: 1344, y: 0, w: CARD_W });
 
     const released = canvasView(appendOp(log, { type: "card.unpinned", payload: { card_id: pinned } }, at(4)));
     expect(canvasLayout(released).flow.find((p) => p.card.cardId === pinned)?.pinned).toBe(false);

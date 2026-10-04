@@ -2,7 +2,10 @@ import { findingCardId, isDiscarded, pinOf, planGroups, SlimEvent } from "@qryvo
 import recorded from "@qryvox/shared/case-recorded.json";
 import { describe, expect, it } from "vitest";
 import { rationale } from "../lib/board";
-import { cardModel, dockableCategories, naturalSlot } from "../lib/canvas-cards";
+import { blockLines, CARD_MAX_H, CARD_MIN_H, cardModel, cardSize, dockableCategories, type ExpandedMap, naturalSlot } from "../lib/canvas-cards";
+import { canvasLayout } from "../lib/canvas-layout";
+import { overlaps } from "../lib/tiling";
+import { CARD_W } from "../lib/tiling";
 import { canvasView, fixtureEvents } from "../lib/canvas-source";
 import { appendOp, canvasLog, type PendingOp, reread, rolledBack, sent, settled, shownLog } from "../lib/canvas-store";
 
@@ -136,5 +139,50 @@ describe("the live store", () => {
     const elsewhere = appendOp(events, restore.op, restore.envelope);
     const fresh = [...elsewhere, recorded(pin, 32)];
     expect(reread(log, fresh)).toEqual({ confirmed: fresh, pending: [] });
+  });
+});
+
+describe("card sizing (#80)", () => {
+  const finding = view.cards.find((c) => c.kind === "finding")!;
+  const excerpt = view.cards.find((c) => c.kind === "excerpt")!;
+
+  it("bounds every card between CARD_MIN_H and CARD_MAX_H", () => {
+    for (const card of view.cards) {
+      const size = cardSize(cardModel(card, view.state, view.rationales));
+      expect(size.h).toBeGreaterThanOrEqual(CARD_MIN_H);
+      expect(size.h).toBeLessThanOrEqual(CARD_MAX_H);
+      expect(size.w).toBe(CARD_W);
+    }
+  });
+
+  it("grows with more text and reports when the full text fits", () => {
+    const short = cardModel(excerpt, view.state);
+    const longQuote = { ...excerpt, citation: { ...excerpt.citation, quote: "word ".repeat(400) } } as typeof excerpt;
+    const long = cardModel(longQuote, view.state);
+    expect(cardSize(long).h).toBeGreaterThan(cardSize(short).h);
+    expect(blockLines(short, "quote").hidden).toBe(false);
+    expect(blockLines(long, "quote").hidden).toBe(true);
+  });
+
+  it("folds expanded blocks into a larger size", () => {
+    const model = cardModel(excerpt, view.state);
+    const collapsed = cardSize(model);
+    const expanded = cardSize(model, { quote: true });
+    expect(expanded.h).toBeGreaterThanOrEqual(collapsed.h);
+    const modelL = cardModel({ ...excerpt, citation: { ...excerpt.citation, quote: "word ".repeat(400) } } as typeof excerpt, view.state);
+    expect(cardSize(modelL, { quote: true }).h).toBeGreaterThan(cardSize(modelL).h);
+    void finding;
+  });
+
+  it("feeds the layout through the canvas store's fold: expanded cards re-tile larger, without overlap", () => {
+    const expanded: ExpandedMap = new Map([[excerpt.cardId, { quote: true }]]);
+    const before = canvasLayout(view);
+    const after = canvasLayout(view, { expanded });
+    const b = before.flow.find((p) => p.card.cardId === excerpt.cardId);
+    const a = after.flow.find((p) => p.card.cardId === excerpt.cardId);
+    expect(a!.rect.h).toBeGreaterThanOrEqual(b!.rect.h);
+    for (const [i, p] of after.flow.entries()) {
+      for (const q of after.flow.slice(i + 1)) expect(overlaps(p.rect, q.rect)).toBe(false);
+    }
   });
 });

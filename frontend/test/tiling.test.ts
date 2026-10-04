@@ -2,6 +2,7 @@ import { type CardId, findingCardId, SlimEvent, type WorldPos } from "@qryvox/sh
 import recorded from "@qryvox/shared/case-recorded.json";
 import { describe, expect, it } from "vitest";
 import { canvasLayout } from "../lib/canvas-layout";
+import { cardModel, cardSize } from "../lib/canvas-cards";
 import { canvasView, fixtureEvents } from "../lib/canvas-source";
 import { CARD_H, CARD_W, cardRect, FLOW_COLUMNS, GAP, overlaps, slotRect, snapToGrid, tile } from "../lib/tiling";
 import type { Rect } from "../lib/viewport";
@@ -118,7 +119,7 @@ describe("on the fixtures", () => {
     const { flow, docked: inPlan, plan, bounds } = canvasLayout(view);
     const [docked, pinned, discarded] = view.cards.filter((c) => c.kind === "finding").map((c) => c.cardId);
 
-    expect(flow.find((p) => p.card.cardId === pinned)).toMatchObject({ pinned: true, rect: cardRect({ x: 0, y: 0 }) });
+    expect(flow.find((p) => p.card.cardId === pinned)).toMatchObject({ pinned: true, rect: { x: 0, y: 0, ...cardSize(cardModel(view.cards.find((c) => c.cardId === pinned)!, view.state, view.rationales)) } });
     expect(flow.some((p) => p.card.cardId === docked || p.card.cardId === discarded)).toBe(false);
     expect(flow).toHaveLength(view.cards.length - 2);
     // The docked card is in the plan region, to the left of the flow, which keeps clear of it.

@@ -13,6 +13,7 @@ import {
 } from "@qryvox/shared";
 import { categoryLabel, KIND_LABELS, rationale, SEVERITY_LABELS } from "./board";
 import type { CanvasCard, CanvasView } from "./canvas-source";
+import { CARD_W, type CardSize } from "./tiling";
 
 // What a canvas card says (#54), as a pure function of the card and the folded state: the words and the
 // facts the one Card component draws, for both kinds. Nothing here calls a model: a finding card's
@@ -103,6 +104,78 @@ export function cardModel(card: CanvasCard, state: CaseState, rationales: Readon
     instant: card.neighbourOf !== undefined,
     similarTo: card.neighbourOf ? similarLine(card.neighbourOf.seed, state) : card.candidateOf === undefined ? null : similarTo(card.candidateOf, state),
   };
+}
+
+// A card's size from what it says (#80): its height follows its text — the title, the rationale line
+// (two lines when the model wrote it, #62), or the excerpt's quote — within a band no card leaves, so
+// truncation stays bounded (#81 expands the rest, in place). Pure arithmetic on the model, the same in
+// tests as on the canvas: the tiler (lib/tiling.ts) packs each card at this size. The width is the
+// flow's one shared width.
+export const CARD_MIN_H = 180;
+export const CARD_MAX_H = 480;
+
+// The clamped line budget per text block while collapsed, and the bounded excerpt when expanded (#81).
+const TITLE_LINES = 3;
+const RATIONALE_LINES = 1;
+const RATIONALE_WRITTEN_LINES = 2;
+const QUOTE_LINES = 4;
+const EXPANDED_TITLE_LINES = 10;
+const EXPANDED_RATIONALE_LINES = 10;
+const EXPANDED_QUOTE_LINES = 12;
+
+// Roughly how many characters of each block fit on a line at the flow's width and type.
+const TITLE_CHARS = 34;
+const RATIONALE_CHARS = 50;
+const QUOTE_CHARS = 40;
+
+const TITLE_LINE_PX = 23;
+const RATIONALE_LINE_PX = 18;
+const QUOTE_LINE_PX = 23;
+// Padding, the badge row, the chips row and the action row around the text.
+const CHROME_PX = 146;
+
+export type TextBlock = "title" | "rationale" | "quote";
+export type ExpandedBlocks = Partial<Record<TextBlock, boolean>>;
+// Which of a card's blocks are expanded, per card (#81). Absent means every block collapsed.
+export type ExpandedMap = ReadonlyMap<CardId, ExpandedBlocks>;
+
+function lineCount(text: string, perLine: number): number {
+  return Math.max(1, Math.ceil(text.length / perLine));
+}
+
+function clampedLines(count: number, cap: number): number {
+  return Math.min(count, cap);
+}
+
+// How many lines the block shows at its collapsed clamp, and so whether anything is hidden: a block
+// that fits shows no Expand control (#81).
+export function blockLines(model: CardModel, block: TextBlock): { shown: number; hidden: boolean } {
+  if (model.kind === "finding") {
+    if (block === "title") {
+      const n = lineCount(model.title, TITLE_CHARS);
+      return { shown: clampedLines(n, TITLE_LINES), hidden: n > TITLE_LINES };
+    }
+    const cap = model.written ? RATIONALE_WRITTEN_LINES : RATIONALE_LINES;
+    const n = lineCount(model.rationale, RATIONALE_CHARS);
+    return { shown: clampedLines(n, cap), hidden: n > cap };
+  }
+  const n = lineCount(model.quote, QUOTE_CHARS);
+  return { shown: clampedLines(n, QUOTE_LINES), hidden: n > QUOTE_LINES };
+}
+
+export function cardSize(model: CardModel, expanded: ExpandedBlocks = {}): CardSize {
+  let text = 0;
+  if (model.kind === "finding") {
+    const title = lineCount(model.title, TITLE_CHARS);
+    text += clampedLines(title, expanded.title ? EXPANDED_TITLE_LINES : TITLE_LINES) * TITLE_LINE_PX;
+    const cap = model.written ? RATIONALE_WRITTEN_LINES : RATIONALE_LINES;
+    const rationale = lineCount(model.rationale, RATIONALE_CHARS);
+    text += clampedLines(rationale, expanded.rationale ? EXPANDED_RATIONALE_LINES : cap) * RATIONALE_LINE_PX;
+  } else {
+    const quote = lineCount(model.quote, QUOTE_CHARS);
+    text += clampedLines(quote, expanded.quote ? EXPANDED_QUOTE_LINES : QUOTE_LINES) * QUOTE_LINE_PX;
+  }
+  return { w: CARD_W, h: Math.min(CARD_MAX_H, Math.max(CARD_MIN_H, CHROME_PX + text)) };
 }
 
 // Where a card docks when it is docked by its button, or dropped on the plan region: its category, under
