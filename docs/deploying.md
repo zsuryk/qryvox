@@ -11,6 +11,7 @@ One command per action. Deploys go through `scripts/deploy.sh`; `smoke` is a pla
 | `pnpm deploy:web` | Deploys the frontend. |
 | `pnpm deploy:all` | `api` then `web`, from the same commit — the same two can never be deployed out of order, so production never runs a new frontend against an old backend. |
 | `pnpm smoke` | End-to-end check of the deployed backend: health, open a case, ingest the pack, run the full pipeline, verify the chain. |
+| `pnpm demo:seed -- --base <url>` | Builds the demo state on a deployment through its API: two verified products, three approved personas each. See "Seeding the demo" below. |
 | `pnpm deploy:setup` | One-time: creates and links both Vercel projects, pushes production env vars. |
 
 ## First run on a new machine
@@ -72,6 +73,39 @@ JUDGE_TOKEN=... pnpm smoke              # when the judge-link token is switched 
 It opens a case, ingests the fabricated pack, runs the pipeline in the browser's order
 (extract, decompose, contradictions, compliance, findings), and asserts the chain verifies
 intact. A fresh case and fresh ids every run, so it is safe to re-run after any contract change.
+
+## Seeding the demo
+
+A fresh database holds nothing a judge can look at. `pnpm demo:seed` builds the demo state over the HTTP
+API, the way the browser would, so it runs against any deployment, local or production:
+
+```sh
+pnpm demo:seed -- --base https://qryvox-api.vercel.app --token $JUDGE_TOKEN --web https://qryvox.vercel.app
+pnpm demo:seed -- --base http://localhost:8787      # a local backend, no token
+```
+
+`--token` (or `JUDGE_TOKEN`) is the judge-link token, needed when the backend has `JUDGE_TOKEN` set.
+`--web` only makes the printed case and client links absolute. It spends model tokens: about 6-10 minutes
+on Kimi K3. Run it once, after the model switch (#17), and watch the spend limit.
+
+What it builds, per product (Larkspur revised, then Wrenfield): a case with the pack ingested; the five
+steps (extract, decompose, contradictions, compliance, findings); the product facts (attributes); card
+rationales; and a disposition on every finding on the board. Once both are verified, each persona (Mrs
+Chan, Mr Lee, Ms Wong) gets a profile, a drafted advice with the shelf compared, an explanation, and the
+adviser's approval with `explained_directly`. A refused step (422 grounding, 502) is retried up to 3 times
+under a new `step_run_id`. It ends by verifying each chain and printing the case and client URLs and each
+step's time and tokens.
+
+- **Dispositions.** The answer key (`frontend/public/eval/<pack>/ground-truth.json`) decides: a finding
+  that matches a planted entry (same category, and a quote containing the planted one, as the eval tiles
+  match) is approved; every other finding is dismissed.
+- **Documents.** The PDFs in `frontend/public/pack/` are read with the frontend's own `parseDocument` and
+  pdf.js, so text and hashes equal a browser drop; each hash is checked against the manifest.
+- **Idempotent by product.** A product's case id is derived from its pack id, so a rerun lands on the same
+  case, reads its log, and runs only what is missing. A finished product costs no model call, and a
+  rerun that finds everything built prints "none: everything was already built".
+- Another run of a seed against a database with other cases for the same product name is fine: the shelf
+  takes the latest verified case per product.
 
 ## Constraints worth knowing before demo night
 
