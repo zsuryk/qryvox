@@ -233,6 +233,19 @@ rules' results and not a recommendation; the adviser sees it before approving, s
 sign-off. Only the advised product has a model-written explanation. Advice drafted before #68 has no `shelf`;
 `shelfFor` then reads its alternatives. `alternatives` remains as the suitable entries of a not-suitable advice.
 
+**Client list** — a client's whole-shelf view (#71, ADR-0008): they answer the questionnaire once, at `/start`
+with no product, and the answers are recorded as a `client.profiled` in every verified product's case and drafted
+against each by the rules (no model). Their page, `/list/<client id>`, shows every product ordered suitable,
+needs your adviser, not suitable, each with its verdict as a sentence ("suits you" or "does not suit you"), one or
+two deciding reasons with citation chips (a rule's repeated reasons are one row: `groupReasons`), and a filter for
+"only the ones that suit me". Opening a product runs one explain on that product's advice, in the client's
+language, then; unopened products cost nothing. The adviser decides the whole list in one decision
+(`POST /clients/:id/decision`), which lands as an `advice.decided` on each product's own log.
+
+**Adviser's pick** — one suitable product the adviser marks when approving a client list, recorded as
+`adviser_pick` on that advice's decision (additive). It is the only product the client's page calls
+"recommended": a recommendation is the adviser's act under the SFC regime, while the list is the rules' result.
+
 **Document version** — a document ingested again under the same `document_id` (a product update, e.g.
 Larkspur v2) replaces the earlier version for every later step and in the fold; the earlier stays in the
 log. A new attributes run then supersedes advice drafted on the old one.
