@@ -69,8 +69,40 @@ export const DecideAdviceRequest = z.object({
   decision: AdviceDecision,
   reason: RejectionReason.optional(),
   confirmations: z.array(DecisionConfirmation).optional(),
+  // #71: mark this approved, suitable product as the adviser's pick. Refused on anything else.
+  adviser_pick: z.boolean().optional(),
 });
 export type DecideAdviceRequest = z.infer<typeof DecideAdviceRequest>;
+
+// --- The client's list (#71, ADR-0008): one questionnaire, every verified product. ---
+
+// POST /clients — a client's answers, given once on /start, recorded as a client.profiled in every verified
+// product's case and drafted against each. event_id is the browser's: every event the call appends takes an
+// id derived from it and the case, so a retry after a partial failure finishes the rest and appends nothing twice.
+export const RecordClientListRequest = z.object({ event_id: z.uuid(), profile: ClientProfile });
+export type RecordClientListRequest = z.infer<typeof RecordClientListRequest>;
+
+// One product of a client's list: the case it was verified in, and the advice drafted there for the client.
+export const ClientListProduct = z.object({ case_id: z.string().min(1), advice_id: z.uuid() });
+export type ClientListProduct = z.infer<typeof ClientListProduct>;
+export const ClientListResponse = z.object({ client_id: z.string().min(1), products: z.array(ClientListProduct) });
+export type ClientListResponse = z.infer<typeof ClientListResponse>;
+
+// GET /clients/:clientId — the cases that hold this client's answers: where the list's products are read from.
+export const ClientCasesResponse = z.object({ client_id: z.string().min(1), case_ids: z.array(z.string().min(1)) });
+export type ClientCasesResponse = z.infer<typeof ClientCasesResponse>;
+
+// POST /clients/:clientId/decision — the adviser decides the client's whole list in one decision: every
+// advice of theirs in play is approved (or rejected, with the one reason). pick_case_id marks one suitable
+// product as the adviser's pick, on approval only.
+export const DecideListRequest = z.object({
+  event_id: z.uuid(),
+  decision: AdviceDecision,
+  reason: RejectionReason.optional(),
+  confirmations: z.array(DecisionConfirmation).optional(),
+  pick_case_id: z.string().min(1).optional(),
+});
+export type DecideListRequest = z.infer<typeof DecideListRequest>;
 
 // The judge-link token (ADR-0001): the demo URL carries ?k=<token>, the browser keeps it in sessionStorage
 // and sends it in this header on every POST /cases/:caseId/steps. A backend with JUDGE_TOKEN set refuses an

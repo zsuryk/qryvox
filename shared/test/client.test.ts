@@ -284,3 +284,27 @@ describe("a vulnerable client (#42)", () => {
     expect(state.advice[0]!.decision).toMatchObject({ decision: "rejected", reason: "needs_discussion_first", confirmations: [] });
   });
 });
+
+describe("the adviser's pick (#71)", () => {
+  it("is carried through the fold from the decision that made it, and is false on every older decision", () => {
+    const profiledAt = events.length + 1;
+    const picked = fold(after(
+      { type: "client.profiled", payload: chan },
+      { type: "advice.drafted", payload: draft(profiledAt), event_id: ADVICE_ID },
+      { type: "advice.decided", payload: { advice_id: ADVICE_ID, decision: "approved", adviser_pick: true } },
+    ));
+    expect(picked.advice[0]!.decision).toMatchObject({ decision: "approved", adviserPick: true });
+
+    const plain = fold(after(
+      { type: "client.profiled", payload: chan },
+      { type: "advice.drafted", payload: draft(profiledAt), event_id: ADVICE_ID },
+      { type: "advice.decided", payload: { advice_id: ADVICE_ID, decision: "approved" } },
+    ));
+    expect(plain.advice[0]!.decision).toMatchObject({ adviserPick: false });
+  });
+
+  it("still folds the recorded case, whose decisions know nothing of a pick", () => {
+    const decided = fold(events).advice.filter((a) => a.decision !== null);
+    expect(decided.every((a) => a.decision!.adviserPick === false)).toBe(true);
+  });
+});

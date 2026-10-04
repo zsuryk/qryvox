@@ -162,6 +162,27 @@ export function decidingReasons(reasons: readonly Reason[]): Reason[] {
   return [...of("blocks"), ...of("conditional"), ...of("warns")];
 }
 
+// Verdicts in the order a client's list shows them (#71): what suits first, then what needs the adviser,
+// then what does not suit.
+export const VERDICT_ORDER: Record<Verdict, number> = { suitable: 0, conditional: 1, not_suitable: 2 };
+
+// Reasons of one rule and one effect shown as one row (#71): Mrs Chan's three S4 blocks are one thing to
+// read, with three passages behind it. Rows keep the order the reasons came in; a passage two reasons share
+// is listed once; a reason nothing speaks to adds no passage.
+export type ReasonGroup = { rule: Reason["rule"]; effect: ReasonEffect; reasons: Reason[]; citations: Citation[] };
+
+export function groupReasons(reasons: readonly Reason[]): ReasonGroup[] {
+  const groups: ReasonGroup[] = [];
+  for (const reason of reasons) {
+    let group = groups.find((g) => g.rule === reason.rule && g.effect === reason.effect);
+    if (!group) groups.push((group = { rule: reason.rule, effect: reason.effect, reasons: [], citations: [] }));
+    group.reasons.push(reason);
+    const c = reason.citation;
+    if (c && !group.citations.some((o) => o.document_id === c.document_id && o.page === c.page && o.quote === c.quote)) group.citations.push(c);
+  }
+  return groups;
+}
+
 // --- Explanation (the explain step, #30) ---
 
 // What a passage explains: "r<i>" is reasons[i], "d<i>" is disclosures[i] of the advice.

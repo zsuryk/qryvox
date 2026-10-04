@@ -152,6 +152,7 @@ function apply(state: CaseState, event: SlimEvent): CaseState {
                   decidedAtSeq: event.seq,
                   reason: event.payload.reason ?? null,
                   confirmations: event.payload.confirmations ?? [],
+                  adviserPick: event.payload.adviser_pick ?? false,
                 },
               }
             : a,

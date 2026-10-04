@@ -72,6 +72,8 @@ export type CaseAdvice = Advice & {
     decidedAtSeq: number;
     reason: RejectionReason | null;
     confirmations: DecisionConfirmation[];
+    // The adviser marked this product as their pick when approving the client's list (#71).
+    adviserPick: boolean;
   } | null;
 };
 

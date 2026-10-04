@@ -8,6 +8,7 @@ import {
   type Finding,
   fold,
   GroundTruth,
+  groupReasons,
   PersonaSet,
   productRiskLevel,
   type Reason,
@@ -218,6 +219,31 @@ describe("the shelf comparison an advice carries (#68)", () => {
     const ranks = deciding.map((r) => order.indexOf(r.effect));
     expect(ranks).toEqual([...ranks].sort());
     expect(deciding.filter((r) => r.effect === "blocks").map((r) => r.rule)).toHaveLength(5);
+  });
+
+  it("shows the repeated reasons of one rule as one row, with each distinct passage behind it (#71)", () => {
+    const { reasons } = assessSuitability(chan, larkspurAttributes, findings);
+    const deciding = decidingReasons(reasons);
+    const groups = groupReasons(deciding);
+
+    // Mrs Chan's liquidity blocks are several reasons under S4: one row, every passage kept once.
+    const s4 = deciding.filter((r) => r.rule === "S4" && r.effect === "blocks");
+    expect(s4.length).toBeGreaterThan(1);
+    expect(groups.filter((g) => g.rule === "S4" && g.effect === "blocks")).toHaveLength(1);
+    const group = groups.find((g) => g.rule === "S4")!;
+    expect(group.reasons).toEqual(s4);
+    const quotes = group.citations.map((c) => c.quote);
+    expect(new Set(quotes).size).toBe(quotes.length);
+    expect(groups.length).toBeLessThan(deciding.length);
+    // Nothing is lost: every reason is in exactly one row.
+    expect(groups.flatMap((g) => g.reasons)).toHaveLength(deciding.length);
+  });
+
+  it("keeps a block and a warning of the same rule apart, in the order they came", () => {
+    const reason = (effect: "blocks" | "warns", rule: "S3" | "S4"): Reason => ({ rule, effect, profile_field: "goal", citation: null });
+    const groups = groupReasons([reason("blocks", "S4"), reason("warns", "S3"), reason("warns", "S4"), reason("blocks", "S4")]);
+    expect(groups.map((g) => `${g.rule}:${g.effect}:${g.reasons.length}`)).toEqual(["S4:blocks:2", "S3:warns:1", "S4:warns:1"]);
+    expect(groups.every((g) => g.citations.length === 0)).toBe(true);
   });
 
   it("accepts an entry whatever its verdict, and refuses one whose verdict is not what its reasons amount to", () => {

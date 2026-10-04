@@ -204,6 +204,9 @@ export const AdviceDecided = z.object({
     // before them still parse.
     reason: RejectionReason.optional(),
     confirmations: z.array(DecisionConfirmation).optional(),
+    // #71: the adviser's pick, on the approval of one suitable product in a client's list. It is the only
+    // thing the client's page calls "recommended". Optional, so decisions recorded before it still parse.
+    adviser_pick: z.boolean().optional(),
   }),
 });
 
