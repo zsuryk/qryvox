@@ -22,6 +22,8 @@ export type StepDefinition<Input, Output extends Record<string, unknown>, Reply 
   // Only on the steps find-similar re-runs: the documents a seed's quote must appear in, on its page.
   seedDocuments?(input: Input): readonly IngestedDocument[];
   output: z.ZodType<Reply>;
+  // A reply that fails grounding gets one more attempt inside the same run, with the refusal reason fed back (#78).
+  retryOnRefusal?: boolean;
   // Checks the parsed reply against the input (e.g. quotes really appear on the cited page).
   // Returns the output to store, or an error that fails the run.
   ground(reply: Reply, input: Input): { output: Output } | { error: string };

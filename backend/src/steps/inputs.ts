@@ -103,8 +103,14 @@ export function seedPassage(documents: readonly IngestedDocument[], seed: Citati
 // Punctuation at the very ends is the sentence's, not the source's: a model writes "…of the Fund," with its
 // own comma inside the quotation marks, or adds a full stop a table cell never had (Kimi K3 did both). Only
 // the ends are trimmed; anything that changes the words inside still fails.
+// Pairs are taken in order, short or long, and only then kept by length: a short quoted word ("income") must
+// not leave its closing mark to pair with the next opening one, which made the sentence between two real
+// quotations look like a quotation of its own and refused a faithful text (#78).
 export function quotations(text: string): string[] {
-  return [...text.matchAll(/["“]([^"”]{8,})["”]/g)].map((m) => m[1]!.replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g, ""));
+  return [...text.matchAll(/["“]([^"”]*)["”]/g)]
+    .map((m) => m[1]!)
+    .filter((inside) => inside.length >= 8)
+    .map((inside) => inside.replace(/^[\s.,;:!?]+|[\s.,;:!?]+$/g, ""));
 }
 
 // Whether a quotation is in one of the passages it may come from, ignoring whitespace and case.

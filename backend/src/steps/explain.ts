@@ -27,6 +27,9 @@ import { StepPrecondition, type StepDefinition } from "./step.js";
 // explain@2 (#67): the client's page already headlines the verdict right above the summary, so the summary
 // starts from the main reason instead of saying the verdict again, and a summary that opens with the
 // headline is refused.
+// explain@3 (#78): Kimi K3 was refused too often by the checks (computed gaps, "5y", paraphrases in quotation marks).
+// The checks are unchanged; the prompt now states them, each item lists the numbers it may state, and a refused
+// first attempt gets one retry inside the same run with the refusal reason fed back (retryOnRefusal).
 
 // One reason or disclosure of the advice, as the model sees it and the checks hold it to.
 type Item = {
@@ -68,17 +71,20 @@ For each reader write:
 - summary: one or two sentences saying, in general terms, why the verdict is what it is. The client already reads the verdict as a headline right above the summary, so never restate it: start from the main reason, in words. Write no numbers in the summary, not even the client's own; the passages give the figures.
 - passages: exactly one passage for every item you are given (reasons r0, r1, … and disclosures d0, d1, …), with that item's ref.
 
-Each passage explains only its own item:
+Each passage explains only its own item. The reply is checked mechanically against the advice, and a reply that fails any check is thrown away, so keep to these rules exactly:
 - Use only the facts given for that item. Do not mention any other rule, document, product or fact.
-- When you quote the document, copy the words exactly and put them in double quotes.
-- Any number you write must appear in that item's quote or be the client's own answer given for it.
-- Never compute anything, compare returns, predict performance or recommend another product.
+- Quotation marks are only for words copied letter for letter from one place: that item's quote line, its rule text, or the client's answer. Copy one unbroken stretch: no "…", no joining two pieces, no changed word, no added word. Never put your own wording, the outcome, a document's name or a paraphrase inside quotation marks. When in doubt, say it in your own words with no quotation marks at all.
+- Numbers: each item lists the numbers you may write. Write a number only as it appears in that item's quote or the client's answer, and only when it is on that list. Never calculate: no differences, sums, ratios, averages or percentages of percentages; if the item gives two fees, say which is higher or lower in words, never by how much. Never round, convert or restate a number in another form.
+- Never abbreviate: write "five years" as the quote has it, never "5y", "5 yrs" or "5 yr"; write "per annum", "percent" and "months" out as the source does.
+- Write no number that is not on the list, not even a year, a count or a page unless the list has it. The summaries contain no digits at all.
+- Never predict performance, compare returns, or recommend another product.
 
 Respond with only a JSON object and no other text, in exactly this shape:
 {"depths":{"novice":{"summary":"…","passages":[{"ref":"r0","text":"…"}]},"informed":{…},"expert":{…}}}`;
 
 export const explain: StepDefinition<ExplainInput, Explanation, ExplainReply> = {
   name: "explain",
+  retryOnRefusal: true,
 
   async loadInput(db, caseId, inputRunId, _intent, requested) {
     if (inputRunId === null) throw new StepPrecondition("explain needs input_run_id: the id of the advice to explain");
@@ -188,11 +194,21 @@ function firstSentence(text: string): string {
 
 const sentence = (text: string) => normalize(text).replace(/[\s.!?。！？]+$/u, "").toLowerCase();
 
+// What the model is told about the numbers an item may state: exactly the set the check holds it to.
+const allowed = (numbers: Set<string>) =>
+  numbers.size === 0 ? "  numbers you may write: none" : `  numbers you may write (only as written in the quote or answer, never computed): ${[...numbers].join(", ")}`;
+
 function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttributes, findings: readonly CaseFinding[]): Item[] {
   const reasons = advice.reasons.map((reason, i): Item => {
     const rule = ruleById(reason.rule);
     const answer = client.profile[reason.profile_field];
     const productLevel = reason.rule === "S2" ? productRiskLevel(attributes) : null;
+    const numbers = numbersIn(
+      reason.citation?.quote ?? null,
+      reason.citation?.page ?? null,
+      Array.isArray(answer) ? answer.join(" ") : String(answer),
+      productLevel,
+    );
     return {
       ref: `r${i}`,
       rules: [reason.rule],
@@ -204,12 +220,7 @@ function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttrib
         rule.title,
         rule.text,
       ],
-      numbers: numbersIn(
-        reason.citation?.quote ?? null,
-        reason.citation?.page ?? null,
-        Array.isArray(answer) ? answer.join(" ") : String(answer),
-        productLevel,
-      ),
+      numbers,
       brief: [
         `- r${i}: rule ${reason.rule} "${rule.title}": ${rule.text}`,
         `  outcome: ${reason.effect}`,
@@ -218,6 +229,7 @@ function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttrib
         reason.citation
           ? `  quote (${reason.citation.document_id}, page ${reason.citation.page}): "${reason.citation.quote}"`
           : "  quote: none; nothing in the documents speaks to this",
+        allowed(numbers),
       ]
         .filter((l) => l !== null)
         .join("\n"),
@@ -227,15 +239,17 @@ function items(advice: CaseAdvice, client: CaseClient, attributes: ProductAttrib
     const finding = findings.find((f) => f.finding_id === d.finding_id);
     const sides = [d.citation, ...(finding ? [finding.citation, finding.counterpart] : [])].filter((c) => c !== null);
     const unique = sides.filter((c, j) => sides.findIndex((o) => o.quote === c.quote) === j);
+    const numbers = numbersIn(...unique.flatMap((c) => [c.quote, c.page]));
     return {
       ref: `d${i}`,
       rules: [d.rule, ...(finding?.rule ? [finding.rule] : [])],
       documents: unique.map((c) => c.document_id),
       quotes: [...unique.map((c) => c.quote), ruleById(d.rule).title, ruleById(d.rule).text, ...(finding?.rule ? [ruleById(finding.rule).title, ruleById(finding.rule).text] : [])],
-      numbers: numbersIn(...unique.flatMap((c) => [c.quote, c.page])),
+      numbers,
       brief: [
         `- d${i}: disclosure under rule ${d.rule}: ${finding?.claim ?? d.finding_id}`,
         ...unique.map((c) => `  quote (${c.document_id}, page ${c.page}): "${c.quote}"`),
+        allowed(numbers),
       ].join("\n"),
     };
   });

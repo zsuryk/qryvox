@@ -3,7 +3,7 @@ import { ANALYST_ACTOR, type Citation, PROMPT_VERSIONS, type RunStepRequest, typ
 import type { Db } from "../db/client.js";
 import type { EventRow } from "../db/schema.js";
 import { checkRateLimit, type RateLimits } from "../guards.js";
-import { extractJson, LlmError, type Llm } from "../llm.js";
+import { type ChatMessage, extractJson, LlmError, type Llm } from "../llm.js";
 import { append, EventIdConflict, type EventDraft, findCompletedRun, isUniqueViolation, listEventsOfType, type Tx } from "../log.js";
 import { attributes } from "./attributes.js";
 import { compliance } from "./compliance.js";
@@ -79,18 +79,36 @@ export async function runStep(
     return { status, body: { error, step_run_id: req.step_run_id, seq: row!.seq } };
   };
 
+  // A step that opts in (explain, #78) gets one more attempt when its reply is refused for not parsing or not
+  // grounding: the same run, the same step_run_id, one step.started, and the refusal reason fed back to the
+  // model. The refused attempt is kept in raw_response as {attempts: [...], raw_response} on whatever the run
+  // records next, so the log shows both attempts while the client only ever sees the run's final outcome. A
+  // model that cannot be reached is not retried.
+  const messages = step.messages(input, seed);
+  const attempts: { error: string; raw_response: unknown }[] = [];
+  const recorded = (raw: unknown) => (attempts.length === 0 ? raw : { attempts, raw_response: raw });
   let completion;
-  try {
-    completion = await llm.complete(step.messages(input, seed));
-  } catch (err) {
-    if (!(err instanceof LlmError)) throw err;
-    return fail(502, err.message, err.raw);
+  let grounded: { output: Record<string, unknown> };
+  for (;;) {
+    try {
+      completion = await llm.complete(
+        attempts.length === 0 ? messages : [...messages, ...retryTurn(completion!.content, attempts.at(-1)!.error)],
+      );
+    } catch (err) {
+      if (!(err instanceof LlmError)) throw err;
+      return fail(502, err.message, recorded(err.raw));
+    }
+    const parsed = step.output.safeParse(extractJson(completion.content));
+    const result: { output: Record<string, unknown> } | { error: string } = parsed.success
+      ? step.ground(parsed.data, input)
+      : { error: `model output did not match the ${req.step} schema` };
+    if (!("error" in result)) {
+      grounded = result;
+      break;
+    }
+    if (!step.retryOnRefusal || attempts.length > 0) return fail(422, result.error, recorded(completion.raw));
+    attempts.push({ error: result.error, raw_response: completion.raw });
   }
-
-  const parsed = step.output.safeParse(extractJson(completion.content));
-  if (!parsed.success) return fail(422, `model output did not match the ${req.step} schema`, completion.raw);
-  const grounded = step.ground(parsed.data, input);
-  if ("error" in grounded) return fail(422, grounded.error, completion.raw);
 
   const created = step.toFindings?.(grounded.output) ?? [];
   try {
@@ -99,7 +117,7 @@ export async function runStep(
         ...draft,
         eventId: randomUUID(),
         type: "step.completed",
-        payload: { ...run, output: grounded.output, raw_response: completion.raw },
+        payload: { ...run, output: grounded.output, raw_response: recorded(completion.raw) },
       },
       // Read inside the transaction, so two findings runs completing together cannot both stay on the board.
       ...(step.toFindings ? await supersededBy(tx, caseId, draft) : []),
@@ -113,6 +131,17 @@ export async function runStep(
     if (!winner) throw err;
     return completedOutcome(winner, req);
   }
+}
+
+// The turn that asks a model to try again: its own refused reply, then why it was refused.
+function retryTurn(reply: string, error: string): ChatMessage[] {
+  return [
+    { role: "assistant", content: reply },
+    {
+      role: "user",
+      content: `Your reply was refused by the checks: ${error}.\nWrite the whole reply again as the same JSON object, fixing exactly those problems and keeping every rule above.`,
+    },
+  ];
 }
 
 // The seed as the run records it, once its quote is found on its cited page of the documents the step

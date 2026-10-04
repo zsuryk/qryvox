@@ -11,6 +11,7 @@ import {
 } from "@qryvox/shared";
 import { describe, expect, it } from "vitest";
 import type { ChatMessage } from "../src/llm";
+import { listEventsOfType } from "../src/log";
 import { setup, type TestApp } from "./helpers";
 import { larkspurLlm, pack } from "./larkspur";
 
@@ -96,14 +97,14 @@ async function refused(fn: (passages: Depth["passages"], depth: Depth) => void) 
 }
 
 describe("the explain step", () => {
-  it("stores all three depths for the advice under explain@2", async () => {
+  it("stores all three depths for the advice under explain@3", async () => {
     const { t, caseId, adviceId, advice } = await chanAdvice();
     reply = { depths: faithful(advice) };
 
     const res = await explainCall(t, caseId, adviceId);
     expect(res.status, await res.clone().text()).toBe(200);
     const result = StepResult.parse(await res.json());
-    expect(result.prompt_version).toBe("explain@2");
+    expect(result.prompt_version).toBe("explain@3");
     const explanation = Explanation.parse(result.output);
     expect(explanation.advice_id).toBe(adviceId);
     expect(explanation.depths.novice.passages).toHaveLength(advice.reasons.length + advice.disclosures.length);
@@ -384,5 +385,139 @@ describe("what it explains", () => {
 
     await t.request("POST", `/cases/${caseId}/clients`, { event_id: randomUUID(), profile: { ...chan, horizon_years: 6 } });
     expect((await explainCall(t, caseId, adviceId)).status).toBe(409);
+  });
+});
+
+describe("fewer refusals of a faithful text (#78)", () => {
+  it("states the real rules in the prompt: no arithmetic, numbers as written, exact quotes, no abbreviated units", async () => {
+    let system = "";
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    answer = (messages) => {
+      system = messages[0]!.content;
+      return { depths: faithful(advice) };
+    };
+    try {
+      expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+    } finally {
+      answer = () => reply;
+    }
+    expect(system).toMatch(/Never calculate/);
+    expect(system).toMatch(/only as it appears in that item's quote or the client's answer/);
+    expect(system).toMatch(/Never put your own wording.*inside quotation marks/);
+    expect(system).toMatch(/"5y"/);
+    expect(system).toMatch(/summaries contain no digits/);
+  });
+
+  it("lists, for every item, exactly the numbers it may state", async () => {
+    let sent = "";
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    answer = (messages) => {
+      sent = messages.at(-1)!.content;
+      return { depths: faithful(advice) };
+    };
+    try {
+      expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+    } finally {
+      answer = () => reply;
+    }
+    const lines = sent.split("\n").filter((l) => l.includes("numbers you may write"));
+    expect(lines).toHaveLength(advice.reasons.length + advice.disclosures.length);
+    // r0: the horizon rule, quote "at least five years", the client's two years, page 1.
+    const r0 = sent.split("\n- ").find((b) => b.startsWith("r0:"))!;
+    expect(r0).toMatch(/numbers you may write[^\n]*: (?=[^\n]*\b5\b)(?=[^\n]*\b2\b)/);
+    const exit = sent.split("\n- ").find((b) => b.includes("2.00%"))!;
+    expect(exit).toMatch(/numbers you may write[^\n]*\b2\b/);
+  });
+
+  it("refuses a number the model computed from two it was given (the gap between two fees)", async () => {
+    expect(await refused((p) => (p[0]!.text = "The fee table is 0.40 higher than the factsheet."))).toMatch(/r0 states 0.40/);
+  });
+
+  it("refuses an abbreviated unit, which states a number the quote only spells out", async () => {
+    expect(await refused((p) => (p[0]!.text = "A 7y fund."))).toMatch(/r0 states 7/);
+  });
+
+  it("pairs quotation marks in order: a short quoted word does not turn the text after it into a quotation", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    const quote = advice.reasons[0]!.citation!.quote;
+    reply = bend(advice, (p) => (p[0]!.text = `You said "own" is not enough, and the document says: "${quote}" Two years is short.`));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+    // ...while a made-up quotation after a short one is still caught.
+    reply = bend(advice, (p) => (p[0]!.text = `You said "own", and the document says "guaranteed growth every single year" as well.`));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(422);
+  });
+
+  it("refuses a quotation that joins two stretches of the citation", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    reply = bend(advice, (p) => (p[0]!.text = 'The fund "aims to provide a regular income ... over at least five years" it says.'));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(422);
+  });
+});
+
+describe("one retry inside the same run, with the refusal reason fed back (#78)", () => {
+  const eventsOf = async (t: TestApp, caseId: string) => EventPage.parse(await (await t.request("GET", `/cases/${caseId}/events`)).json()).events;
+
+  it("completes the run when the second attempt holds, recording both attempts on the one completed event", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    const bad = bend(advice, (p) => (p[0]!.text = "A fund that is dearer by 99."));
+    const good = { depths: faithful(advice) };
+    const calls: ChatMessage[][] = [];
+    answer = (messages) => {
+      calls.push(messages);
+      return calls.length === 1 ? bad : good;
+    };
+    try {
+      const res = await explainCall(t, caseId, adviceId);
+      expect(res.status, await res.clone().text()).toBe(200);
+    } finally {
+      answer = () => reply;
+    }
+    expect(calls).toHaveLength(2);
+    const retry = calls[1]!;
+    expect(retry.at(-2)).toMatchObject({ role: "assistant" });
+    expect(retry.at(-1)!.content).toMatch(/refused by the checks: the explanation does not hold to the advice: .*r0 states 99/);
+
+    const events = (await eventsOf(t, caseId)).filter((e) => e.type.startsWith("step.") && (e.payload as { step?: string }).step === "explain");
+    expect(events.map((e) => e.type)).toEqual(["step.started", "step.completed"]);
+    // raw_response is kept on the log, not sent on the wire: read it from the stored event.
+    const stored = await listEventsOfType(t.database.db, caseId, "step.completed");
+    const raw = (stored.find((r) => (r.payload as { step: string }).step === "explain")!.payload as { raw_response: { attempts: { error: string }[]; raw_response: unknown } }).raw_response;
+    expect(raw.attempts).toHaveLength(1);
+    expect(raw.attempts[0]!.error).toMatch(/r0 states 99/);
+    expect(raw.raw_response).toBeDefined();
+  });
+
+  it("fails the run, once, when the second attempt is refused too", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    let n = 0;
+    answer = () => {
+      n += 1;
+      return bend(advice, (p) => (p[0]!.text = `Attempt ${n}: you would wait 77 years.`));
+    };
+    try {
+      const res = await explainCall(t, caseId, adviceId);
+      expect(res.status).toBe(422);
+      expect(StepFailure.parse(await res.json()).error).toMatch(/r0 states 77/);
+    } finally {
+      answer = () => reply;
+    }
+    expect(n).toBe(2);
+    const events = (await eventsOf(t, caseId)).filter((e) => e.type.startsWith("step.") && (e.payload as { step?: string }).step === "explain");
+    expect(events.map((e) => e.type)).toEqual(["step.started", "step.failed"]);
+  });
+
+  it("does not retry a run that was faithful the first time", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    let n = 0;
+    answer = () => {
+      n += 1;
+      return { depths: faithful(advice) };
+    };
+    try {
+      expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+    } finally {
+      answer = () => reply;
+    }
+    expect(n).toBe(1);
   });
 });
