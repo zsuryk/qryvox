@@ -1,5 +1,4 @@
 import {
-  type Alternative,
   ANALYST_ACTOR,
   assessSuitability,
   type CaseState,
@@ -7,6 +6,7 @@ import {
   type DecideAdviceRequest,
   ProductAttributes,
   RULES_VERSION,
+  type ShelfEntry,
   undismissedFindings,
   vulnerability,
 } from "@qryvox/shared";
@@ -72,8 +72,13 @@ export function draftAdvice(db: Db, caseId: string, eventId: string, clientId: s
 
     const attributes = await attributesOf(tx, caseId, run);
     const assessment = assessSuitability(client.profile, attributes, undismissedFindings(state));
+    // Every other verified product is assessed for this client, whatever the verdict (#68): the same rules,
+    // no model, so showing the whole shelf costs nothing. The alternatives are its suitable entries.
+    const compared = await shelfComparison(tx, caseId, attributes, client.profile);
     const alternatives =
-      assessment.verdict === "suitable" ? undefined : await alternativesFor(tx, caseId, attributes, client.profile);
+      assessment.verdict === "suitable"
+        ? undefined
+        : compared.filter((e) => e.verdict === "suitable").map((e) => ({ ...e, verdict: "suitable" as const }));
     return {
       payload: {
         client_id: clientId,
@@ -82,6 +87,7 @@ export function draftAdvice(db: Db, caseId: string, eventId: string, clientId: s
         ...assessment,
         rules_version: RULES_VERSION,
         ...(alternatives ? { alternatives } : {}),
+        shelf: compared,
       },
       companions: current.map((a) => supersede(a.adviceId, "product_changed")),
     };
@@ -144,22 +150,19 @@ async function shelf(tx: Tx, caseId: string, own: ProductAttributes) {
   return [...products.values()];
 }
 
-// The products on the shelf the same rules find suitable for this client, each with its own reasons,
-// disclosures and citations. Empty when none fits: the advice then says so.
-async function alternativesFor(tx: Tx, caseId: string, own: ProductAttributes, profile: ClientProfile): Promise<Alternative[]> {
-  return (await shelf(tx, caseId, own)).flatMap((product) => {
+// The shelf as the rules find it for this client: every other verified product with its verdict, its own
+// reasons, disclosures and citations. Empty only when nothing else is verified.
+async function shelfComparison(tx: Tx, caseId: string, own: ProductAttributes, profile: ClientProfile): Promise<ShelfEntry[]> {
+  return (await shelf(tx, caseId, own)).map((product) => {
     const assessment = assessSuitability(profile, product.attributes, undismissedFindings(product.state));
-    if (assessment.verdict !== "suitable") return [];
-    return [
-      {
-        case_id: product.caseId,
-        product_name: product.attributes.product_name!.value,
-        attributes_run_id: product.runId,
-        verdict: "suitable" as const,
-        reasons: assessment.reasons,
-        disclosures: assessment.disclosures,
-      },
-    ];
+    return {
+      case_id: product.caseId,
+      product_name: product.attributes.product_name!.value,
+      attributes_run_id: product.runId,
+      verdict: assessment.verdict,
+      reasons: assessment.reasons,
+      disclosures: assessment.disclosures,
+    };
   });
 }
 

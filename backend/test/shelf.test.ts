@@ -107,3 +107,62 @@ describe("advice that points along the shelf", () => {
     expect((await advise(t, wrenfield, lee))).toMatchObject({ verdict: "not_suitable", alternatives: [] });
   });
 });
+
+describe("advice that compares the whole shelf (#68)", () => {
+  it("gives every verdict a shelf: Mr Lee's carries Wrenfield with the verdict the rules reach, though it is no alternative", async () => {
+    const t = await setup({ llm: shelfLlm() });
+    const larkspur = await verify(t, larkspurPack);
+    const wrenfield = await verify(t, wrenfieldPack);
+
+    const advice = await advise(t, larkspur, lee);
+
+    expect(advice.alternatives).toEqual([]);
+    expect(advice.shelf).toHaveLength(1);
+    const [entry] = advice.shelf!;
+    expect(entry).toMatchObject({ case_id: wrenfield, product_name: "Wrenfield Short Duration Fund", verdict: "not_suitable" });
+    expect(entry!.reasons.some((r) => r.effect === "blocks")).toBe(true);
+  });
+
+  it("shows Mrs Chan Wrenfield as suitable, the same entry her alternatives hold", async () => {
+    const t = await setup({ llm: shelfLlm() });
+    const larkspur = await verify(t, larkspurPack);
+    await verify(t, wrenfieldPack);
+
+    const advice = await advise(t, larkspur, chan);
+
+    expect(advice.shelf!.map((e) => `${e.product_name}:${e.verdict}`)).toEqual(["Wrenfield Short Duration Fund:suitable"]);
+    expect(advice.shelf).toEqual(advice.alternatives);
+  });
+
+  it("keeps the shelf for advice that is already suitable, without writing alternatives", async () => {
+    const t = await setup({ llm: shelfLlm() });
+    const larkspur = await verify(t, larkspurPack);
+    await verify(t, wrenfieldPack);
+
+    const advice = await advise(t, larkspur, wong);
+
+    expect(advice.alternatives).toBeUndefined();
+    expect(advice.shelf).toHaveLength(1);
+  });
+
+  it("carries a product that does not suit with its blocking reasons and their citations", async () => {
+    const t = await setup({ llm: shelfLlm() });
+    await verify(t, larkspurPack);
+    const wrenfield = await verify(t, wrenfieldPack);
+
+    const advice = await advise(t, wrenfield, chan);
+    const [larkspurEntry] = advice.shelf!;
+
+    expect(larkspurEntry).toMatchObject({ verdict: "not_suitable" });
+    const blocks = larkspurEntry!.reasons.filter((r) => r.effect === "blocks");
+    expect(blocks.length).toBeGreaterThan(0);
+    expect(blocks.every((r) => r.citation !== null)).toBe(true);
+  });
+
+  it("leaves the shelf empty when no other product is verified", async () => {
+    const t = await setup({ llm: shelfLlm() });
+    const larkspur = await verify(t, larkspurPack);
+    expect((await advise(t, larkspur, chan)).shelf).toEqual([]);
+  });
+});
+
