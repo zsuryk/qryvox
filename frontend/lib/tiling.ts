@@ -2,12 +2,12 @@ import type { CardId, WorldPos } from "@qryvox/shared";
 import type { Rect } from "./viewport";
 
 // Auto-tiling (#53): where each card on the canvas goes, in world coordinates, with nothing overlapping.
-// Cards flow left to right in rows of a fixed number of columns from the flow's origin, every card the
-// same size with the same gap, so a card's slot is a matter of arithmetic and never of what the screen
-// shows. A pinned card stays exactly where the analyst put it, and the flow goes around it: a slot that
-// would touch a pinned card, or anything else in the way, is skipped, and the card takes the next free
-// one. Reflowing after a card arrives or leaves therefore moves only unpinned cards, and a new arrival
-// goes on the end, after every card already laid out.
+// Cards flow left to right in rows of a fixed number of columns from the flow's origin, at one gap and
+// one shared width, so a card's column never depends on what the screen shows. A card's height is its
+// own (#79, #80): a row grows to its tallest card. A pinned card stays exactly where the analyst put it,
+// and the flow goes around it: a slot that would touch a pinned card, or anything else in the way, is
+// skipped, and the card takes the next free one. Reflowing after a card arrives or leaves therefore moves
+// only unpinned cards, and a new arrival goes on the end, after every card already laid out.
 //
 // Pure and in world units only: the viewport (lib/viewport.ts) is what turns any of this into pixels.
 
@@ -19,15 +19,24 @@ export const GAP = 24;
 export const FLOW_COLUMNS = 4;
 export const FLOW_ORIGIN: WorldPos = { x: 0, y: 0 };
 
+// A card's size on the flow. Cards share their width (the flow is column-based) but may differ in
+// height: how much a card has to say decides that (#80), and the flow packs each at its own height.
+export type CardSize = { w: number; h: number };
+
+export const CARD_SIZE: CardSize = { w: CARD_W, h: CARD_H };
+
 export type TileOptions = {
   columns?: number;
   origin?: WorldPos;
   // Anything else the flow must keep clear of, such as the plan region.
   obstacles?: readonly Rect[];
+  // Each card's size by id; a card missing here is CARD_SIZE. Defaults to every card CARD_SIZE,
+  // which packs exactly the fixed grid of #53.
+  sizes?: ReadonlyMap<CardId, CardSize>;
 };
 
-export function cardRect(at: WorldPos): Rect {
-  return { x: at.x, y: at.y, w: CARD_W, h: CARD_H };
+export function cardRect(at: WorldPos, size: CardSize = CARD_SIZE): Rect {
+  return { x: at.x, y: at.y, w: size.w, h: size.h };
 }
 
 // Whether two rectangles come closer than `clearance` to each other. Touching at exactly the clearance is
@@ -44,22 +53,48 @@ export function slotRect(k: number, { columns = FLOW_COLUMNS, origin = FLOW_ORIG
 // Lay out `order` — every card on the canvas, in the order they arrived — around the pinned ones. The
 // result has a rectangle for every card in `order`, pinned cards at their pins.
 export function tile(order: readonly CardId[], pins: ReadonlyMap<CardId, WorldPos>, options: TileOptions = {}): Map<CardId, Rect> {
+  const { columns = FLOW_COLUMNS, origin = FLOW_ORIGIN, sizes } = options;
+  const sizeOf = (id: CardId): CardSize => sizes?.get(id) ?? CARD_SIZE;
   const placed = new Map<CardId, Rect>();
   const occupied: Rect[] = [...(options.obstacles ?? [])];
   for (const id of order) {
     const pin = pins.get(id);
     if (pin) {
-      placed.set(id, cardRect(pin));
-      occupied.push(cardRect(pin));
+      const rect = cardRect(pin, sizeOf(id));
+      placed.set(id, rect);
+      occupied.push(rect);
     }
   }
-  let k = 0;
+  // Row-flow packing: each row is filled left to right with up to `columns` cards, and the row is as
+  // tall as its tallest card. A slot a pinned card or obstacle would touch is skipped, exactly as the
+  // fixed grid skipped it. With every card CARD_SIZE this advances exactly like the slot index, so the
+  // uniform layout is unchanged.
+  let column = 0;
+  let rowY = origin.y;
+  let rowH = 0;
   for (const id of order) {
     if (placed.has(id)) continue;
-    let rect = slotRect(k, options);
-    while (occupied.some((o) => overlaps(o, rect, GAP))) rect = slotRect(++k, options);
-    placed.set(id, rect);
-    k += 1;
+    const rect = () => ({ x: origin.x + column * (CARD_W + GAP), y: rowY, w: sizeOf(id).w, h: sizeOf(id).h });
+    let candidate = rect();
+    for (;;) {
+      if (!occupied.some((o) => overlaps(o, candidate, GAP))) break;
+      column += 1;
+      if (column === columns) {
+        column = 0;
+        rowY += rowH + GAP;
+        rowH = 0;
+      }
+      candidate = rect();
+    }
+    placed.set(id, candidate);
+    occupied.push(candidate);
+    rowH = Math.max(rowH, candidate.h);
+    column += 1;
+    if (column === columns) {
+      column = 0;
+      rowY += rowH + GAP;
+      rowH = 0;
+    }
   }
   return placed;
 }

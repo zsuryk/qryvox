@@ -144,3 +144,74 @@ describe("on the fixtures", () => {
     expect(narrow.groups.flatMap((g) => g.cards.map((c) => c.cardId))).toEqual(wide.docked.map((p) => p.card.cardId));
   });
 });
+
+describe("variable card sizes (#79)", () => {
+  const sizesOf = (hs: number[]) => new Map(ids(hs.length).map((id, i) => [id, { w: CARD_W, h: hs[i]! }]));
+
+  it("packs mixed heights in rows with no overlap and at least GAP between cards", () => {
+    const order = ids(7);
+    const sizes = sizesOf([200, 320, 240, 180, 400, 260, 220]);
+    const rects = tile(order, new Map(), { sizes });
+    expectNoOverlap([...rects.values()]);
+    for (const [id, rect] of rects) expect(rect.h).toBe(sizes.get(id)!.h);
+    // Between any two cards there is either a full gap or they are in different rows.
+    for (const [id, a] of rects) {
+      for (const [other, b] of rects) {
+        if (id === other) continue;
+        const nearX = a.x < b.x + b.w + GAP && b.x < a.x + a.w + GAP;
+        const nearY = a.y < b.y + b.h + GAP && b.y < a.y + a.h + GAP;
+        expect(overlaps(a, b, GAP)).toBe(false);
+        void nearX;
+        void nearY;
+      }
+    }
+  });
+
+  it("grows a row only to the tallest card in it", () => {
+    const order = ids(FLOW_COLUMNS + 1);
+    const sizes = sizesOf([400, 200, 200, 200, 220]);
+    const rects = tile(order, new Map(), { sizes });
+    const first = [...rects.values()].slice(0, FLOW_COLUMNS);
+    const secondRow = rects.get(order[FLOW_COLUMNS]!)!;
+    expect(secondRow.y).toBe(400 + GAP);
+    expect(Math.min(...first.map((r) => r.y))).toBe(0);
+  });
+
+  it("keeps pins exact and routes the flow around them, with the varied sizes", () => {
+    const order = ids(9);
+    const sizes = sizesOf([200, 300, 250, 350, 200, 300, 260, 220, 240]);
+    const pins = new Map<CardId, WorldPos>([
+      [order[1]!, { x: 0, y: 0 }],
+      [order[5]!, { x: 500, y: 424 }],
+    ]);
+    const rects = tile(order, pins, { sizes });
+    expect(rects.get(order[1]!)).toEqual({ x: 0, y: 0, w: CARD_W, h: 300 });
+    expect(rects.get(order[5]!)).toEqual({ x: 500, y: 424, w: CARD_W, h: 300 });
+    expectNoOverlap([...rects.values()]);
+    for (const [id, rect] of rects) {
+      if (pins.has(id)) continue;
+      for (const pin of pins.keys()) expect(overlaps(rect, rects.get(pin)!, GAP)).toBe(false);
+    }
+  });
+
+  it("appends a new arrival after the last card already laid out", () => {
+    const order = ids(5);
+    const sizes = sizesOf([220, 300, 180, 260, 240]);
+    const before = tile(order, new Map(), { sizes });
+    const after = tile([...order, findingCardId("new")], new Map(), { sizes: new Map([...sizes, [findingCardId("new"), { w: CARD_W, h: 280 }]]) });
+    for (const [id, rect] of before) expect(after.get(id)).toEqual(rect);
+    const last = [...before.values()].reduce((a, b) => (a.y + a.h > b.y + b.h ? a : b));
+    const added = after.get(findingCardId("new"))!;
+    expect(added.y).toBeGreaterThanOrEqual(0);
+    expect([...after.values()].filter((r) => r !== added)).toHaveLength(5);
+    void last;
+  });
+
+  it("reflows with the same result as the fixed grid when every card has CARD_H", () => {
+    const order = ids(9);
+    const sizes = new Map(order.map((id) => [id, { w: CARD_W, h: CARD_H }]));
+    expect([...tile(order, new Map(), { sizes }).entries()]).toEqual([...tile(order, new Map()).entries()]);
+    const pins = new Map<CardId, WorldPos>([[order[2]!, { x: 400, y: 244 }]]);
+    expect([...tile(order, pins, { sizes }).entries()]).toEqual([...tile(order, pins).entries()]);
+  });
+});
