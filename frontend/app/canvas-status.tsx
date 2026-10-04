@@ -16,10 +16,11 @@ import { Sheet } from "./ui";
 // canvas's top bar, and opening it raises the record as a sheet from the bottom of the screen. The sheet is
 // put on the page itself rather than inside the canvas, whose floating layers would otherwise hold it.
 
-const WORD: Record<StepRunStatus, { label: string; tone: string; mark: string }> = {
+const WORD: Record<StepRunStatus | "abandoned", { label: string; tone: string; mark: string }> = {
   running: { label: "Running", tone: "badge--tint", mark: "…" },
   completed: { label: "Done", tone: "badge--positive", mark: "✓" },
   failed: { label: "Failed", tone: "badge--negative", mark: "!" },
+  abandoned: { label: "Abandoned", tone: "badge--negative", mark: "–" },
 };
 
 export default function CanvasStatus({ events, sheet = false }: { events: readonly SlimEvent[]; sheet?: boolean }) {

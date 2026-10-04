@@ -1,4 +1,4 @@
-import { SlimEvent } from "@qryvox/shared";
+import { ABANDONED_MARGIN_MS, SlimEvent, STEP_TIMEOUT_MS } from "@qryvox/shared";
 import { describe, expect, it } from "vitest";
 import { canvasView, fixtureEvents } from "../lib/canvas-source";
 import { type RunLine, statusLines } from "../lib/canvas-status";
@@ -107,8 +107,16 @@ describe("the status panel", () => {
   it("lists a find-similar run with its seed", () => {
     const seed = { document_id: "deck", page: 2, quote: "No entry or exit charges." };
     const lines = runs(
-      statusLines(withSteps({ type: "step.started", run: "s1", payload: { step: "extract", prompt_version: "extract@1", seed } })),
+      statusLines(withSteps({ type: "step.started", run: "s1", payload: { step: "extract", prompt_version: "extract@1", seed } }), Date.parse("2026-10-03T12:00:30.000Z")),
     );
     expect(lines.at(-1)).toMatchObject({ label: "Look further · Extract statements", status: "running", detail: "More like “No entry or exit charges.”, page 2" });
+  });
+
+  it("shows a run still running long after its call could have lasted as abandoned, not running (#75)", () => {
+    const payload = { step: "rationale", prompt_version: "rationale@1", input_run_id: null };
+    const log = withSteps({ type: "step.started", run: "a1", payload });
+    const started = Date.parse("2026-10-03T12:00:00.000Z");
+    expect(runs(statusLines(log, started + STEP_TIMEOUT_MS)).at(-1)?.status).toBe("running");
+    expect(runs(statusLines(log, started + STEP_TIMEOUT_MS + ABANDONED_MARGIN_MS + 1)).at(-1)).toMatchObject({ label: "Write card rationales", status: "abandoned" });
   });
 });

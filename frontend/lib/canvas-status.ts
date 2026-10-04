@@ -6,6 +6,7 @@ import {
   findingCardId,
   findingIdOfCard,
   fold,
+  isAbandoned,
   ParseOutput,
   RationaleOutput,
   similarNeighbours,
@@ -28,7 +29,8 @@ export type RunLine = {
   seq: number;
   runId: string;
   label: string;
-  status: StepRunStatus;
+  // "abandoned" (#75): still running on the log long after its call could have lasted; nothing will settle it.
+  status: StepRunStatus | "abandoned";
   // Why it failed, when it did: the latest step.failed's reason.
   error: string | null;
   // Attempts that failed before this one, under the same run id (a retry), with the last reason.
@@ -45,15 +47,15 @@ export type CardLine = { kind: "card"; seq: number; text: string; card: string }
 
 export type StatusLine = RunLine | CardLine;
 
-export function statusLines(events: readonly SlimEvent[]): StatusLine[] {
+export function statusLines(events: readonly SlimEvent[], now: number = Date.now()): StatusLine[] {
   const state = fold(events);
-  const runs = [...state.stepRuns, ...state.seededRuns].map((run) => runLine(run, events, state));
+  const runs = [...state.stepRuns, ...state.seededRuns].map((run) => runLine(run, events, state, now));
   const shown = events.some((e) => e.type === "card.similar_requested") ? caseCards(events, state) : [];
   const cards = events.flatMap((event) => cardLine(event, state, events, shown));
   return [...runs, ...cards].sort((a, b) => a.seq - b.seq);
 }
 
-function runLine(run: StepRun, events: readonly SlimEvent[], state: CaseState): RunLine {
+function runLine(run: StepRun, events: readonly SlimEvent[], state: CaseState, now: number): RunLine {
   const own = events.filter((e) => e.step_run_id === run.stepRunId && e.type.startsWith("step."));
   const failures = own.flatMap((e) => (e.type === "step.failed" ? [e.payload.error] : []));
   const started = own.find((e) => e.type === "step.started");
@@ -81,7 +83,7 @@ function runLine(run: StepRun, events: readonly SlimEvent[], state: CaseState): 
     seq: run.startedAtSeq,
     runId: run.stepRunId,
     label: run.seed ? `Look further · ${STEP_LABELS[run.step]}` : STEP_LABELS[run.step],
-    status: run.status,
+    status: isAbandoned(events, run, now) ? "abandoned" : run.status,
     error: run.status === "failed" ? run.error : null,
     failedAttempts: Math.max(0, failedBefore),
     lastFailure: failedBefore > 0 ? (failures[failedBefore - 1] ?? null) : null,
