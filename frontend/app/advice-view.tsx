@@ -288,9 +288,15 @@ function ClientCard({
             ))}
           </div>
         </div>
-        <button type="button" className="btn btn--small" onClick={onEdit}>
-          New answers
-        </button>
+        <div className="row" style={{ "--row-gap": "0.5rem" } as React.CSSProperties}>
+          {/* A client who answered once for the whole shelf is decided in one go, with a pick (#71). */}
+          <Link className="btn btn--small btn--plain" href={`/advise/${client.clientId}`}>
+            Decide the whole list →
+          </Link>
+          <button type="button" className="btn btn--small" onClick={onEdit}>
+            New answers
+          </button>
+        </div>
       </div>
 
       {vulnerable.length > 0 && (
@@ -353,6 +359,7 @@ function ClientCard({
                 {advice.decision.decision === "approved" ? "Approved" : "Rejected"} by {advice.decision.actor}
                 {advice.decision.reason ? ` · ${REJECTION[advice.decision.reason]}` : ""}
                 {advice.decision.confirmations.includes("explained_directly") ? " · explained directly" : ""}
+                {advice.decision.adviserPick ? " · adviser's pick" : ""}
               </span>
             ) : (
               <span className="badge badge--strong badge--caution">

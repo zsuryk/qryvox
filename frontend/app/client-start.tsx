@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ClientProfile } from "@qryvox/shared";
 import { blankProfile, newClientId } from "../lib/advice";
-import { draftAdvice, recordProfile, runStep } from "../lib/api";
+import { draftAdvice, recordClientList, recordProfile, runStep } from "../lib/api";
 import { type Lang, WORDS } from "../lib/i18n";
 import LanguageSwitch from "./language-switch";
 import ProfileForm from "./profile-form";
@@ -16,7 +16,10 @@ import ProfileForm from "./profile-form";
 
 type Stage = { key: "recorded" | "checked" | "writing"; state: "doing" | "done" | "skipped" };
 
-export default function ClientStart({ caseId, product, ready }: { caseId: string; product: string; ready: boolean }) {
+// Without a product (#71, /start) the answers are given once for the whole shelf: the server records them in
+// every verified product's case and drafts each, and the client lands on their list. Nothing is written
+// until they open a product.
+export default function ClientStart({ caseId, product, ready }: { caseId: string | null; product: string | null; ready: boolean }) {
   const router = useRouter();
   const [lang, setLang] = useState<Lang>("en");
   const [stages, setStages] = useState<Stage[] | null>(null);
@@ -28,6 +31,14 @@ export default function ClientStart({ caseId, product, ready }: { caseId: string
   async function submit(answers: ClientProfile) {
     const profile: ClientProfile = { ...answers, client_id: newClientId(), language: lang };
     const say = (key: Stage["key"], state: Stage["state"]) => setStages((s) => [...(s ?? []).filter((x) => x.key !== key), { key, state }]);
+    if (caseId === null) {
+      say("recorded", "doing");
+      await recordClientList(crypto.randomUUID(), profile);
+      say("recorded", "done");
+      say("checked", "done");
+      router.push(`/list/${profile.client_id}`);
+      return;
+    }
     say("recorded", "doing");
     await recordProfile(caseId, crypto.randomUUID(), profile, true);
     say("recorded", "done");
@@ -54,14 +65,14 @@ export default function ClientStart({ caseId, product, ready }: { caseId: string
           <p className="t-eyebrow">{w.eyebrow}</p>
           {stages === null && <LanguageSwitch lang={lang} onChange={setLang} />}
         </div>
-        <h1 className="t-large">{product}</h1>
-        <p className="t-body muted measure">{w.lead}</p>
+        <h1 className="t-large">{product ?? w.listTitle}</h1>
+        <p className="t-body muted measure">{product === null ? w.listLead : w.lead}</p>
         <p className="t-footnote faint">{w.anonymity}</p>
       </div>
 
       {!ready ? (
         <div className="card">
-          <p className="t-body">{w.notReady}</p>
+          <p className="t-body">{product === null ? w.noProducts : w.notReady}</p>
         </div>
       ) : stages ? (
         <div className="card stack materialize" aria-live="polite" style={{ "--stack-gap": "0.75rem" } as React.CSSProperties}>

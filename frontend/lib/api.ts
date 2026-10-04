@@ -2,6 +2,8 @@ import {
   type AdviceDecision,
   AppendResponse,
   type CardOperationRequest,
+  ClientCasesResponse,
+  ClientListResponse,
   CardOperationResponse,
   ChangeDispositionRequest,
   type ClientProfile,
@@ -196,4 +198,27 @@ export async function decideAdvice(
 // The depth a client chose, shared by them (#38). Called only once they have switched sharing on.
 export async function recordReading(caseId: string, clientId: string, adviceId: string, depth: KnowledgeLevel): Promise<AppendResponse> {
   return AppendResponse.parse(await post(`/cases/${caseId}/clients/${clientId}/readings`, { event_id: crypto.randomUUID(), advice_id: adviceId, depth }));
+}
+
+// --- A client's list (#71, ADR-0008): one questionnaire for every verified product.
+
+// The answers, given once: the server records them in every verified product's case and drafts each product's
+// advice by the rules. event_id names the whole request, so a retry finishes it and appends nothing twice.
+export async function recordClientList(eventId: string, profile: ClientProfile): Promise<ClientListResponse> {
+  return ClientListResponse.parse(await post("/clients", { event_id: eventId, profile }));
+}
+
+// The cases that hold a client's answers. NotFound for a client nobody has recorded.
+export async function fetchClientCases(clientId: string): Promise<string[]> {
+  return ClientCasesResponse.parse(await get(`/clients/${encodeURIComponent(clientId)}`)).case_ids;
+}
+
+// The adviser's one decision on the client's whole list; pickCaseId marks one suitable product as their pick.
+export async function decideClientList(
+  clientId: string,
+  eventId: string,
+  decision: AdviceDecision,
+  extra: { reason?: RejectionReason; confirmations?: DecisionConfirmation[]; pick_case_id?: string } = {},
+): Promise<ClientListResponse> {
+  return ClientListResponse.parse(await post(`/clients/${encodeURIComponent(clientId)}/decision`, { event_id: eventId, decision, ...extra }));
 }

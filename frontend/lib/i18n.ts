@@ -56,6 +56,31 @@ type Words = {
     writing: string;
     takesAMinute: string;
     adviserWillExplain: string;
+    // /start without a product (#71): one questionnaire for the whole list.
+    listTitle: string;
+    listLead: string;
+    noProducts: string;
+  };
+  // The client's list of products (#71): every verified product, each saying whether it suits them.
+  list: {
+    eyebrow: string;
+    title: string;
+    lead: (n: number) => string;
+    waiting: string;
+    filter: string;
+    count: (shown: number, total: number) => string;
+    nothingSuits: string;
+    recommended: string;
+    pickNote: string;
+    note: string;
+    open: string;
+    back: string;
+    compare: string;
+    writing: string;
+    writingNote: string;
+    writeFailed: string;
+    retry: string;
+    moreReasons: (n: number) => string;
   };
   advice: {
     eyebrow: string;
@@ -75,6 +100,13 @@ type Words = {
     shared: (n: number) => string;
     approved: (actor: string, date: string | null, rules: string) => string;
     fabricated: string;
+    // The explanation is in the other language (#75): offered on request, one explain run, kept on the log.
+    otherLanguage: {
+      note: (writtenIn: string) => string;
+      button: (language: string) => string;
+      writing: string;
+      failed: string;
+    };
   };
   // The shelf comparison (#68): every verified product, as the rules find it for this client.
   shelf: {
@@ -153,6 +185,29 @@ export const WORDS: Record<Lang, Words> = {
       writing: "Writing your explanation",
       takesAMinute: "this can take a minute",
       adviserWillExplain: "your adviser will explain it",
+      listTitle: "Which products suit you?",
+      listLead: "Answer a few questions, once. The institution's rules check every product your adviser has verified against your answers, every reason tied to the product's own documents. Your adviser confirms the result before you see it.",
+      noProducts: "No product has been verified yet. Please come back once your adviser has finished reviewing one.",
+    },
+    list: {
+      eyebrow: "Your products",
+      title: "What suits you",
+      lead: (n) => `You answered once. The institution's rules checked ${n} ${n === 1 ? "product" : "products"} against your answers, every reason tied to the product's own documents.`,
+      waiting: "Your adviser is checking your list. It appears here as soon as they confirm it.",
+      filter: "Only the ones that suit me",
+      count: (shown, total) => `Showing ${shown} of ${total}`,
+      nothingSuits: "None of these suits you. Your adviser will talk you through what to do next.",
+      recommended: "Recommended by your adviser",
+      pickNote: "Your adviser chose this one for you.",
+      note: "\"Suits you\" and \"does not suit you\" are the results of the institution's rules, applied to every product in the same way. Only a product marked recommended is your adviser's advice.",
+      open: "Read the full explanation",
+      back: "← Your products",
+      compare: "Compare with every other product ↓",
+      writing: "Writing your explanation",
+      writingNote: "This can take a minute. It is written when you open a product, not before.",
+      writeFailed: "The explanation could not be written just now. The reasons below are the rules' own words.",
+      retry: "Try again",
+      moreReasons: (n) => `and ${n} more ${n === 1 ? "reason" : "reasons"} on the full page`,
     },
     advice: {
       eyebrow: "Your advice",
@@ -172,6 +227,12 @@ export const WORDS: Record<Lang, Words> = {
       shared: (n) => (n === 0 ? "Nothing shared yet." : `Shared ${n} ${n === 1 ? "choice" : "choices"}.`),
       approved: (actor, date, rules) => `Approved by your adviser (${actor})${date ? ` on ${date}` : ""}. Drafted by the institution's rules, ${rules}.`,
       fabricated: "The product, its issuer and this client are fabricated for a demonstration. Nothing here is an offer.",
+      otherLanguage: {
+        note: (writtenIn) => `The explanation on this page is written in ${writtenIn}.`,
+        button: (language) => `Read this in ${language}`,
+        writing: "Writing it now. This can take a minute.",
+        failed: "It could not be written just now. Please try again.",
+      },
     },
     shelf: {
       title: "Compared with every product your adviser has checked",
@@ -259,6 +320,29 @@ export const WORDS: Record<Lang, Words> = {
       writing: "正在撰寫你的說明",
       takesAMinute: "可能需要一分鐘",
       adviserWillExplain: "你的顧問會向你解釋",
+      listTitle: "哪些產品適合你？",
+      listLead: "只需回答幾個問題一次。機構的規則會按你的答案檢查你的顧問核實過的每個產品，每個理由都對應產品文件的原文。你的顧問確認結果後，你才會看到。",
+      noProducts: "目前還沒有已核實的產品。請在你的顧問完成審核後再回來。",
+    },
+    list: {
+      eyebrow: "你的產品",
+      title: "哪些適合你",
+      lead: (n) => `你只回答了一次。機構的規則已按你的答案檢查 ${n} 個產品，每個理由都對應產品文件的原文。`,
+      waiting: "你的顧問正在確認你的清單，確認後會立即在這裡顯示。",
+      filter: "只看適合我的",
+      count: (shown, total) => `顯示 ${total} 個中的 ${shown} 個`,
+      nothingSuits: "這些產品都不適合你。你的顧問會與你商量下一步。",
+      recommended: "你的顧問推薦",
+      pickNote: "這是你的顧問為你揀選的產品。",
+      note: "「適合你」和「不適合你」是機構規則以同一方式檢查每個產品的結果。只有標明「顧問推薦」的產品，才是你的顧問的建議。",
+      open: "閱讀完整說明",
+      back: "← 你的產品",
+      compare: "與其他產品比較 ↓",
+      writing: "正在撰寫你的說明",
+      writingNote: "可能需要一分鐘。說明在你打開產品時才撰寫，不會預先撰寫。",
+      writeFailed: "暫時未能撰寫說明。以下是規則本身的說明。",
+      retry: "再試一次",
+      moreReasons: (n) => `另有 ${n} 項理由，見完整頁面`,
     },
     advice: {
       eyebrow: "你的建議",
@@ -278,6 +362,12 @@ export const WORDS: Record<Lang, Words> = {
       shared: (n) => (n === 0 ? "尚未分享。" : `已分享 ${n} 次選擇。`),
       approved: (actor, date, rules) => `由你的顧問（${actor}）${date ? `於 ${date} ` : ""}確認。按機構規則 ${rules} 起草。`,
       fabricated: "此產品、發行商及客戶均為示範而虛構，並非任何要約。",
+      otherLanguage: {
+        note: (writtenIn) => `本頁的說明以 ${writtenIn} 撰寫。`,
+        button: (language) => `以${language}閱讀`,
+        writing: "正在撰寫，可能需要一分鐘。",
+        failed: "暫時未能撰寫，請再試一次。",
+      },
     },
     shelf: {
       title: "與你的顧問核實過的所有產品比較",
