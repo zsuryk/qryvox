@@ -13,6 +13,7 @@
     "record:fixture": "tsx --conditions=source scripts/record-fold-fixture.ts",
     "smoke": "tsx --conditions=source scripts/smoke.ts",
     "demo:seed": "tsx --conditions=source scripts/demo-seed.ts",
+    "e2e": "tsx --conditions=source scripts/e2e.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "drizzle-kit": "catalog:",
+    "playwright-core": "^1.63.0",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

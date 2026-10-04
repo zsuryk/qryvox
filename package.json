@@ -18,7 +18,8 @@
     "deploy:web": "bash scripts/deploy.sh web",
     "deploy:all": "bash scripts/deploy.sh all",
     "smoke": "pnpm --filter @qryvox/backend smoke",
-    "demo:seed": "pnpm --filter @qryvox/backend demo:seed"
+    "demo:seed": "pnpm --filter @qryvox/backend demo:seed",
+    "e2e": "pnpm --filter @qryvox/backend e2e"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",
