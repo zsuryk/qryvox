@@ -37,7 +37,7 @@ export type PlanLayout = {
   cards: Map<CardId, Rect>;
 };
 
-export function planLayout(groups: readonly PlanGroup[], origin: WorldPos = { x: -(PLAN_W + PLAN_GAP), y: 0 }): PlanLayout {
+export function planLayout(groups: readonly PlanGroup[], sizes: ReadonlyMap<CardId, number> = new Map(), origin: WorldPos = { x: -(PLAN_W + PLAN_GAP), y: 0 }): PlanLayout {
   const inner = origin.x + PLAN_PAD;
   const targetW = (CARD_W - (AUTHORITY_ORDER.length - 1) * 6) / AUTHORITY_ORDER.length;
   const categories: PlanLayout["categories"] = [];
@@ -60,8 +60,11 @@ export function planLayout(groups: readonly PlanGroup[], origin: WorldPos = { x:
       const top = y;
       y += GROUP_HEAD;
       for (const card of group.cards) {
-        cards.set(card.cardId, { x: inner, y, w: CARD_W, h: CARD_H });
-        y += CARD_H + STACK_GAP;
+        // A docked card is the same card it was on the flow, at the same height its content asks for
+        // (#80): the plan is where the reportable set is stacked, not where cards shrink.
+        const h = sizes.get(card.cardId) ?? CARD_H;
+        cards.set(card.cardId, { x: inner, y, w: CARD_W, h });
+        y += h + STACK_GAP;
       }
       slots.push({ slot: { category, authority }, target, group: { x: inner, y: top, w: CARD_W, h: y - top - STACK_GAP }, count: group.cards.length });
     }

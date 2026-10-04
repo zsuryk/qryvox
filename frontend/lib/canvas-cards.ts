@@ -123,17 +123,24 @@ const EXPANDED_TITLE_LINES = 10;
 const EXPANDED_RATIONALE_LINES = 10;
 const EXPANDED_QUOTE_LINES = 12;
 
-// Roughly how many characters of each block fit on a line at the flow's width and type.
+// Roughly how many characters of each block fit on a line at the flow's width and type, measured off
+// the rendered cards: a title about 34, the rationale line about 34, a quoted passage about 21 (a wide
+// glyph-heavy passage wraps sooner). Under-counted rather than over, so a block that really does overflow
+// its clamp is offered its Expand (#81) rather than quietly cut.
 const TITLE_CHARS = 34;
-const RATIONALE_CHARS = 50;
-const QUOTE_CHARS = 40;
+const RATIONALE_CHARS = 32;
+const QUOTE_CHARS = 21;
 
-const TITLE_LINE_PX = 23;
-const RATIONALE_LINE_PX = 18;
-const QUOTE_LINE_PX = 23;
-// Padding, the badge row, the chips row and the action row around the text. Pairs with the sizes and
-// paddings in app/globals.css (.canvas-card): changing one side's metrics wants the other's.
-const CHROME_PX = 146;
+// A line of each block, and the card around its text: padding, the badge row, the citation row, the
+// action row and the gaps between them, plus the small Expand control a clamped block carries. Pairs
+// with the type and the paddings in app/globals.css (.canvas-card): changing one side's metrics wants
+// the other's, and the canvas is where that is measured.
+const TITLE_LINE_PX = 21;
+const RATIONALE_LINE_PX = 17;
+const QUOTE_LINE_PX = 22;
+const FINDING_CHROME_PX = 140;
+const EXCERPT_CHROME_PX = 133;
+const EXPAND_PX = 17;
 
 export type TextBlock = "title" | "rationale" | "quote";
 export type ExpandedBlocks = Partial<Record<TextBlock, boolean>>;
@@ -183,11 +190,13 @@ export function blockLines(model: CardModel, block: TextBlock): { shown: number;
 
 export function cardSize(model: CardModel, expanded: ExpandedBlocks = {}): CardSize {
   const blocks: TextBlock[] = model.kind === "finding" ? ["title", "rationale"] : ["quote"];
-  const text = blocks.reduce(
-    (sum, block) => sum + clampedLines(lineCount(blockText(model, block), blockChars(block)), expanded[block] ? expandedCap(block) : collapsedCap(model, block)) * blockLinePx(block),
-    0,
-  );
-  return { w: CARD_W, h: Math.min(CARD_MAX_H, Math.max(CARD_MIN_H, CHROME_PX + text)) };
+  const height = blocks.reduce((sum, block) => {
+    const lines = lineCount(blockText(model, block), blockChars(block));
+    const collapsed = collapsedCap(model, block);
+    // A block longer than its clamp carries the Expand control (#81), collapsed or expanded.
+    return sum + clampedLines(lines, expanded[block] ? expandedCap(block) : collapsed) * blockLinePx(block) + (lines > collapsed ? EXPAND_PX : 0);
+  }, model.kind === "finding" ? FINDING_CHROME_PX : EXCERPT_CHROME_PX);
+  return { w: CARD_W, h: Math.min(CARD_MAX_H, Math.max(CARD_MIN_H, height)) };
 }
 
 // Where a card docks when it is docked by its button, or dropped on the plan region: its category, under

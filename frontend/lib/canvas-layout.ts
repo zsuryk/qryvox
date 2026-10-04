@@ -35,14 +35,13 @@ export function canvasLayout(view: CanvasView, { narrow = false, expanded }: Lay
   const groups = planGroups(state)
     .map((g) => ({ ...g, cards: g.cards.filter((d) => byId.has(d.cardId)) }))
     .filter((g) => g.cards.length > 0);
-  const plan = planLayout(groups);
+  // Each card's height is its content's (#80), docked ones in the plan's stack included.
+  const sizes = new Map<CardId, CardSize>(view.cards.map((card) => [card.cardId, cardSize(cardModel(card, state, view.rationales), expanded?.get(card.cardId))]));
+  const heights = new Map([...sizes].map(([id, size]): [CardId, number] => [id, size.h]));
+  const plan = planLayout(groups, heights);
   const docked = [...plan.cards].map(([cardId, rect]) => ({ card: byId.get(cardId)!, rect, pinned: false }));
   const onFlow = view.cards.filter((c) => !plan.cards.has(c.cardId) && !isDiscarded(state, c.cardId));
   const pins = new Map<CardId, WorldPos>(state.board.pinned.map((p) => [p.cardId, p.worldPos]));
-  // Each card's height is its content's (#80), and the flow packs the cards at those heights (#79).
-  const sizes = new Map<CardId, CardSize>(
-    view.cards.map((card) => [card.cardId, cardSize(cardModel(card, state, view.rationales),expanded?.get(card.cardId))]),
-  );
   const rects = tile(
     onFlow.map((c) => c.cardId),
     pins,

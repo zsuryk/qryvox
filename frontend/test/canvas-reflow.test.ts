@@ -42,7 +42,8 @@ describe("reflow (#82)", () => {
       const pins = new Map(view.state.board.pinned.map((p) => [p.cardId, p.worldPos]));
       const sizes = new Map(onFlow.map((c) => [c.cardId, cardSize(cardModel(c, view.state, view.rationales))]));
       const groups = planGroups(view.state).map((g) => ({ ...g, cards: g.cards.filter((d) => byId.has(d.cardId)) })).filter((g) => g.cards.length > 0);
-      const expected = tile(onFlow.map((c) => c.cardId), pins, { obstacles: [planLayout(groups).bounds], sizes });
+      const plan = planLayout(groups, new Map(view.cards.map((c) => [c.cardId, cardSize(cardModel(c, view.state, view.rationales)).h]))).bounds;
+      const expected = tile(onFlow.map((c) => c.cardId), pins, { obstacles: [plan], sizes });
       for (const placed of layout.flow) {
         expect(placed.rect).toEqual(expected.get(placed.card.cardId));
       }
@@ -53,7 +54,6 @@ describe("reflow (#82)", () => {
         expect(placed?.rect).toMatchObject({ x: pin.worldPos.x, y: pin.worldPos.y });
       }
       // Every card is a gap clear of the next, and of the plan region the flow must go around.
-      const plan = planLayout(groups).bounds;
       for (const [i, a] of layout.flow.entries()) {
         for (const b of layout.flow.slice(i + 1)) expect(overlaps(a.rect, b.rect, GAP)).toBe(false);
         if (!a.pinned) expect(overlaps(a.rect, plan, GAP)).toBe(false);

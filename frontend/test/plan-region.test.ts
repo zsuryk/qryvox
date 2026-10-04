@@ -40,6 +40,18 @@ describe("the plan's layout", () => {
     expect(plan.bounds.h).toBeGreaterThan(planLayout([]).bounds.h);
   });
 
+  it("stacks a docked card at the height its content asks for (#80), the card it was on the flow", () => {
+    const group = docked("fees", "deck", "a", "b");
+    const tall = new Map([[findingCardId("a"), 320]]);
+    const plan = planLayout([group], tall);
+    expect(plan.cards.get(findingCardId("a"))!.h).toBe(320);
+    // The card after it sits below the whole of it, and nothing overlaps.
+    expect(plan.cards.get(findingCardId("b"))!.y).toBeGreaterThanOrEqual(plan.cards.get(findingCardId("a"))!.y + 320);
+    const rects = [...plan.cards.values()];
+    for (const [i, a] of rects.entries()) for (const b of rects.slice(i + 1)) expect(overlaps(a, b)).toBe(false);
+    for (const r of rects) expect(r.y + r.h).toBeLessThanOrEqual(plan.bounds.y + plan.bounds.h);
+  });
+
   it("says what is under a point: a slot's target or its group, the region, or nothing", () => {
     const plan = planLayout([docked("terms", "factsheet", "a")]);
     const slot = plan.slots.find((s) => s.slot.category === "terms" && s.slot.authority === "factsheet")!;
