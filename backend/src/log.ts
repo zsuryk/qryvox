@@ -258,3 +258,14 @@ export async function findingStatus(db: Db, caseId: string, findingId: string): 
   if (!rows.some((r) => r.type === "finding.created")) return null;
   return rows.some((r) => r.type === "finding.superseded") ? "superseded" : "active";
 }
+
+// Every case that holds a client's answers (#71): where a client's list reads its products from. In the
+// order the cases were first answered for them.
+export async function casesOfClient(db: Db | Tx, clientId: string): Promise<string[]> {
+  const rows = await db
+    .select({ caseId: events.caseId })
+    .from(events)
+    .where(and(eq(events.type, "client.profiled"), sql`json_extract(${events.payload}, '$.client_id') = ${clientId}`))
+    .orderBy(asc(events.at), asc(events.caseId));
+  return [...new Set(rows.map((r) => r.caseId))];
+}

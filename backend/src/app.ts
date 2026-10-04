@@ -4,7 +4,9 @@ import {
   CardOperationRequest,
   CardOperationResponse,
   ChangeDispositionRequest,
+  ClientCasesResponse,
   DecideAdviceRequest,
+  DecideListRequest,
   DraftAdviceRequest,
   EVENT_PAGE_LIMIT,
   EVENT_TYPES,
@@ -13,6 +15,7 @@ import {
   IngestDocumentRequest,
   OpenCaseRequest,
   type OpenCaseResponse,
+  RecordClientListRequest,
   RecordProfileRequest,
   RecordReadingRequest,
   RunStepRequest,
@@ -21,7 +24,7 @@ import {
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { AdviceConflict, AdviceNotFound, decideAdvice, draftAdvice, recordProfile } from "./advice.js";
+import { AdviceConflict, AdviceNotFound, clientCases, decideAdvice, decideList, draftAdvice, recordClientList, recordProfile } from "./advice.js";
 import { CardConflict, recordCardOperation } from "./cards.js";
 import { assertAppendOnly } from "./db/append-only.js";
 import type { Database } from "./db/client.js";
@@ -237,6 +240,28 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
 
     const row = await decideAdvice(db, caseId, c.req.param("adviceId"), body.data);
     return c.json({ seq: row.seq } satisfies AppendResponse, 201);
+  });
+
+  // A client's list (#71, ADR-0008): the answers given once, recorded and drafted in every verified product's
+  // case; the cases that hold them; and the adviser's one decision on the whole list. No model is called.
+  app.post("/clients", async (c) => {
+    const body = RecordClientListRequest.safeParse(await readJson(c));
+    if (!body.success) return badRequest(c, body.error);
+    return c.json(await recordClientList(db, body.data.event_id, body.data.profile), 201);
+  });
+
+  app.get("/clients/:clientId", async (c) => {
+    const clientId = c.req.param("clientId");
+    return c.json({ client_id: clientId, case_ids: await clientCases(db, clientId) } satisfies ClientCasesResponse);
+  });
+
+  app.post("/clients/:clientId/decision", async (c) => {
+    const body = DecideListRequest.safeParse(await readJson(c));
+    if (!body.success) return badRequest(c, body.error);
+    if (body.data.decision === "rejected" && !body.data.reason) {
+      return c.json({ error: "a rejection needs its reason: choose why the draft is rejected" }, 400);
+    }
+    return c.json(await decideList(db, c.req.param("clientId"), body.data), 201);
   });
 
   app.get("/cases/:caseId/events", async (c) => {

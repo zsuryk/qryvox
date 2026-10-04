@@ -2,19 +2,22 @@ import {
   ANALYST_ACTOR,
   assessSuitability,
   type CaseState,
+  type ClientListResponse,
   type ClientProfile,
   type DecideAdviceRequest,
+  type DecideListRequest,
   ProductAttributes,
   RULES_VERSION,
   type ShelfEntry,
   undismissedFindings,
   vulnerability,
 } from "@qryvox/shared";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Db } from "./db/client.js";
 import type { EventRow } from "./db/schema.js";
 import {
   appendOnceWith,
+  casesOfClient,
   casesWithCompletedStep,
   type EventDraft,
   findByEventId,
@@ -117,12 +120,18 @@ export async function decideAdvice(db: Db, caseId: string, adviceId: string, req
         `this client needs extra care (${why.join("; ")}): confirm you have explained the advice to them directly before approving`,
       );
     }
+    // The adviser's pick (#71): one suitable product, on its approval.
+    if (req.adviser_pick) {
+      if (req.decision !== "approved") throw new AdviceConflict("only an approval can mark the adviser's pick");
+      if (advice.verdict !== "suitable") throw new AdviceConflict("only a product the rules find suitable can be the adviser's pick");
+    }
     return {
       payload: {
         advice_id: adviceId,
         decision: req.decision,
         ...(req.reason ? { reason: req.reason } : {}),
         ...(confirmations.length > 0 ? { confirmations } : {}),
+        ...(req.adviser_pick ? { adviser_pick: true } : {}),
       },
       companions: [],
     };
@@ -133,7 +142,12 @@ export async function decideAdvice(db: Db, caseId: string, adviceId: string, req
 // run and an attributes run that named the product — the latest verified case per product. Never the
 // advice's own product, however many cases it has.
 async function shelf(tx: Tx, caseId: string, own: ProductAttributes) {
-  const ownName = own.product_name?.value.toLowerCase();
+  return verifiedProducts(tx, caseId, own.product_name?.value.toLowerCase());
+}
+
+// Every verified product, the latest verified case per name, except the case (and any case of the product
+// named) `except`. A client's list (#71) takes them all.
+async function verifiedProducts(tx: Db | Tx, caseId: string | null, ownName: string | undefined) {
   const products = new Map<string, { caseId: string; runId: string; at: string; attributes: ProductAttributes; state: CaseState }>();
   for (const id of await casesWithCompletedStep(tx, "attributes")) {
     if (id === caseId) continue;
@@ -180,4 +194,65 @@ function latestCompleted(state: CaseState, step: "findings" | "attributes"): str
 export async function attributesOf(db: Db | Tx, caseId: string, runId: string): Promise<ProductAttributes> {
   const row = await findCompletedRun(db, caseId, runId);
   return ProductAttributes.parse((row?.payload as { output?: unknown } | undefined)?.output);
+}
+
+// --- A client's list (#71, ADR-0008) ---
+
+// An event id derived from the request's and the case's, so one request that appends to many cases is safe to
+// repeat: the same request names the same events. Shaped as a version-4 uuid, as every event id is.
+function derivedId(eventId: string, caseId: string, label: string): string {
+  const h = createHash("sha256").update(`${eventId}:${caseId}:${label}`).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+
+// The client's answers, given once: recorded in every verified product's case and drafted against each, by
+// the rules and no model. A retry with the same event_id finishes what a failure left and appends nothing twice.
+export async function recordClientList(db: Db, eventId: string, profile: ClientProfile): Promise<ClientListResponse> {
+  const products = await verifiedProducts(db, null, undefined);
+  if (products.length === 0) throw new AdviceConflict("no product is verified yet: there is nothing to compare for this client");
+  const listed: ClientListResponse["products"] = [];
+  for (const product of products) {
+    await recordProfile(db, product.caseId, derivedId(eventId, product.caseId, "profile"), profile, true);
+    const advice = derivedId(eventId, product.caseId, "advice");
+    await draftAdvice(db, product.caseId, advice, profile.client_id);
+    listed.push({ case_id: product.caseId, advice_id: advice });
+  }
+  return { client_id: profile.client_id, products: listed };
+}
+
+// The cases that hold this client's answers, or a 404 for a client nobody has recorded.
+export async function clientCases(db: Db, clientId: string): Promise<string[]> {
+  const ids = await casesOfClient(db, clientId);
+  if (ids.length === 0) throw new AdviceNotFound(`client ${clientId} not found`);
+  return ids;
+}
+
+// The adviser's one decision on the client's whole list: their advice in play in every case, approved or
+// rejected together, optionally with one suitable product as the pick. Everything is checked before anything
+// is appended, so a refusal leaves no case decided; a retry repeats the same events.
+export async function decideList(db: Db, clientId: string, req: DecideListRequest): Promise<ClientListResponse> {
+  const targets: { caseId: string; adviceId: string; verdict: string }[] = [];
+  for (const caseId of await clientCases(db, clientId)) {
+    const advice = inPlay(await foldCase(db, caseId), clientId).at(-1);
+    if (advice) targets.push({ caseId, adviceId: advice.adviceId, verdict: advice.verdict });
+  }
+  if (targets.length === 0) throw new AdviceConflict(`client ${clientId} has no advice in play to decide`);
+  if (req.pick_case_id !== undefined) {
+    const pick = targets.find((t) => t.caseId === req.pick_case_id);
+    if (req.decision !== "approved") throw new AdviceConflict("only an approval can mark the adviser's pick");
+    if (!pick) throw new AdviceConflict(`case ${req.pick_case_id} is not on this client's list`);
+    if (pick.verdict !== "suitable") throw new AdviceConflict("only a product the rules find suitable can be the adviser's pick");
+  }
+  const decided: ClientListResponse["products"] = [];
+  for (const t of targets) {
+    await decideAdvice(db, t.caseId, t.adviceId, {
+      event_id: derivedId(req.event_id, t.caseId, "decision"),
+      decision: req.decision,
+      ...(req.reason ? { reason: req.reason } : {}),
+      ...(req.confirmations ? { confirmations: req.confirmations } : {}),
+      ...(t.caseId === req.pick_case_id ? { adviser_pick: true } : {}),
+    });
+    decided.push({ case_id: t.caseId, advice_id: t.adviceId });
+  }
+  return { client_id: clientId, products: decided };
 }
