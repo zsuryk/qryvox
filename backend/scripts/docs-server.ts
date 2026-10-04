@@ -14,7 +14,10 @@ import {
   CardOperationRequest,
   CardOperationResponse,
   ChangeDispositionRequest,
+  ClientCasesResponse,
+  ClientListResponse,
   DecideAdviceRequest,
+  DecideListRequest,
   DraftAdviceRequest,
   ErrorResponse,
   EVENT_PAGE_LIMIT,
@@ -24,6 +27,7 @@ import {
   JUDGE_TOKEN_HEADER,
   OpenCaseRequest,
   OpenCaseResponse,
+  RecordClientListRequest,
   RecordProfileRequest,
   RecordReadingRequest,
   RunStepRequest,
@@ -136,6 +140,24 @@ const TEXT = {
       "sharing on their own page. Three choices in a row of another depth suggest the adviser asks again; nothing " +
       "changes a profile by itself.",
     noClient: "Unknown case, or the case has no such client",
+    clientList: "Record a client's answers across every verified product",
+    clientListDesc:
+      "A client's answers, given once on /start: appends client.profiled in every verified product's case and drafts " +
+      "advice against each (rules@1; no model is called). event_id is the browser's: every event the call appends takes " +
+      "an id derived from it and the case, so a retry after a partial failure finishes the rest and appends nothing twice. " +
+      "Answers with the client's list: one product per case, with its advice id.",
+    clientListRecorded: "Recorded and drafted; the client's list",
+    clientCases: "The cases that hold a client's answers",
+    clientCasesDesc: "Where the client's list is read from: the ids of the cases with a client.profiled for this pseudonymous id.",
+    clientCasesOk: "The case ids (empty when the client is unknown)",
+    decideList: "Approve or reject a client's whole list",
+    decideListDesc:
+      "Appends advice.decided, attributed to the adviser, on every advice of the client's in play, in one decision. " +
+      "A rejection needs its reason. pick_case_id marks one suitable product as the adviser's pick, on approval only; " +
+      "the client then sees it as Recommended. Idempotent by event_id: every event takes an id derived from it and the case.",
+    decideListOk: "Decided; the products it covered",
+    decideListRefused:
+      "No advice in play to decide, a pick on a rejection, a pick not on the client's list, or a pick the rules do not find suitable",
     payload: "One event's full payload, heavy fields included",
     payloadOk: "Full payload",
     noEvent: "No such event",
@@ -223,6 +245,22 @@ const TEXT = {
       "追加一筆 client.read，以客戶的化名 ID 為行動者。只有客戶在自己的頁面開啟分享後才會送出。" +
       "連續三次選擇另一種深度時，會提示顧問重新詢問；系統不會自行修改客戶檔案。",
     noClient: "找不到此案件，或此案件沒有這位客戶",
+    clientList: "記錄客戶對所有已核實產品的答案",
+    clientListDesc:
+      "客戶在 /start 一次填寫的答案：在每個已核實產品的案件中追加 client.profiled，並依各案件起草建議" +
+      "（rules@1；不會呼叫模型）。event_id 由瀏覽器產生：這次呼叫追加的每一筆事件，其 ID 都由它與案件推導而來，" +
+      "因此部分失敗後重試只會補完其餘，不會重複追加。回傳客戶的清單：每個案件一項產品，附建議 ID。",
+    clientListRecorded: "已記錄並起草；客戶的清單",
+    clientCases: "保存客戶答案的案件",
+    clientCasesDesc: "客戶清單的讀取來源：含有此化名 ID 之 client.profiled 的案件 ID。",
+    clientCasesOk: "案件 ID（客戶不存在時為空）",
+    decideList: "核准或退回客戶的整份清單",
+    decideListDesc:
+      "對客戶所有仍有效的建議，一次追加 advice.decided，記錄為顧問所做。退回必須附上理由。" +
+      "pick_case_id 只能在核准時使用，將一個適合的產品標為顧問的推薦；客戶之後會看到它標示為「Recommended」。" +
+      "以 event_id 確保冪等：每一筆事件的 ID 都由它與案件推導而來。",
+    decideListOk: "已決定；涵蓋的產品",
+    decideListRefused: "沒有仍有效的建議可決定、退回時指定了推薦、推薦的案件不在客戶清單上，或規則不認為適合的產品被指定為推薦",
     payload: "單一事件的完整內容，包含大型欄位",
     payloadOk: "完整內容",
     noEvent: "找不到此事件",
@@ -249,6 +287,10 @@ const schemas = {
   RecordReadingRequest,
   DraftAdviceRequest,
   DecideAdviceRequest,
+  RecordClientListRequest,
+  ClientListResponse,
+  ClientCasesResponse,
+  DecideListRequest,
   ErrorResponse,
 };
 
@@ -271,6 +313,7 @@ function openapi(lang: Lang) {
   });
   const error = (description: string) => json("ErrorResponse", description);
   const caseId = { name: "caseId", in: "path", required: true, schema: { type: "string" } };
+  const clientId = { name: "clientId", in: "path", required: true, schema: { type: "string" } };
 
   return {
     openapi: "3.1.0",
@@ -394,6 +437,35 @@ function openapi(lang: Lang) {
             400: error(t.invalidBody),
             404: error(t.noAdvice),
             409: error(t.adviceSuperseded),
+          },
+        },
+      },
+      "/clients": {
+        post: {
+          summary: t.clientList,
+          description: t.clientListDesc,
+          requestBody: body("RecordClientListRequest"),
+          responses: { 201: json("ClientListResponse", t.clientListRecorded), 400: error(t.invalidBody) },
+        },
+      },
+      "/clients/{clientId}": {
+        get: {
+          summary: t.clientCases,
+          description: t.clientCasesDesc,
+          parameters: [clientId],
+          responses: { 200: json("ClientCasesResponse", t.clientCasesOk) },
+        },
+      },
+      "/clients/{clientId}/decision": {
+        post: {
+          summary: t.decideList,
+          description: t.decideListDesc,
+          parameters: [clientId],
+          requestBody: body("DecideListRequest"),
+          responses: {
+            201: json("ClientListResponse", t.decideListOk),
+            400: error(t.invalidBody),
+            409: error(t.decideListRefused),
           },
         },
       },
