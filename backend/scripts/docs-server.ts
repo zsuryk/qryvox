@@ -15,6 +15,7 @@ import {
   CardOperationResponse,
   ChangeDispositionRequest,
   ClientCasesResponse,
+  ClientQueueResponse,
   ClientListResponse,
   DecideAdviceRequest,
   DecideListRequest,
@@ -148,6 +149,9 @@ const TEXT = {
       "Answers with the client's list: one product per case, with its advice id.",
     clientListRecorded: "Recorded and drafted; the client's list",
     clientCases: "The cases that hold a client's answers",
+    clientQueue: "The adviser's queue of clients",
+    clientQueueDesc: "Read-only. Every client with advice in play, oldest answers first: whether they are vulnerable, and each case holding their advice with its verdict and decision (null while it awaits the adviser).",
+    clientQueueOk: "The clients with advice in play (empty when there are none)",
     clientCasesDesc: "Where the client's list is read from: the ids of the cases with a client.profiled for this pseudonymous id.",
     clientCasesOk: "The case ids (empty when the client is unknown)",
     decideList: "Approve or reject a client's whole list",
@@ -252,6 +256,9 @@ const TEXT = {
       "因此部分失敗後重試只會補完其餘，不會重複追加。回傳客戶的清單：每個案件一項產品，附建議 ID。",
     clientListRecorded: "已記錄並起草；客戶的清單",
     clientCases: "保存客戶答案的案件",
+    clientQueue: "顧問的客戶待辦清單",
+    clientQueueDesc: "唯讀。列出所有有效建議的客戶，最早回答者在前：是否屬易受傷害客戶，以及各案件的結論與決定（等待顧問時為 null）。",
+    clientQueueOk: "有效建議的客戶（沒有時為空）",
     clientCasesDesc: "客戶清單的讀取來源：含有此化名 ID 之 client.profiled 的案件 ID。",
     clientCasesOk: "案件 ID（客戶不存在時為空）",
     decideList: "核准或退回客戶的整份清單",
@@ -290,6 +297,7 @@ const schemas = {
   RecordClientListRequest,
   ClientListResponse,
   ClientCasesResponse,
+  ClientQueueResponse,
   DecideListRequest,
   ErrorResponse,
 };
@@ -441,6 +449,11 @@ function openapi(lang: Lang) {
         },
       },
       "/clients": {
+        get: {
+          summary: t.clientQueue,
+          description: t.clientQueueDesc,
+          responses: { 200: json("ClientQueueResponse", t.clientQueueOk) },
+        },
         post: {
           summary: t.clientList,
           description: t.clientListDesc,

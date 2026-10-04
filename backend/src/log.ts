@@ -269,3 +269,14 @@ export async function casesOfClient(db: Db | Tx, clientId: string): Promise<stri
     .orderBy(asc(events.at), asc(events.caseId));
   return [...new Set(rows.map((r) => r.caseId))];
 }
+
+// Every client with answers on the log, with when they first answered: the adviser's queue reads from these.
+export async function profiledClients(db: Db | Tx): Promise<{ clientId: string; at: string }[]> {
+  const clientId = sql<string>`json_extract(${events.payload}, '$.client_id')`;
+  const rows = await db
+    .select({ clientId, at: sql<string>`min(${events.at})` })
+    .from(events)
+    .where(eq(events.type, "client.profiled"))
+    .groupBy(clientId);
+  return rows.sort((a, b) => a.at.localeCompare(b.at) || a.clientId.localeCompare(b.clientId));
+}

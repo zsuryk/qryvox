@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { approvedAdviceFor, type ClientProfile, ClientCasesResponse, ClientListResponse, ErrorResponse, EventPage, fold, StepResult } from "@qryvox/shared";
+import { approvedAdviceFor, type ClientProfile, ClientCasesResponse, ClientListResponse, ClientQueueResponse, ErrorResponse, EventPage, fold, StepResult } from "@qryvox/shared";
 import { describe, expect, it } from "vitest";
 import { setup, type TestApp } from "./helpers";
 import { pack as larkspurPack } from "./larkspur";
@@ -95,6 +95,27 @@ describe("one questionnaire, every product (#71)", () => {
     const found = ClientCasesResponse.parse(await (await t.request("GET", "/clients/persona-chan")).json());
     expect(found.case_ids.sort()).toEqual([larkspur, wrenfield].sort());
     await error(await t.request("GET", "/clients/persona-nobody"), 404);
+  });
+
+  it("lists the clients with advice in play for the adviser, oldest first, and where each decision stands", async () => {
+    const { t, larkspur, wrenfield } = await shelfOfTwo();
+    const queue = async () => ClientQueueResponse.parse(await (await t.request("GET", "/clients")).json()).clients;
+    expect(await queue()).toEqual([]);
+
+    await answer(t, chan);
+    await answer(t, wong);
+    const before = await queue();
+    expect(before.map((c) => [c.client_id, c.vulnerable])).toEqual([
+      ["persona-chan", true],
+      ["persona-wong", false],
+    ]);
+    expect(before[0]!.cases.map((c) => c.case_id).sort()).toEqual([larkspur, wrenfield].sort());
+    expect(before.flatMap((c) => c.cases.map((x) => x.decision))).toEqual([null, null, null, null]);
+
+    await decideList(t, "persona-wong", { decision: "approved" });
+    const after = await queue();
+    expect(after.find((c) => c.client_id === "persona-wong")!.cases.every((c) => c.decision === "approved")).toBe(true);
+    expect(after.find((c) => c.client_id === "persona-chan")!.cases.every((c) => c.decision === null)).toBe(true);
   });
 
   it("refuses when no product is verified", async () => {

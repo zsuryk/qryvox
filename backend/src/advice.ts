@@ -3,6 +3,7 @@ import {
   assessSuitability,
   type CaseState,
   type ClientListResponse,
+  type ClientQueueEntry,
   type ClientProfile,
   type DecideAdviceRequest,
   type DecideListRequest,
@@ -18,6 +19,7 @@ import type { EventRow } from "./db/schema.js";
 import {
   appendOnceWith,
   casesOfClient,
+  profiledClients,
   casesWithCompletedStep,
   type EventDraft,
   findByEventId,
@@ -255,4 +257,24 @@ export async function decideList(db: Db, clientId: string, req: DecideListReques
     decided.push({ case_id: t.caseId, advice_id: t.adviceId });
   }
   return { client_id: clientId, products: decided };
+}
+
+// The adviser's queue (#71): each client with advice in play, the cases holding it and the state of each
+// decision. Read-only; oldest answers first.
+export async function clientQueue(db: Db): Promise<ClientQueueEntry[]> {
+  const queue: ClientQueueEntry[] = [];
+  for (const { clientId, at } of await profiledClients(db)) {
+    const cases: ClientQueueEntry["cases"] = [];
+    let vulnerable = false;
+    for (const caseId of await casesOfClient(db, clientId)) {
+      const state = await foldCase(db, caseId);
+      const advice = inPlay(state, clientId).at(-1);
+      if (!advice) continue;
+      const profile = state.clients.find((c) => c.clientId === clientId)?.profile;
+      if (profile && vulnerability(profile).length > 0) vulnerable = true;
+      cases.push({ case_id: caseId, advice_id: advice.adviceId, verdict: advice.verdict, decision: advice.decision?.decision ?? null });
+    }
+    if (cases.length > 0) queue.push({ client_id: clientId, vulnerable, answered_at: at, cases });
+  }
+  return queue;
 }

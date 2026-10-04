@@ -5,6 +5,7 @@ import {
   CardOperationResponse,
   ChangeDispositionRequest,
   ClientCasesResponse,
+  ClientQueueResponse,
   DecideAdviceRequest,
   DecideListRequest,
   DraftAdviceRequest,
@@ -24,7 +25,7 @@ import {
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
-import { AdviceConflict, AdviceNotFound, clientCases, decideAdvice, decideList, draftAdvice, recordClientList, recordProfile } from "./advice.js";
+import { AdviceConflict, AdviceNotFound, clientCases, clientQueue, decideAdvice, decideList, draftAdvice, recordClientList, recordProfile } from "./advice.js";
 import { CardConflict, recordCardOperation } from "./cards.js";
 import { assertAppendOnly } from "./db/append-only.js";
 import type { Database } from "./db/client.js";
@@ -249,6 +250,8 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
     if (!body.success) return badRequest(c, body.error);
     return c.json(await recordClientList(db, body.data.event_id, body.data.profile), 201);
   });
+
+  app.get("/clients", async (c) => c.json({ clients: await clientQueue(db) } satisfies ClientQueueResponse));
 
   app.get("/clients/:clientId", async (c) => {
     const clientId = c.req.param("clientId");
