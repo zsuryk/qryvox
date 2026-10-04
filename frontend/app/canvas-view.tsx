@@ -29,6 +29,7 @@ import { DISPOSITION_LABEL, keyIntent } from "../lib/disposition";
 import { chipKey, intentCards, intentView } from "../lib/intent-chips";
 import { rationaleRequest, unwordedFindingsRun } from "../lib/pipeline";
 import { errorMessage } from "../lib/errors";
+import { browserHost, type FullscreenHost, fullscreenTarget, isFullscreen, leaveFallback, toggleFullscreen } from "../lib/fullscreen";
 import {
   centreOn,
   fitTo,
@@ -339,9 +340,16 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
   const layouts = useMemo(() => ({ wide: canvasLayout(view, { expanded: expandedMap }), narrow: canvasLayout(view, { narrow: true, expanded: expandedMap }) }), [view, expandedMap]);
   const bounds = useMemo(() => ({ wide: layouts.wide.bounds, narrow: layouts.narrow.bounds }), [layouts]);
   const frame = useRef<HTMLDivElement | null>(null);
+  const section = useRef<HTMLElement | null>(null);
   const bin = useRef<HTMLButtonElement | null>(null);
   const planButton = useRef<HTMLButtonElement | null>(null);
-  const { viewport, ready, narrow, fit, zoom, reset, reveal, release, gestures } = useViewport(frame, bounds);
+  // Which element goes full screen: the surface on a wide screen, the whole section on a phone (#83).
+  const fullscreenToggle = useRef<() => void>(() => undefined);
+  const { viewport, ready, narrow, fit, refit, zoom, reset, reveal, release, gestures } = useViewport(frame, bounds, () => fullscreenToggle.current());
+  const { on: full, toggle: toggleFull } = useFullscreen(frame, section, narrow, refit, say);
+  useEffect(() => {
+    fullscreenToggle.current = () => void toggleFull();
+  }, [toggleFull]);
   const layout = narrow ? layouts.narrow : layouts.wide;
   // The viewport as it now is, for a long press that picks a card up a while after it went down.
   const seen = useRef(viewport);
@@ -360,6 +368,9 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
   const [trayOpen, setTrayOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const hint = "canvas-hint";
+  // What went full screen: the surface on a wide screen, the section holding it on a phone (#83). A sheet
+  // lives inside that one, or it would open behind the full-screen backdrop.
+  const surfaceFull = full && !narrow;
   const board = view.state.board;
   const pinnedCount = layout.flow.filter((p) => p.pinned).length;
   const dockedCount = layouts.wide.docked.length;
@@ -620,7 +631,7 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
   });
 
   return (
-    <section className="section canvas-section" aria-label="Canvas">
+    <section ref={section} className="section canvas-section" aria-label="Canvas">
       <div className="row spread canvas-summary">
         <div className="row">
           <p className="t-footnote muted">
@@ -810,6 +821,20 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
           <button type="button" className="btn btn--small" onClick={fit}>
             Fit
           </button>
+          {/* Full screen (#83): the whole screen, or the whole canvas section on a phone. Icon with a
+              name and a pressed state, read from the browser, never from a flag of our own. */}
+          <button
+            type="button"
+            className="btn btn--small canvas__fullscreen"
+            aria-label={full ? "Leave full screen" : "Full screen"}
+            aria-pressed={full}
+            title={full ? "Back to the page as it was" : "Give the cards the whole screen (F)"}
+            onClick={() => void toggleFull()}
+          >
+            <span aria-hidden className="canvas__fullscreen-icon">
+              <FullscreenIcon full={full} />
+            </span>
+          </button>
           {/* Every unpinned card back into the tiling, pinned cards kept (#82). The canvas keeps no
               positions of its own — the fold has the pins and nothing else — so reflowing is asking the
               auto-tiler to lay the cards out again: a fresh expanded map, same blocks, laid out afresh. */}
@@ -827,18 +852,27 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
             Reflow
           </button>
         </div>
+
+        {/* A sheet the canvas opens is inside whatever went full screen (#83), or it is behind it: on a
+            wide screen that is the surface, on a phone the section that holds it. */}
+        {surfaceFull ? (
+          <>
+            {planOpen && <PlanSheet groups={layouts.wide.groups} models={models} onUndock={actions.undock} onClose={() => setPlanOpen(false)} />}
+            {sheet && <CitationSheet events={log} citation={sheet.citation.citation} label={sheet.label} onClose={() => setSheet(null)} />}
+          </>
+        ) : null}
       </div>
       <p id={hint} className="t-caption faint canvas-hint">
         Drag the background to move around, or one finger anywhere. Scroll to pan; hold ⌘ or Ctrl and scroll, or pinch with
         two fingers, to zoom. With the canvas focused, the arrow keys pan, + and − zoom, 0 fits everything and 1 is actual
-        size. Drag a card (on a touch screen, hold it a moment first) to pin it somewhere, onto the bin to discard it, or
+        size, and F gives the canvas the whole screen. Drag a card (on a touch screen, hold it a moment first) to pin it somewhere, onto the bin to discard it, or
         onto the plan to dock it; each card&apos;s buttons do the same. Approve and Dismiss on a finding card are your
         decision on the finding, recorded on the case as on Review; with a finding card focused, A approves, D dismisses,
         and J or K (↓ or ↑) move to the next or previous finding. Discard is different: it only takes a card off the
         canvas, and decides nothing.
       </p>
-      {planOpen && <PlanSheet groups={layouts.wide.groups} models={models} onUndock={actions.undock} onClose={() => setPlanOpen(false)} />}
-      {sheet && <CitationSheet events={log} citation={sheet.citation.citation} label={sheet.label} onClose={() => setSheet(null)} />}
+      {!surfaceFull && planOpen && <PlanSheet groups={layouts.wide.groups} models={models} onUndock={actions.undock} onClose={() => setPlanOpen(false)} />}
+      {!surfaceFull && sheet && <CitationSheet events={log} citation={sheet.citation.citation} label={sheet.label} onClose={() => setSheet(null)} />}
     </section>
   );
 }
@@ -949,6 +983,15 @@ function presented(el: HTMLElement): Point | null {
   return { x: m.m41, y: m.m42 };
 }
 
+function FullscreenIcon({ full }: { full: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      {/* Out of full screen the corners point in; in it, they point back out. */}
+      {full ? <path d="M6.5 2H2v4.5M9.5 2H14v4.5M14 9.5V14h-4.5M2 9.5V14h4.5" /> : <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" />}
+    </svg>
+  );
+}
+
 function BinIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -982,11 +1025,16 @@ const TOP_BAR = 60;
 
 type Bounds = { wide: Rect | null; narrow: Rect | null };
 
-function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Bounds) {
+function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Bounds, onFullscreen: () => void) {
   const [viewport, setViewport] = useState<Viewport>(IDENTITY);
   const [ready, setReady] = useState(false);
   const [narrow, setNarrow] = useState(false);
   const size = useRef<Size>({ width: 0, height: 0 });
+  // The frame as an element, for the calls that need it now rather than on the next render (full screen).
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    frameRef.current = frame.current;
+  });
   // What a fit fits, for the observer and the keyboard, which outlive any one render.
   const content = useRef(bounds);
   useEffect(() => {
@@ -1013,11 +1061,11 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Bounds) {
     frameId.current = null;
   };
 
-  // The whole of the content in view. The first view is no smaller than a card can be read at, and on a
-  // touch screen it is life size wherever a card fits across at life size, so the cards' buttons are a
-  // finger's 44 points (#61). On a phone the margin is the screen's own, with room left at the top for
-  // the bar the Plan and Activity buttons float in. Fit, asked for, shows everything.
-  const fitWith = useCallback((first: boolean) => {
+  // The whole of the content in view. `floor` is what the fit will not go below: a first view, and a change
+  // of space such as full screen (#83), are never smaller than a card can be read at — and on a touch
+  // screen never smaller than a card's buttons are a finger's 44 points wide (#61). Fit, asked for, shows
+  // everything and floors at nothing.
+  const fitWith = useCallback((floor: boolean) => {
     const narrowNow = isNarrow.current;
     const content_ = narrowNow ? content.current.narrow : content.current.wide;
     const { width } = size.current;
@@ -1026,11 +1074,20 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Bounds) {
     const rect = narrowNow ? { ...content_, y: content_.y - TOP_BAR, h: content_.h + TOP_BAR } : content_;
     const touch = window.matchMedia("(pointer: coarse)").matches;
     const readable = touch || narrowNow ? Math.min(1, (width - 2 * padding) / CARD_W) : 0.7;
-    setViewport(fitTo(rect, size.current, { padding, maxZoom: 1, minZoom: first ? Math.max(0.7, readable) : undefined }));
+    setViewport(fitTo(rect, size.current, { padding, maxZoom: 1, minZoom: floor ? Math.max(0.7, readable) : undefined }));
   }, []);
   const fit = useCallback(() => {
     stopGlide();
     fitWith(false);
+  }, [fitWith]);
+  // Fit against the frame as it is right now: for a change of space the browser has already made (full
+  // screen, #83), where the size the observer last saw is the one before. The cards are laid out for the
+  // space they now have, at the same readable floor as any other view of them.
+  const refit = useCallback(() => {
+    const el = frameRef.current;
+    if (el) size.current = { width: el.clientWidth, height: el.clientHeight };
+    stopGlide();
+    fitWith(true);
   }, [fitWith]);
 
   // Bring a world rectangle into view if any of it is off screen, centred, at the zoom already chosen.
@@ -1246,6 +1303,7 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Bounds) {
         "-": () => zoom(1 / 1.25),
         "0": fit,
         "1": reset,
+        f: onFullscreen,
       };
       const move = moves[event.key];
       if (!move) return;
@@ -1255,5 +1313,60 @@ function useViewport(frame: RefObject<HTMLDivElement | null>, bounds: Bounds) {
     },
   };
 
-  return { viewport, ready, narrow, fit, zoom, reset, reveal, release, gestures };
+  return { viewport, ready, narrow, fit, refit, zoom, reset, reveal, release, gestures };
+}
+
+// Full screen (#83): the whole screen, or on a phone the whole canvas section with it, so a small screen
+// is worth reading. The state is the browser's own, read every time — fullscreenchange, Escape, the
+// platform's own gesture — and never a flag of our own, so leaving full screen any way at all leaves
+// the control saying the right thing. A viewing preference and nothing more: it decides nothing, changes
+// no card's state and appends nothing to the log, and the cards are re-fitted either way, laid out for
+// the space they now have with every pin where it was.
+function useFullscreen(surface: RefObject<HTMLElement | null>, section: RefObject<HTMLElement | null>, narrow: boolean, refit: () => void, say: (words: string) => void) {
+  const [on, setOn] = useState(false);
+  // The browser, asked where there is one: this canvas is rendered on the server too, where there is no
+  // document to ask, so the host is built when a browser is what we are running in.
+  const hostRef = useRef<FullscreenHost | null>(null);
+  const host = (): FullscreenHost => (hostRef.current ??= browserHost(document, document.documentElement));
+  // Which element goes full screen: the surface, or the section with the case chrome on a phone.
+  const target = useCallback((): HTMLElement | null => (fullscreenTarget(narrow) === "section" ? section.current : surface.current), [narrow, section, surface]);
+
+  const seen = useRef(false);
+  const read = useCallback(() => {
+    const now = isFullscreen(host());
+    // Going in and coming out both change the space the cards have: re-fit them to it, laid out for
+    // where they now are, every pin where it was.
+    if (now !== seen.current) {
+      seen.current = now;
+      refit();
+    }
+    setOn(now);
+  }, [refit]);
+  // The browser's own events, and Escape for the CSS fallback where the browser has none to leave.
+  useEffect(() => {
+    document.addEventListener("fullscreenchange", read);
+    document.addEventListener("webkitfullscreenchange", read);
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      // A sheet is open, its Escape is the sheet's: one keypress must not close both.
+      if (document.querySelector('[role="dialog"]')) return;
+      if (leaveFallback(host())) read();
+    };
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("fullscreenchange", read);
+      document.removeEventListener("webkitfullscreenchange", read);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [read]);
+
+  const toggle = useCallback(async () => {
+    const el = target();
+    if (!el) return;
+    const outcome = await toggleFullscreen(host(), el);
+    read();
+    if (outcome === "refused") say("The browser would not go full screen: the canvas is as it was.");
+  }, [read, say, target]);
+
+  return { on, toggle };
 }

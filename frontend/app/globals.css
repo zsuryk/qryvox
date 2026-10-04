@@ -1330,6 +1330,58 @@ details[open] > summary::before {
   outline: 2px solid var(--tint);
   outline-offset: 2px;
 }
+/* Full screen (#83): the canvas takes the screen, not the page. On a wide screen it is the surface that
+   goes edge to edge — no rounded corners, no page scrollbar behind it, the grid and the floating
+   controls still on it. On a phone it is the whole canvas section, so the case chrome, the intent line
+   and the Plan and Activity buttons go with it, and coming back restores exactly what was there.
+   Where the browser has no element full screen (iPhone Safari) the canvas marks itself and the same
+   layout comes from a plain fixed box — the same answer, read the same way. */
+.canvas:fullscreen,
+.canvas-section:fullscreen,
+.canvas[data-fullscreen="true"],
+.canvas-section[data-fullscreen="true"] {
+  border-radius: 0;
+  box-shadow: none;
+  inset: 0;
+  position: fixed;
+  z-index: 100;
+}
+.canvas:fullscreen,
+.canvas[data-fullscreen="true"] {
+  background-color: var(--surface-sunken);
+  background-image: radial-gradient(circle, var(--fill-strong) 1px, transparent 1.25px);
+  height: 100%;
+  width: 100%;
+}
+/* The section in full screen is a column: the intent line and the buttons at its head, the canvas in
+   what is left of the screen. The page's own help paragraph has no place on it. */
+.canvas-section:fullscreen,
+.canvas-section[data-fullscreen="true"] {
+  background-color: var(--surface);
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  margin-top: 0;
+  overflow: hidden;
+  padding: 0.75rem;
+  width: 100%;
+}
+.canvas-section:fullscreen .canvas,
+.canvas-section[data-fullscreen="true"] .canvas {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+.canvas-section:fullscreen .canvas-hint,
+.canvas-section[data-fullscreen="true"] .canvas-hint {
+  display: none;
+}
+.canvas__fullscreen-icon {
+  display: block;
+  height: 14px;
+  width: 14px;
+}
+
 .canvas-empty {
   margin-bottom: 0.75rem;
 }

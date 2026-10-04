@@ -176,6 +176,11 @@ any slot a pinned card is in (`frontend/lib/tiling.ts`). Docked and discarded ca
 the flow in arrival order, and every pinned card stays where it was put. The canvas derives its layout
 from the log, so a reflow never changes any card's state, only ever the positions the flow assigns.
 
+**Full screen** — the canvas taking the whole screen (`F`, or the toolbar's control): the card surface on
+a wide screen, the whole canvas section — intent line, Plan and Activity buttons and all — on a phone. A
+viewing preference, never a card operation: it appends nothing to the log, and where the browser has no
+element full screen the canvas marks itself and CSS takes it edge to edge instead.
+
 **Plan region** — the area of the canvas where docked cards form the reportable set, grouped by category ×
 authority (PPM, fee table, factsheet, deck — the order of `AUTHORITY_ORDER`). Each docked card names its
 group (`plan_slot`) on the event that docked it (`planGroups`). On the canvas it is a column left of the

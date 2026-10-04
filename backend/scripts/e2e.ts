@@ -10,11 +10,13 @@
 // Steps, in order (each is timed and screenshotted; a failed step does not stop the ones that do not need it):
 //   1 home                 the intake page, and the way into a reviewed case
 //   2 canvas               Larkspur's live canvas: dock a card, pin one, discard one, Similar, a typed intent
+//   2b canvas full screen  the surface edge to edge with the pins kept, a sheet in it, back out on Escape (#83)
 //   3 client (繁體中文)    /start: answer once, land on the list, still waiting for the adviser
 //   4 adviser              /advise/<client>: the vulnerable-client confirmation, a pick, Approve the whole list
 //   5 client list          the list appears by itself; only the pick is "Recommended"; open it, the explanation is written
 //   6 replay               the scrubber at /cases/<id>/record, by keyboard
-//   7 phone 390x844        the canvas and the client's list, with no sideways scroll
+//   7 phone 390x844        the canvas and the client's list, with no sideways scroll; the whole canvas
+//                          section full screen and back, with the chrome exactly as it was (#83)
 //   8 chains               both products' hash chains verify intact on the API
 //
 // Fails loudly: any page error, console error, or 4xx/5xx response from the app is a failure of the run, wherever
@@ -184,6 +186,48 @@ await step("2 canvas", async (note) => {
   await shot(page, "2c-canvas-intent");
 }, () => desk);
 
+// Full screen on the desktop canvas (#83): the surface goes edge to edge, the cards are re-fitted into
+// it with every pin where it was, Escape brings the page back exactly as it was, and the log is the same
+// either way — a viewing preference decides nothing.
+await step("2b canvas full screen", async (note) => {
+  const page = desk!;
+  const events = () => page.locator(".canvas-summary p.t-footnote").first().innerText();
+  const before = await events();
+  const pinnedBefore = await page.locator("article.canvas-card--pinned").count();
+  await page.locator(".canvas__fullscreen").click();
+  await page.waitForFunction(() => document.fullscreenElement !== null || !!document.querySelector("[data-fullscreen]"), null, { timeout: 10_000 });
+  const pressed = await page.locator(".canvas__fullscreen").getAttribute("aria-pressed");
+  if (pressed !== "true") throw new Error(`the control does not read itself as pressed (aria-pressed=${pressed})`);
+  const bar = await page.evaluate(() => [window.innerWidth, window.innerHeight, document.documentElement.scrollWidth] as [number, number, number]);
+  if (bar[2] > bar[0]) throw new Error(`a page scrollbar sits behind the full screen canvas (${bar[2]}px in ${bar[0]})`);
+  const pinned = await page.locator("article.canvas-card--pinned").count();
+  if (pinned !== pinnedBefore) throw new Error(`full screen unpinned a card (${pinnedBefore} -> ${pinned})`);
+  note(`full screen ${bar[0]}x${bar[1]}, ${pinned} pinned card${pinned === 1 ? "" : "s"} kept`);
+  await page.waitForTimeout(600);
+  await shot(page, "2d-canvas-full-screen");
+
+  // A sheet opened in full screen is inside it, so it is visible, and Escape closes the sheet alone.
+  await page.locator(".canvas-card__chip").first().click();
+  await page.locator('.sheet[role="dialog"]').waitFor({ timeout: 10_000 });
+  if (!(await page.locator(".canvas .sheet[role=dialog]").count())) throw new Error("the sheet opened behind the full screen canvas");
+  note("a sheet opens in full screen");
+  await page.waitForTimeout(400);
+  await shot(page, "2e-canvas-full-screen-sheet");
+  await page.keyboard.press("Escape");
+  await page.locator('.sheet[role="dialog"]').waitFor({ state: "detached", timeout: 10_000 });
+  if (await page.evaluate(() => document.fullscreenElement === null && !document.querySelector("[data-fullscreen]"))) {
+    throw new Error("one Escape closed the sheet and left full screen");
+  }
+  // Out of full screen the way a browser leaves it, and the control follows the browser down.
+  await page.evaluate(() => document.fullscreenElement && document.exitFullscreen());
+  await page.waitForFunction(() => document.fullscreenElement === null && !document.querySelector("[data-fullscreen]"), null, { timeout: 10_000 });
+  const back = await page.locator(".canvas__fullscreen").getAttribute("aria-pressed");
+  if (back !== "false") throw new Error(`the control still says full screen after leaving it (aria-pressed=${back})`);
+  if ((await events()) !== before) throw new Error("full screen changed what the canvas says about the cards");
+  note("out again, the log untouched");
+  await shot(page, "2f-canvas-back");
+}, () => desk);
+
 // The client answers in 繁體中文, as a 65-year-old who relies on the income and may need the money soon.
 await step("3 client answers (zh)", async (note) => {
   ({ page: client } = await newPage(browser, "client", { viewport: { width: 1000, height: 1100 }, colorScheme: "light", locale: "zh-HK" }));
@@ -308,6 +352,41 @@ await step("7 phone 390x844", async (note) => {
     await shot(page, "7b-phone-activity");
     await page.keyboard.press("Escape");
     note("canvas ok");
+
+    // Full screen on a phone (#83): the whole canvas section, the intent line and the Plan and Activity
+    // buttons with it, at a card's life size so its buttons stay a finger's 44 points, and back out again
+    // with the chrome exactly as it was.
+    const chrome = await page.locator(".canvas-section > .canvas-summary").isVisible();
+    await page.locator(".canvas__fullscreen").click();
+    await page.waitForFunction(() => document.fullscreenElement !== null || !!document.querySelector("[data-fullscreen]"), null, { timeout: 10_000 });
+    await page.waitForTimeout(600);
+    const [sectionFull, plan, toolbar] = await Promise.all([
+      page.evaluate(() => document.querySelector(".canvas-section")?.hasAttribute("data-fullscreen") || document.fullscreenElement?.classList.contains("canvas-section") === true),
+      page.getByRole("button", { name: "Plan" }).isVisible(),
+      page.locator(".canvas__toolbar").isVisible(),
+    ]);
+    if (!sectionFull) throw new Error("the canvas section did not go full screen on the phone");
+    if (!plan || !toolbar) throw new Error("the phone's Plan button or the toolbar is not on screen full screen");
+    // A card at life size is what keeps its buttons a finger's 44 points: the fit floors there (#83).
+    const zoom = await page.evaluate(() => new DOMMatrix(getComputedStyle(document.querySelector(".canvas__world")!).transform).a);
+    if (zoom < 0.99) throw new Error(`the cards are not at life size in full screen (zoom ${zoom.toFixed(2)}), so their buttons are not a finger's 44 points`);
+    await sideways("the full screen canvas");
+    note(`section full screen at ${Math.round(zoom * 100)}%, Plan and toolbar on screen`);
+    await shot(page, "7d-phone-full-screen");
+    await page.getByRole("button", { name: "Plan" }).click();
+    await page.locator('.sheet[role="dialog"]').waitFor({ timeout: 10_000 });
+    await shot(page, "7e-phone-full-screen-plan");
+    await page.keyboard.press("Escape");
+    await page.locator('.sheet[role="dialog"]').waitFor({ state: "detached", timeout: 10_000 });
+    if (await page.evaluate(() => document.fullscreenElement === null && !document.querySelector("[data-fullscreen]"))) {
+      throw new Error("one Escape closed the sheet and left full screen");
+    }
+    await page.evaluate(() => document.fullscreenElement && document.exitFullscreen());
+    await page.waitForFunction(() => document.fullscreenElement === null && !document.querySelector("[data-fullscreen]"), null, { timeout: 10_000 });
+    if (!(await page.locator(".canvas-section > .canvas-summary").isVisible()) || !chrome) throw new Error("the case chrome did not come back with it");
+    await sideways("the canvas after full screen");
+    note("back out, chrome as it was");
+    await shot(page, "7f-phone-after-full-screen");
     if (state.clientId) {
       await open(page, `/list/${state.clientId}`);
       await page.locator("ol.list-plain li.card").first().waitFor({ timeout: 30_000 });
