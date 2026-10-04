@@ -75,6 +75,23 @@ export const Alternative = z
   });
 export type Alternative = z.infer<typeof Alternative>;
 
+// One product on the shelf as the rules find it for this client (#68), with any verdict: the same shape as
+// an Alternative, but the products that do not suit are kept, each with the reasons that decided it.
+export const ShelfEntry = z
+  .object({
+    case_id: z.string().min(1),
+    product_name: z.string().min(1),
+    attributes_run_id: z.string().min(1),
+    verdict: Verdict,
+    reasons: z.array(Reason).min(1),
+    disclosures: z.array(Disclosure),
+  })
+  .refine((e) => verdictFor(e.reasons) === e.verdict, {
+    message: "a shelf entry's verdict must be the one its reasons amount to (verdictFor)",
+    path: ["verdict"],
+  });
+export type ShelfEntry = z.infer<typeof ShelfEntry>;
+
 // What advice.drafted records. The advice's id is that event's event_id, as a case is named after its
 // case.opened, so a retried draft lands on the same advice.
 export const Advice = z.object({
@@ -91,6 +108,9 @@ export const Advice = z.object({
   // when drafting did not look (suitable advice, and advice drafted before #39); empty when it looked and
   // nothing on the shelf fits.
   alternatives: z.array(Alternative).optional(),
+  // Every other verified product with the verdict the same rules reach for this client, suitable or not
+  // (#68): a comparison, never a recommendation. Absent on advice drafted before #68.
+  shelf: z.array(ShelfEntry).optional(),
 }).refine((a) => a.verdict === verdictFor(a.reasons), {
   message: "the verdict must be the one its reasons amount to (verdictFor)",
   path: ["verdict"],
@@ -126,6 +146,20 @@ export function verdictFor(reasons: readonly Reason[]): Verdict {
   if (reasons.some((r) => r.effect === "blocks")) return "not_suitable";
   if (reasons.some((r) => r.effect === "conditional")) return "conditional";
   return "suitable";
+}
+
+// The shelf comparison an advice carries: its shelf when it has one, otherwise the alternatives older
+// advice recorded (all suitable), so a reader never has to ask which kind of advice it is.
+export function shelfFor(advice: Pick<Advice, "shelf" | "alternatives">): readonly ShelfEntry[] {
+  return advice.shelf ?? advice.alternatives ?? [];
+}
+
+// The reasons that decided a verdict, most decisive first: blocks, then open conditions, then warnings.
+// A product that meets every rule has none: its verdict rests on what it meets, which a reader may still
+// ask to see in full.
+export function decidingReasons(reasons: readonly Reason[]): Reason[] {
+  const of = (effect: Reason["effect"]) => reasons.filter((r) => r.effect === effect);
+  return [...of("blocks"), ...of("conditional"), ...of("warns")];
 }
 
 // --- Explanation (the explain step, #30) ---

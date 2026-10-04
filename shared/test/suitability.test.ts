@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   activeFindings,
+  decidingReasons,
   assessSuitability,
   type Finding,
   fold,
@@ -10,6 +11,8 @@ import {
   PersonaSet,
   productRiskLevel,
   type Reason,
+  ShelfEntry,
+  shelfFor,
   SlimEvent,
   undismissedFindings,
 } from "../src";
@@ -196,5 +199,43 @@ describe("the personas on Wrenfield", () => {
 
   it("is a level-2 product: investment-grade only, not capital protected", () => {
     expect(productRiskLevel(wrenfieldAttributes)).toBe(2);
+  });
+});
+
+describe("the shelf comparison an advice carries (#68)", () => {
+  const chan = persona("persona-chan").profile;
+  const entry = (profile: typeof chan, attributes: typeof larkspurAttributes) => {
+    const { verdict, reasons, disclosures } = assessSuitability(profile, attributes, findings);
+    return { case_id: "c", product_name: "P", attributes_run_id: "r", verdict, reasons, disclosures };
+  };
+
+  it("puts the deciding reasons first: blocks, then conditions, then warnings, and leaves what is met out", () => {
+    const { reasons } = assessSuitability(chan, larkspurAttributes, findings);
+    const deciding = decidingReasons(reasons);
+
+    expect(deciding.every((r) => r.effect !== "meets")).toBe(true);
+    const order = ["blocks", "conditional", "warns"];
+    const ranks = deciding.map((r) => order.indexOf(r.effect));
+    expect(ranks).toEqual([...ranks].sort());
+    expect(deciding.filter((r) => r.effect === "blocks").map((r) => r.rule)).toHaveLength(5);
+  });
+
+  it("accepts an entry whatever its verdict, and refuses one whose verdict is not what its reasons amount to", () => {
+    const notSuitable = entry(chan, larkspurAttributes);
+    expect(notSuitable.verdict).toBe("not_suitable");
+    expect(ShelfEntry.safeParse(notSuitable).success).toBe(true);
+    expect(ShelfEntry.safeParse({ ...notSuitable, verdict: "suitable" }).success).toBe(false);
+  });
+
+  it("reads the shelf when advice has one, the alternatives when it is older, and nothing when neither", () => {
+    const e = entry(chan, wrenfieldAttributes);
+    expect(shelfFor({ shelf: [e], alternatives: [] })).toEqual([e]);
+    expect(shelfFor({ alternatives: [{ ...e, verdict: "suitable" }] })).toHaveLength(1);
+    expect(shelfFor({})).toEqual([]);
+  });
+
+  it("still folds the recorded case, whose advice has no shelf", () => {
+    const state = fold(SlimEvent.array().parse(recorded));
+    expect(state.advice.every((a) => a.shelf === undefined && shelfFor(a).length === 0)).toBe(true);
   });
 });

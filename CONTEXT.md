@@ -226,6 +226,13 @@ drafted on verified products only. The shelf is every such product, the latest v
 whose advice is not suitable, recorded on that advice with its own reasons and citations. An empty list says
 nothing on the shelf fits. *Not* a recommendation the model makes: the rules decide it.
 
+**Shelf comparison** — what every advice carries as its `shelf` (#68): each other verified product with the verdict
+the same rules reach for this client, whatever it is, and the reasons that decided it (blocks first, then
+conditions, then warnings: `decidingReasons`). The client sees it beside the advised product, labelled as the
+rules' results and not a recommendation; the adviser sees it before approving, so it falls under the same
+sign-off. Only the advised product has a model-written explanation. Advice drafted before #68 has no `shelf`;
+`shelfFor` then reads its alternatives. `alternatives` remains as the suitable entries of a not-suitable advice.
+
 **Document version** — a document ingested again under the same `document_id` (a product update, e.g.
 Larkspur v2) replaces the earlier version for every later step and in the fold; the earlier stays in the
 log. A new attributes run then supersedes advice drafted on the old one.
