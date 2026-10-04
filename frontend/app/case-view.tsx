@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { SlimEvent, StepName } from "@qryvox/shared";
+import type { RunStepRequest, SlimEvent, StepName } from "@qryvox/shared";
 import { fetchEvents, runStep } from "../lib/api";
 import { errorMessage } from "../lib/errors";
-import { type AttemptFailure, type PipelineAction, type PipelineDeps, runAction, writeRationales } from "../lib/pipeline";
+import { type AttemptFailure, type PipelineAction, type PipelineDeps, readProductFacts, runAction, writeRationales } from "../lib/pipeline";
 import Board from "./board";
 import DispositionConsole from "./disposition";
 import { FindingsEval } from "./eval-tiles";
@@ -53,7 +53,12 @@ export default function CaseView({ events, caseId, refetch }: CaseViewProps) {
     readLog: () => fetchEvents(caseId),
     onStep: (step) => setRunning(step),
     // The card rationales (#62), in the background: the canvas's status panel shows how they went.
-    onFindings: (findingsRunId) => writeRationales((request) => runStep(caseId, request), () => crypto.randomUUID(), findingsRunId),
+    onFindings: (findingsRunId) => {
+      const transport = (request: RunStepRequest) => runStep(caseId, request);
+      writeRationales(transport, () => crypto.randomUUID(), findingsRunId);
+      // The product's facts, so it is on the shelf for clients' lists; skipped when already read.
+      readProductFacts(transport, () => crypto.randomUUID(), () => fetchEvents(caseId));
+    },
   });
 
   async function drive(action: PipelineAction) {

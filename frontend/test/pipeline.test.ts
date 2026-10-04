@@ -14,8 +14,10 @@ import recorded from "@qryvox/shared/case-recorded.json";
 import { boardView, CATEGORIES } from "../lib/board";
 import { StepFailureError } from "../lib/api";
 import {
+  needsAttributes,
   PIPELINE_STEPS,
   type PipelineDeps,
+  readProductFacts,
   pipelineState,
   rationaleRequest,
   rerunFrom,
@@ -523,5 +525,48 @@ describe("card rationales (#62)", () => {
     const t0 = Date.parse(startedAt);
     expect(unwordedFindingsRun(running, t0 + 30_000)).toBeNull();
     expect(unwordedFindingsRun(running, t0 + 10 * 60_000)).toBe(findingsRun);
+  });
+});
+
+// The product's facts (the attributes step) are what put a product on the shelf, so the browser reads them
+// itself once findings have completed, unless the log already holds a run of it.
+describe("the product's facts", () => {
+  const last = recordedLog.at(-1)!;
+  const run = { step: "attributes", model: "fake-model", prompt_version: "v", input_run_id: null };
+  const event = (n: number, type: string, payload: object) =>
+    SlimEvent.parse({ ...last, seq: last.seq + n, event_id: eventId(last.seq + n), step_run_id: "attributes-run", type, payload });
+
+  it("are wanted after findings when the log has no attributes run, and not before findings", () => {
+    expect(needsAttributes(recordedLog)).toBe(true);
+    expect(needsAttributes(opened())).toBe(false);
+  });
+
+  it("are not wanted over a completed run or one under way, and are wanted again after a failure", () => {
+    const started = event(1, "step.started", run);
+    expect(needsAttributes([...recordedLog, started], Date.parse(started.at) + 1000)).toBe(false);
+    expect(needsAttributes([...recordedLog, started, event(2, "step.completed", { ...run, output: {} })])).toBe(false);
+    expect(needsAttributes([...recordedLog, started, event(2, "step.failed", { ...run, error: "boom" })])).toBe(true);
+  });
+
+  it("are started with a new run id and no input, and a failure goes nowhere", async () => {
+    const sent: RunStepRequest[] = [];
+    readProductFacts(
+      async (request) => {
+        sent.push(request);
+        throw new Error("502");
+      },
+      () => "a-1",
+      async () => recordedLog,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sent).toEqual([{ step: "attributes", step_run_id: "a-1", input_run_id: null }]);
+  });
+
+  it("are not started when the log already has them", async () => {
+    const sent: RunStepRequest[] = [];
+    const done = [...recordedLog, event(1, "step.started", run), event(2, "step.completed", { ...run, output: {} })];
+    readProductFacts(async (r) => (sent.push(r), {} as StepResult), () => "a-2", async () => done);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(sent).toEqual([]);
   });
 });

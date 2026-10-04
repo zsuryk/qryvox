@@ -33,7 +33,14 @@ export default function ClientStart({ caseId, product, ready }: { caseId: string
     const say = (key: Stage["key"], state: Stage["state"]) => setStages((s) => [...(s ?? []).filter((x) => x.key !== key), { key, state }]);
     if (caseId === null) {
       say("recorded", "doing");
-      await recordClientList(crypto.randomUUID(), profile);
+      try {
+        await recordClientList(crypto.randomUUID(), profile);
+      } catch (cause) {
+        // 409: nothing is verified yet, so there is no case to record the answers in. Said in the client's
+        // language rather than as the server's English.
+        if (cause instanceof Error && cause.message.startsWith("POST /clients: 409")) throw new Error(w.noProducts, { cause });
+        throw cause;
+      }
       say("recorded", "done");
       say("checked", "done");
       router.push(`/list/${profile.client_id}`);

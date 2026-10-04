@@ -225,6 +225,28 @@ export function writeRationales(steps: StepTransport, newRunId: RunIdSource, fin
   void steps(rationaleRequest(findingsRunId, newRunId())).catch(() => undefined);
 }
 
+// Whether the browser should start the attributes step ("Read product facts") on its own: once a findings
+// run has completed and the log holds no attributes run that completed or is still going. Without that run
+// the product is not on the shelf, and a client who answers at /start is recorded in no case. A failed or
+// abandoned run does not count, so the next advance tries again; the Advice tab's button stays the manual way.
+export function needsAttributes(events: readonly SlimEvent[], now: number = Date.now()): boolean {
+  const runs = fold(events).stepRuns;
+  if (!runs.some((r) => r.step === "findings" && r.status === "completed")) return false;
+  return !runs.some((r) => r.step === "attributes" && r.status !== "failed" && !isAbandoned(events, r, now));
+}
+
+export function attributesRequest(stepRunId: string): RunStepRequest {
+  return { step: "attributes", step_run_id: stepRunId, input_run_id: null };
+}
+
+// Starts the attributes step if the log says none has run, and lets it go: like the rationales, a failure is
+// on the log (the status panel shows it) and never holds the pipeline up.
+export function readProductFacts(steps: StepTransport, newRunId: RunIdSource, readLog: () => Promise<readonly SlimEvent[]>): void {
+  void readLog()
+    .then((events) => (needsAttributes(events) ? steps(attributesRequest(newRunId())) : undefined))
+    .catch(() => undefined);
+}
+
 // The findings run whose findings are on the board, when no rationale run has completed or is running over
 // it: a case analysed before the step existed, or one whose run failed or was abandoned (#75: a run still
 // "running" long after its call could have lasted, because the browser that started it closed). Null when
