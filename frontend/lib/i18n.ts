@@ -70,13 +70,20 @@ type Words = {
     noSource: string;
     know: string;
     knowSource: string;
-    fits: (n: number) => string;
-    fitsBody: string;
     noneFit: string;
     share: string;
     shared: (n: number) => string;
     approved: (actor: string, date: string | null, rules: string) => string;
     fabricated: string;
+  };
+  // The shelf comparison (#68): every verified product, as the rules find it for this client.
+  shelf: {
+    title: string;
+    caption: string;
+    thisProduct: string;
+    verdict: (product: string) => Record<Verdict, string>;
+    meetsAll: string;
+    askAdviser: string;
   };
   answers: {
     title: string;
@@ -160,13 +167,23 @@ export const WORDS: Record<Lang, Words> = {
       noSource: "Nothing in the product's documents speaks to this.",
       know: "Things you should know",
       knowSource: "Things you should know",
-      fits: (n) => (n === 1 ? "A product that fits you" : "Products that fit you"),
-      fitsBody: "Checked by the same rules, it suits you on every one. Ask your adviser about it.",
       noneFit: "Nothing else your adviser has checked fits you either. They will talk you through what to do next.",
       share: "Let my adviser see which level of detail I choose, so they can explain things my way.",
       shared: (n) => (n === 0 ? "Nothing shared yet." : `Shared ${n} ${n === 1 ? "choice" : "choices"}.`),
       approved: (actor, date, rules) => `Approved by your adviser (${actor})${date ? ` on ${date}` : ""}. Drafted by the institution's rules, ${rules}.`,
       fabricated: "The product, its issuer and this client are fabricated for a demonstration. Nothing here is an offer.",
+    },
+    shelf: {
+      title: "Compared with every product your adviser has checked",
+      caption: "These are the results of the institution's rules, applied to each product in the same way. They are not a recommendation: only the product this page is about, listed first, is your adviser's advice.",
+      thisProduct: "The product this page is about",
+      verdict: (product) => ({
+        suitable: `${product} suits you.`,
+        conditional: `${product} may suit you, once your adviser confirms one thing.`,
+        not_suitable: `${product} does not suit you.`,
+      }),
+      meetsAll: "It meets every rule.",
+      askAdviser: "Ask your adviser about it.",
     },
     answers: {
       title: "What you told us",
@@ -256,13 +273,23 @@ export const WORDS: Record<Lang, Words> = {
       noSource: "產品文件沒有提及這一點。",
       know: "你需要知道的事",
       knowSource: "你需要知道的事",
-      fits: () => "適合你的產品",
-      fitsBody: "以同一套規則檢查，每一項都適合你。可以向你的顧問查詢。",
       noneFit: "你的顧問檢查過的其他產品也不適合你。顧問會與你商量下一步。",
       share: "讓我的顧問知道我選擇哪種詳細程度，以便用我習慣的方式解釋。",
       shared: (n) => (n === 0 ? "尚未分享。" : `已分享 ${n} 次選擇。`),
       approved: (actor, date, rules) => `由你的顧問（${actor}）${date ? `於 ${date} ` : ""}確認。按機構規則 ${rules} 起草。`,
       fabricated: "此產品、發行商及客戶均為示範而虛構，並非任何要約。",
+    },
+    shelf: {
+      title: "與你的顧問核實過的所有產品比較",
+      caption: "以下是機構規則以同一方式檢查每個產品的結果，並非建議。只有本頁所講、列在最前的產品，才是你的顧問的建議。",
+      thisProduct: "本頁所講的產品",
+      verdict: (product) => ({
+        suitable: `${product} 適合你。`,
+        conditional: `${product} 可能適合你，需待你的顧問確認一點。`,
+        not_suitable: `${product} 不適合你。`,
+      }),
+      meetsAll: "符合所有規則。",
+      askAdviser: "可以向你的顧問查詢。",
     },
     answers: {
       title: "你告訴我們的",

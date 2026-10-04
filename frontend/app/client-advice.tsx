@@ -2,13 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ANALYST_ACTOR, type Citation, type ClientProfile, type KnowledgeLevel, ruleById, type SlimEvent, vulnerability } from "@qryvox/shared";
+import { ANALYST_ACTOR, type Citation, type ClientProfile, type KnowledgeLevel, ruleById, shelfFor, type SlimEvent, vulnerability } from "@qryvox/shared";
 import { EFFECT } from "../lib/advice";
 import { recordReading } from "../lib/api";
 import { clientView } from "../lib/client-view";
 import { answerIn, dateIn, type Lang, WORDS } from "../lib/i18n";
 import CitationSheet from "./citation-sheet";
 import LanguageSwitch from "./language-switch";
+import ShelfComparison, { type Cited } from "./shelf-comparison";
 import { Segmented } from "./ui";
 
 // The client's page (#34): the key client journey. Calm and plain — the verdict as a sentence, each reason
@@ -17,11 +18,22 @@ import { Segmented } from "./ui";
 // In the client's language (#43): the one they answered in, and switchable here. The explanation itself
 // is written once, in the language they chose; quoted document text stays in the document's language.
 
-export default function ClientAdvice({ caseId, events, clientId }: { caseId: string; events: readonly SlimEvent[]; clientId: string }) {
+export default function ClientAdvice({
+  caseId,
+  events,
+  clientId,
+  shelfEvents = {},
+}: {
+  caseId: string;
+  events: readonly SlimEvent[];
+  clientId: string;
+  // The events of every other case on the shelf comparison, by case id: their citations open their own pages.
+  shelfEvents?: Record<string, readonly SlimEvent[]>;
+}) {
   const view = clientView(events, clientId);
   const [lang, setLang] = useState<Lang>(view.profile?.language ?? "en");
   const [depth, setDepth] = useState<KnowledgeLevel>(view.profile?.knowledge ?? "novice");
-  const [citing, setCiting] = useState<{ citation: Citation; label: string } | null>(null);
+  const [citing, setCiting] = useState<Cited | null>(null);
   // Whether the client lets their adviser see which depth they choose (#38). Off until they turn it on,
   // and said on the page: nothing about how they read is recorded otherwise.
   const [sharing, setSharing] = useState(false);
@@ -60,7 +72,7 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
   const decidedAt = events.find((e) => e.seq === advice.decision!.decidedAtSeq)?.at ?? null;
   const source = (citation: Citation, label: string) => (
     <div>
-      <button type="button" className="chip chip--link" onClick={() => setCiting({ citation, label })}>
+      <button type="button" className="chip chip--link" onClick={() => setCiting({ citation, label, caseId: null })}>
         {w.advice.source(citation.document_id, citation.page)}
       </button>
     </div>
@@ -133,25 +145,15 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
         </section>
       )}
 
-      {advice.alternatives && advice.alternatives.length > 0 && (
-        <section aria-labelledby="fits" className="card stack" style={{ "--stack-gap": "0.5rem", marginTop: "1.5rem" } as React.CSSProperties}>
-          <p id="fits" className="t-eyebrow">
-            {w.advice.fits(advice.alternatives.length)}
+      {shelfFor(advice).length > 0 ? (
+        <ShelfComparison advice={advice} product={view.product} lang={lang} onCite={(cited) => setCiting(cited)} />
+      ) : (
+        advice.verdict === "not_suitable" &&
+        (advice.shelf ?? advice.alternatives) !== undefined && (
+          <p className="t-callout muted" style={{ marginTop: "1.5rem" }}>
+            {w.advice.noneFit}
           </p>
-          {advice.alternatives.map((alt) => (
-            <div key={alt.case_id}>
-              <h3 className="t-title">{alt.product_name}</h3>
-              <p className="t-callout muted" style={{ marginTop: "0.25rem" }}>
-                {w.advice.fitsBody}
-              </p>
-            </div>
-          ))}
-        </section>
-      )}
-      {advice.alternatives && advice.alternatives.length === 0 && advice.verdict === "not_suitable" && (
-        <p className="t-callout muted" style={{ marginTop: "1.5rem" }}>
-          {w.advice.noneFit}
-        </p>
+        )
       )}
 
       <YourAnswers profile={view.profile} lang={lang} />
@@ -171,7 +173,7 @@ export default function ClientAdvice({ caseId, events, clientId }: { caseId: str
         <p className="faint">{w.advice.fabricated}</p>
       </footer>
 
-      {citing && <CitationSheet events={events} citation={citing.citation} label={citing.label} onClose={() => setCiting(null)} />}
+      {citing && <CitationSheet events={citing.caseId === null ? events : (shelfEvents[citing.caseId] ?? [])} citation={citing.citation} label={citing.label} onClose={() => setCiting(null)} />}
     </main>
   );
 }

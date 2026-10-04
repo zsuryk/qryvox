@@ -4,15 +4,18 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   type AdviceDecision,
+  type CaseAdvice,
   type Citation,
   type ClientProfile,
   type DecisionConfirmation,
+  decidingReasons,
   fold,
   knowledgeSuggestion,
   READING_THRESHOLD,
   type RejectionReason,
   RejectionReason as Reasons,
   ruleById,
+  shelfFor,
   type SlimEvent,
   vulnerability,
 } from "@qryvox/shared";
@@ -392,22 +395,7 @@ function ClientCard({
             </div>
           )}
 
-          {advice.alternatives !== undefined && (
-            <div className="inset stack" style={{ "--stack-gap": "0.375rem" } as React.CSSProperties}>
-              <p className="t-eyebrow">Elsewhere on the shelf</p>
-              {advice.alternatives.length === 0 ? (
-                <p className="t-callout">Nothing else on the shelf fits this client.</p>
-              ) : (
-                advice.alternatives.map((alt) => (
-                  <p key={alt.case_id} className="t-callout">
-                    <span className="text-positive strong">Suitable:</span> {alt.product_name} — meets{" "}
-                    {alt.reasons.map((r) => ruleById(r.rule).title.toLowerCase()).join(", ")}.{" "}
-                    <Link href={`/cases/${alt.case_id}/advice`}>Open that product →</Link>
-                  </p>
-                ))
-              )}
-            </div>
-          )}
+          {shelfFor(advice).length > 0 || advice.alternatives !== undefined ? <Shelf advice={advice} /> : null}
 
           <hr className="hairline" style={{ margin: 0 }} />
 
@@ -531,6 +519,43 @@ function ClientLink({ caseId }: { caseId: string }) {
       >
         {copied ? "Copied ✓" : "Copy client link"}
       </button>
+    </div>
+  );
+}
+
+// The shelf as the rules compared it for this client, shown before the adviser approves: approving signs
+// this off with the rest (#68). Compact: each product, its verdict, and the reasons that decided it.
+function Shelf({ advice }: { advice: CaseAdvice }) {
+  const entries = shelfFor(advice);
+  return (
+    <div className="inset stack" style={{ "--stack-gap": "0.5rem" } as React.CSSProperties}>
+      <div className="stack" style={{ "--stack-gap": "0.125rem" } as React.CSSProperties}>
+        <p className="t-eyebrow">Compared with the rest of the shelf</p>
+        <p className="t-caption faint">The rules&apos; results for this client, shown to them as such, not a recommendation. Approving covers this table.</p>
+      </div>
+      {entries.length === 0 ? (
+        <p className="t-callout">No other product on the shelf is verified.</p>
+      ) : (
+        <ul className="list-plain stack" style={{ "--stack-gap": "0.5rem" } as React.CSSProperties}>
+          {entries.map((entry) => {
+            const deciding = decidingReasons(entry.reasons);
+            return (
+              <li key={entry.case_id} className="stack" style={{ "--stack-gap": "0.125rem" } as React.CSSProperties}>
+                <p className="t-callout">
+                  <span className={`strong text-${VERDICT[entry.verdict].tone}`}>{VERDICT[entry.verdict].label}:</span> {entry.product_name}{" "}
+                  <Link href={`/cases/${entry.case_id}/advice`}>Open that product →</Link>
+                </p>
+                <p className="t-footnote muted">
+                  {deciding.length === 0
+                    ? "Meets every rule."
+                    : deciding.map((r) => `${ruleById(r.rule).title} (${EFFECT[r.effect].label.toLowerCase()})`).join(" · ")}
+                </p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {advice.shelf === undefined && <p className="t-caption faint">Drafted before the shelf was compared: only the suitable alternatives were recorded.</p>}
     </div>
   );
 }
