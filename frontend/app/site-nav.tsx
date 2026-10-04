@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 // well as by weight, so where the analyst stands is never only a matter of style.
 const PLACES = [
   { href: "/", label: "New review" },
+  { href: "/advise", label: "Advise" },
   { href: "/board", label: "Recorded case" },
   { href: "/canvas", label: "Canvas" },
 ] as const;

@@ -4,6 +4,7 @@ import {
   type CardOperationRequest,
   ClientCasesResponse,
   ClientListResponse,
+  ClientQueueResponse,
   CardOperationResponse,
   ChangeDispositionRequest,
   type ClientProfile,
@@ -211,6 +212,11 @@ export async function recordClientList(eventId: string, profile: ClientProfile):
 // The cases that hold a client's answers. NotFound for a client nobody has recorded.
 export async function fetchClientCases(clientId: string): Promise<string[]> {
   return ClientCasesResponse.parse(await get(`/clients/${encodeURIComponent(clientId)}`)).case_ids;
+}
+
+// The adviser's queue: every client with advice in play, oldest answers first.
+export async function fetchClientQueue(): Promise<ClientQueueResponse["clients"]> {
+  return ClientQueueResponse.parse(await get("/clients")).clients;
 }
 
 // The adviser's one decision on the client's whole list; pickCaseId marks one suitable product as their pick.
