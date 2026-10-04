@@ -49,6 +49,7 @@ import {
   zoomBy,
 } from "../lib/viewport";
 import { Card, type CardActions } from "./canvas-card";
+import { IntentBar, useIntent } from "./canvas-intent";
 import CanvasStatus from "./canvas-status";
 import CitationSheet from "./citation-sheet";
 import { Sheet } from "./ui";
@@ -323,6 +324,8 @@ type CanvasProps = {
 
 function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
   const dispatch = store.dispatch;
+  // What the analyst has said they want to look at (#69), as chips.
+  const intent = useIntent(log, mode, store, say);
   const { similar, further, searching, arrived, lit } = useFindSimilar(view, mode, store, say);
   const rationales = useRationales(log, mode, store, say);
   // Both layouts, wide and narrow (#61): the frame's width picks one, and the first fit has to know the
@@ -629,6 +632,7 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
           {said ?? (mode.kind === "fixture" ? "Card operations and decisions stay in this tab: a reload starts the recorded case over." : null)}
         </p>
       </div>
+      <IntentBar intent={intent} mode={mode} />
       {/* A case opens here (#59), before anything has run on it: the steps are run from Review. */}
       {view.cards.length === 0 && mode.kind === "live" && (
         <div className="notice notice--tint canvas-empty">
