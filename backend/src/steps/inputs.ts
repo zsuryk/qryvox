@@ -115,8 +115,25 @@ export function quotedFrom(quoted: string, sources: readonly string[]): boolean 
 // Numbers by value, not by spelling: "2.00%" in the source and "2%" in an explanation are the same charge.
 export const value = (n: string) => String(Number(n));
 
+// A source that says "five years" lets a text say "5" (#75): the number words one to twenty count as the
+// numbers they name. Only a source is read this way; what a model writes is still checked by its digits.
+const NUMBER_WORDS = [
+  "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+  "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
+];
+
 export function numbersIn(...texts: (string | number | null)[]): Set<string> {
-  return new Set(texts.flatMap((t) => (t === null ? [] : (String(t).match(/\d+(?:\.\d+)?/g) ?? []).map(value))));
+  return new Set(
+    texts.flatMap((t) => {
+      if (t === null) return [];
+      const text = String(t);
+      const words = (text.toLowerCase().match(/\b[a-z]+\b/g) ?? []).flatMap((w) => {
+        const at = NUMBER_WORDS.indexOf(w);
+        return at < 0 ? [] : [String(at + 1)];
+      });
+      return [...(text.match(/\d+(?:\.\d+)?/g) ?? []).map(value), ...words];
+    }),
+  );
 }
 
 // The numbers a text states, as written. Rule ids (S1, P4) are names, not stated numbers.

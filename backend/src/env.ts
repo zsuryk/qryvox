@@ -1,3 +1,5 @@
+import { STEP_TIMEOUT_MS } from "@qryvox/shared";
+
 // Local defaults match .env.example; production values live only in the Vercel project (ADR-0001).
 const databaseUrl = process.env.DATABASE_URL ?? "file:./dev.db";
 
@@ -45,6 +47,6 @@ function llmConfig() {
     // spent 15,000 reasoning tokens (over 300 s) on Larkspur's compliance step, and 1,600 (55 s) at "low".
     reasoningEffort: process.env.LLM_REASONING_EFFORT || undefined,
     // Under Vercel's 300 s function limit; local models are slow.
-    timeoutMs: Number(process.env.LLM_TIMEOUT_MS ?? 240_000),
+    timeoutMs: Number(process.env.LLM_TIMEOUT_MS ?? STEP_TIMEOUT_MS),
   };
 }

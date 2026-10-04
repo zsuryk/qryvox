@@ -23,6 +23,7 @@ import { StepPrecondition, type StepDefinition } from "./step.js";
 // verdict; this step may only restate it. Every passage is checked against the advice it explains:
 // all of it covered, nothing quoted that its citation does not say, no rule or document it does not
 // cite, no number that is neither in its quote nor the client's own answer.
+// A client may ask for it in the other language (#75): the same prompt, with the language note for that one.
 // explain@2 (#67): the client's page already headlines the verdict right above the summary, so the summary
 // starts from the main reason instead of saying the verdict again, and a summary that opens with the
 // headline is refused.
@@ -79,7 +80,7 @@ Respond with only a JSON object and no other text, in exactly this shape:
 export const explain: StepDefinition<ExplainInput, Explanation, ExplainReply> = {
   name: "explain",
 
-  async loadInput(db, caseId, inputRunId) {
+  async loadInput(db, caseId, inputRunId, _intent, requested) {
     if (inputRunId === null) throw new StepPrecondition("explain needs input_run_id: the id of the advice to explain");
     const state = await foldCase(db, caseId);
     const advice = state.advice.find((a) => a.adviceId === inputRunId);
@@ -92,7 +93,8 @@ export const explain: StepDefinition<ExplainInput, Explanation, ExplainReply> = 
       advice,
       items: items(advice, client, attributes, state.findings),
       documents: state.documents,
-      language: client.profile.language ?? "en",
+      // The language asked for (#75), else the client's own (#43).
+      language: requested ?? client.profile.language ?? "en",
     };
   },
 

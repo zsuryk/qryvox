@@ -1,4 +1,4 @@
-import type { Citation, Finding, IngestedDocument, StepName } from "@qryvox/shared";
+import type { Citation, ClientLanguage, Finding, IngestedDocument, StepName } from "@qryvox/shared";
 import type { z } from "zod";
 import type { Db } from "../db/client.js";
 import type { EventDraft, Tx } from "../log.js";
@@ -14,7 +14,8 @@ export type StepDefinition<Input, Output extends Record<string, unknown>, Reply 
   name: StepName;
   // Reads what the step consumes from the log. Steps are stateless: the log is their only input. intent is
   // the analyst's words on a parse request, which the run records on its events, so it is in the log too.
-  loadInput(db: Db, caseId: string, inputRunId: string | null, intent?: string): Promise<Input>;
+  // language is an explain run's request for a language other than the client's own (#75).
+  loadInput(db: Db, caseId: string, inputRunId: string | null, intent?: string, language?: ClientLanguage): Promise<Input>;
   // The versioned prompt. Never sent to the interface; only PROMPT_VERSIONS[name] is recorded. A seeded
   // run (#64) passes its seed, already checked against the documents; unseeded, the prompt is unchanged.
   messages(input: Input, seed?: Citation): ChatMessage[];

@@ -175,6 +175,56 @@ describe("an explanation in the client's language (#43)", () => {
   });
 });
 
+describe("an explanation in the other language, on request (#75)", () => {
+  const explainIn = (t: TestApp, caseId: string, adviceId: string, language?: "en" | "zh-Hant") =>
+    t.request("POST", `/cases/${caseId}/steps`, { step_run_id: randomUUID(), step: "explain", input_run_id: adviceId, ...(language ? { language } : {}) });
+
+  it("writes in the language asked for, not the client's own, and records it on the run", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    let system = "";
+    reply = bend(advice, (p) => (p[0]!.text = '文件寫明 "' + advice.reasons[0]!.citation!.quote + '"，你的投資期只有 2 年。'));
+    answer = (messages) => {
+      system = messages[0]!.content;
+      return reply;
+    };
+    try {
+      const res = await explainIn(t, caseId, adviceId, "zh-Hant");
+      expect(res.status, await res.clone().text()).toBe(200);
+      expect(Explanation.parse(StepResult.parse(await res.json()).output).language).toBe("zh-Hant");
+    } finally {
+      answer = () => reply;
+    }
+    expect(system).toContain("Traditional Chinese");
+    const { events } = EventPage.parse(await (await t.request("GET", `/cases/${caseId}/events`)).json());
+    const started = events.find((e) => e.type === "step.started" && e.payload.step === "explain");
+    expect(started?.type === "step.started" && started.payload.language).toBe("zh-Hant");
+  });
+
+  it("asks for English the same way for a client who answered in Traditional Chinese", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice({ profile: { ...chan, language: "zh-Hant" } });
+    let system = "";
+    reply = { depths: faithful(advice) };
+    answer = (messages) => {
+      system = messages[0]!.content;
+      return reply;
+    };
+    try {
+      const res = await explainIn(t, caseId, adviceId, "en");
+      expect(res.status, await res.clone().text()).toBe(200);
+      expect(Explanation.parse(StepResult.parse(await res.json()).output).language).toBe("en");
+    } finally {
+      answer = () => reply;
+    }
+    expect(system).not.toContain("Traditional Chinese");
+  });
+
+  it("is refused on any step but explain", async () => {
+    const { t, caseId } = await chanAdvice();
+    const res = await t.request("POST", `/cases/${caseId}/steps`, { step_run_id: randomUUID(), step: "extract", input_run_id: null, language: "en" });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("explanations it refuses", () => {
   it("one that leaves a reason unexplained", async () => {
     expect(await refused((p) => p.splice(2, 1))).toMatch(/novice: r2 is explained 0 times, not once/);
@@ -237,6 +287,25 @@ describe("explanations it refuses", () => {
     const { t, caseId, adviceId, advice } = await chanAdvice();
     reply = bend(advice, (p) => (p[0]!.text = `The PPM, p.${advice.reasons[0]!.citation!.page}, sets the minimum.`));
     expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+  });
+
+  it("reads a number word in the source as that number, from one to twenty (#75)", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    const five = advice.reasons.findIndex((r) => r.citation?.quote.includes("at least five years"));
+    expect(five).toBeGreaterThanOrEqual(0);
+    // Real refusals (#67): the PPM says "five years" and the model wrote "5".
+    reply = bend(advice, (p, depth) => {
+      p[five]!.text = "The fund aims for growth over at least 5 years, longer than you can wait.";
+      depth.summary = "Your money is needed sooner than a 5 year fund allows.";
+    });
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(200);
+  });
+
+  it("still refuses a number the source states in neither digits nor words", async () => {
+    const { t, caseId, adviceId, advice } = await chanAdvice();
+    const five = advice.reasons.findIndex((r) => r.citation?.quote.includes("at least five years"));
+    reply = bend(advice, (p) => (p[five]!.text = "The fund aims for growth over at least 6 years."));
+    expect((await explainCall(t, caseId, adviceId)).status).toBe(422);
   });
 
   it("one that states a number neither its quote nor the client's answer holds", async () => {

@@ -55,7 +55,7 @@ export async function runStep(
   const step = STEPS[req.step];
   if (!llm) throw new LlmNotConfigured("no model is configured: set LLM_BASE_URL and LLM_MODEL");
 
-  const input = await step.loadInput(db, caseId, req.input_run_id, req.intent);
+  const input = await step.loadInput(db, caseId, req.input_run_id, req.intent, req.language);
   const seed = req.seed && groundSeed(step, input, req.seed);
   // Only a run about to spend tokens counts: a stored result or a precondition failure never gets here.
   await checkRateLimit(db, caseId, caller.ipHash, caller.limits);
@@ -65,6 +65,7 @@ export async function runStep(
     prompt_version: PROMPT_VERSIONS[req.step],
     input_run_id: req.input_run_id,
     ...(req.intent !== undefined && { intent: req.intent }),
+    ...(req.language !== undefined && { language: req.language }),
     ...(seed && { seed }),
   };
   const draft = { v: 1, actor: ANALYST_ACTOR, stepRunId: req.step_run_id, ipHash: caller.ipHash };
