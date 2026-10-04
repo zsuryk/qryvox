@@ -118,7 +118,7 @@ export function naturalSlot(card: CanvasCard, view: CanvasView): PlanSlot | null
 
 // The categories a card may be docked under: the same rule the backend refuses a dock by (#55, #65).
 export function dockableCategories(card: CanvasCard, view: CanvasView): PlanSlot["category"][] {
-  return cardCategories(card, view.state, view.cards);
+  return cardCategories(card, view.state, view.all);
 }
 
 // The passage a find-similar run was seeded with, as a line on the candidates it found.

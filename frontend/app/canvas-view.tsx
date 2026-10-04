@@ -26,6 +26,7 @@ import { asked, candidatesOf, hasRecording, instantSaid, instantSimilar, planSim
 import { appendOp, type CanvasLog, canvasLog, type CardOp, reread, rolledBack, sent, settled, shownLog } from "../lib/canvas-store";
 import { changeDisposition, fetchEvents, recordCardOperation, runStep } from "../lib/api";
 import { DISPOSITION_LABEL, keyIntent } from "../lib/disposition";
+import { chipKey, intentCards, intentView } from "../lib/intent-chips";
 import { rationaleRequest, unwordedFindingsRun } from "../lib/pipeline";
 import { errorMessage } from "../lib/errors";
 import {
@@ -322,10 +323,14 @@ type CanvasProps = {
   say: (words: string) => void;
 };
 
-function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
+function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
   const dispatch = store.dispatch;
-  // What the analyst has said they want to look at (#69), as chips.
+  // The intent chips (#70) choose which of the case's cards are on the canvas: `view` below is the case's
+  // view holding only those, which everything drawn and every card's action is read from. The full view is
+  // for what is about the case rather than the canvas: its models and whether it has any findings at all.
   const intent = useIntent(log, mode, store, say);
+  const shown = useMemo(() => intentCards(fullView, log, intent.chips), [fullView, log, intent.chips]);
+  const view = useMemo(() => intentView(fullView, shown), [fullView, shown]);
   const { similar, further, searching, arrived, lit } = useFindSimilar(view, mode, store, say);
   const rationales = useRationales(log, mode, store, say);
   // Both layouts, wide and narrow (#61): the frame's width picks one, and the first fit has to know the
@@ -342,6 +347,14 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
   useEffect(() => {
     seen.current = viewport;
   }, [viewport]);
+  // The chips changing changes what is on the canvas, so it is fitted afresh to what is left.
+  const chipsKey = intent.chips.map(chipKey).join(",");
+  const fittedFor = useRef(chipsKey);
+  useEffect(() => {
+    if (fittedFor.current === chipsKey) return;
+    fittedFor.current = chipsKey;
+    fit();
+  }, [chipsKey, fit]);
   const [sheet, setSheet] = useState<{ citation: CardCitation; label: string } | null>(null);
   const [trayOpen, setTrayOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
@@ -349,7 +362,7 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
   const board = view.state.board;
   const pinnedCount = layout.flow.filter((p) => p.pinned).length;
   const dockedCount = layouts.wide.docked.length;
-  const models = useMemo(() => new Map(view.cards.map((card) => [card.cardId, cardModel(card, view.state, view.rationales)])), [view]);
+  const models = useMemo(() => new Map(fullView.all.map((card) => [card.cardId, cardModel(card, fullView.state, fullView.rationales)])), [fullView]);
   const discarded = board.discarded.flatMap((d) => models.get(d.cardId) ?? []);
 
   // The cards' actions read the latest layout through a ref, so they keep one identity across renders and
@@ -632,9 +645,9 @@ function Canvas({ view, log, mode, store, said, say }: CanvasProps) {
           {said ?? (mode.kind === "fixture" ? "Card operations and decisions stay in this tab: a reload starts the recorded case over." : null)}
         </p>
       </div>
-      <IntentBar intent={intent} mode={mode} />
+      <IntentBar intent={intent} shown={shown} mode={mode} />
       {/* A case opens here (#59), before anything has run on it: the steps are run from Review. */}
-      {view.cards.length === 0 && mode.kind === "live" && (
+      {fullView.cards.length === 0 && mode.kind === "live" && (
         <div className="notice notice--tint canvas-empty">
           <p className="t-callout">
             No findings on this case yet. Run the steps on Review, and each finding arrives here as a card, with the passages it

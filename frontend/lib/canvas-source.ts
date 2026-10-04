@@ -83,18 +83,21 @@ export type CanvasCard = CaseCard;
 
 // rationales: the model-written line on why each finding on the board matters, where a rationale run
 // wrote one that held (#62, rationaleFor), by finding id. A finding without one shows the derived line.
-export type CanvasView = { state: CaseState; cards: CanvasCard[]; rationales: ReadonlyMap<string, string> };
+// cards: the default canvas. all: every card the case has, the latent statements too, which the intent chips
+// (lib/intent-chips.ts) may bring onto it.
+export type CanvasView = { state: CaseState; cards: CanvasCard[]; all: CanvasCard[]; rationales: ReadonlyMap<string, string> };
 
 export function canvasView(events: readonly SlimEvent[]): CanvasView {
   const state = fold(events);
   const { docked, pinned, discarded } = state.board;
   const named = new Set([...docked, ...pinned, ...discarded].map((entry) => entry.cardId));
-  const cards = caseCards(events, state).filter((card) => !(card.kind === "excerpt" && card.latent) || named.has(card.cardId));
+  const all = caseCards(events, state);
+  const cards = all.filter((card) => !(card.kind === "excerpt" && card.latent) || named.has(card.cardId));
   const rationales = new Map(
     activeFindings(state).flatMap((f): [string, string][] => {
       const text = rationaleFor(events, f.finding_id);
       return text === null ? [] : [[f.finding_id, text]];
     }),
   );
-  return { state, cards, rationales };
+  return { state, cards, all, rationales };
 }

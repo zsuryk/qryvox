@@ -8,14 +8,15 @@ import { similarFailure } from "../lib/canvas-similar";
 import type { CanvasMode } from "../lib/canvas-source";
 import type { CanvasLog } from "../lib/canvas-store";
 import { runStep } from "../lib/api";
-import { CARD_STEPS, CHIP_STEP_LABELS, chipKey, chipLabel } from "../lib/intent-chips";
+import { CARD_STEPS, CHIP_STEP_LABELS, chipKey, chipLabel, type IntentCards } from "../lib/intent-chips";
 import { chipsOf, intentRefusal, parseRequest, parseRunFor, parsedAlready, playIntent, RECORDED_INTENTS, standingParseRun } from "../lib/intent-parse";
 import styles from "./canvas-intent.module.css";
 
-// The intent field (#69): one quiet line to say what to look at, and the chips it comes to. Enter
+// The intent field (#69, #70): one quiet line to say what to look at, and the chips it comes to. Enter
 // sends the words to the parse step, which reads them into chips like the ones the picker offers; the chips
 // from the words and the ones picked by hand are merged by the shared resolveIntent, and any of them can be
-// switched off or on again. Only sending words calls a model, and then once: the same words again are a retry.
+// switched off or on again. The chips filter and focus the cards already on the case (lib/intent-chips.ts):
+// changing one calls no model, and only sending words does, once.
 
 type IntentStore = {
   current: RefObject<CanvasLog>;
@@ -123,7 +124,7 @@ export function useIntent(log: readonly SlimEvent[], mode: CanvasMode, store: In
 
 const single = (field: keyof IntentChip, value: string): IntentChip => ({ category: null, authority: null, step_kind: null, [field]: value }) as IntentChip;
 
-export function IntentBar({ intent, mode }: { intent: Intent; mode: CanvasMode }) {
+export function IntentBar({ intent, shown, mode }: { intent: Intent; shown: IntentCards; mode: CanvasMode }) {
   const [picking, setPicking] = useState(false);
   const { chips, resolved, off } = intent;
   const active = (chip: IntentChip) => chips.some((c) => chipKey(c) === chipKey(chip));
@@ -215,9 +216,22 @@ export function IntentBar({ intent, mode }: { intent: Intent; mode: CanvasMode }
       )}
       <p className="t-caption faint">
         {chips.length === 0
-          ? "No chips yet. Say what you want to look at, or pick chips."
-          : "These chips are the intent. Switch one off or on by pressing it; each chip is picked by hand or read from your words."}
+          ? "No intent set: the whole canvas is showing. Say what you want to look at, or pick chips, to narrow it."
+          : `${shown.matched} of the case's ${shown.total} cards match. Each chip adds the cards it names; pinned and docked cards always show. Changing a chip asks no model.`}
       </p>
+      {shown.nothing && (
+        <div className="notice notice--tint" role="status">
+          <p className="t-callout">
+            No cards match these chips.{" "}
+            {chips.some((c) => c.step_kind === "attributes" || c.step_kind === "explain")
+              ? "Product facts and explanations are not cards. "
+              : "The case may not have run that step yet. "}
+            <button type="button" className="btn btn--small btn--plain" onClick={intent.clear}>
+              Clear chips
+            </button>
+          </p>
+        </div>
+      )}
     </div>
   );
 }
