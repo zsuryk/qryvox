@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Advice, AdviceDecision, DecisionConfirmation, RejectionReason, SupersedeCause } from "./advice.js";
 import { CardId, PlanSlot, WorldPos } from "./card.js";
-import { ClientProfile, KnowledgeLevel } from "./client.js";
+import { ClientLanguage, ClientProfile, KnowledgeLevel } from "./client.js";
 import { Citation, Disposition, Finding } from "./finding.js";
 
 // Envelope fields carried by every event, named as in ADR-0002.
@@ -94,6 +94,9 @@ const stepRun = {
   // A find-similar run's seed (#64): the passage the analyst picked, which the run looks for more of. Only
   // extract and contradictions take one. Absent on every unseeded run, and on every event written before it.
   seed: Citation.optional(),
+  // An explain run asked to write in a language other than the client's own (#75): recorded on the run, so
+  // the log stays the step's only input. Absent on every other run, and on every event written before it.
+  language: ClientLanguage.optional(),
 };
 
 // Step events always carry the run's step_run_id in the envelope.

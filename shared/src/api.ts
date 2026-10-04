@@ -15,7 +15,7 @@ import {
   StepName,
 } from "./events.js";
 import { AdviceDecision, DecisionConfirmation, RejectionReason } from "./advice.js";
-import { ClientProfile, KnowledgeLevel } from "./client.js";
+import { ClientLanguage, ClientProfile, KnowledgeLevel } from "./client.js";
 import { Citation, Disposition } from "./finding.js";
 import { ParseInput } from "./intent.js";
 
@@ -149,10 +149,17 @@ export const RunStepRequest = z
     // quoted verbatim from its page. A seeded run's output is candidate cards for the canvas; it never
     // becomes another step's input, so it never reaches the findings on the board.
     seed: Citation.optional(),
+    // explain only (#75): write the explanation in this language rather than the client's own, for a client
+    // who asked to read it in the other one. Written on request and kept on the log.
+    language: ClientLanguage.optional(),
   })
   .refine((r) => (r.step === "parse") === (r.intent !== undefined), {
     message: "intent is required for the parse step and only for it",
     path: ["intent"],
+  })
+  .refine((r) => r.language === undefined || r.step === "explain", {
+    message: "language is only for the explain step",
+    path: ["language"],
   })
   .refine((r) => r.seed === undefined || isSeedable(r.step), {
     message: "only the extract and contradictions steps take a seed",

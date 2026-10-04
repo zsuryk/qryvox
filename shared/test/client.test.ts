@@ -4,6 +4,10 @@ import {
   Advice,
   adviceToRedraft,
   explanationFor,
+  explanationLanguages,
+  isAbandoned,
+  ABANDONED_MARGIN_MS,
+  STEP_TIMEOUT_MS,
   approvedAdviceFor,
   ClientProfile,
   fold,
@@ -198,6 +202,57 @@ describe("explanationFor", () => {
 
     expect(explanationFor(later, ADVICE_ID)?.depths.novice.summary).toBe("Second.");
     expect(explanationFor(later, "00000000-0000-4000-8000-0000000000bb")).toBeNull();
+  });
+
+  it("finds the explanation in the language asked for, and none when it was never written in it (#75)", () => {
+    const n = events.length;
+    const inLanguage = (seq: number, language?: "en" | "zh-Hant") => {
+      const e = explained(seq, `run-${seq}`, language === "zh-Hant" ? "不適合。" : "English.");
+      if (e.type !== "step.completed") throw new Error("completed");
+      return SlimEvent.parse({ ...e, payload: { ...e.payload, output: { ...e.payload.output, ...(language ? { language } : {}) } } });
+    };
+    // One written before languages were recorded counts as English.
+    const english = [...events, inLanguage(n + 1)];
+    expect(explanationFor(english, ADVICE_ID, "en")?.depths.novice.summary).toBe("English.");
+    expect(explanationFor(english, ADVICE_ID, "zh-Hant")).toBeNull();
+    expect(explanationLanguages(english, ADVICE_ID)).toEqual(["en"]);
+
+    const both = [...english, inLanguage(n + 2, "zh-Hant")];
+    expect(explanationFor(both, ADVICE_ID, "zh-Hant")?.depths.novice.summary).toBe("不適合。");
+    expect(explanationFor(both, ADVICE_ID, "en")?.depths.novice.summary).toBe("English.");
+    // With no language asked for, the latest written is the one, as before.
+    expect(explanationFor(both, ADVICE_ID)?.language).toBe("zh-Hant");
+    expect(explanationLanguages(both, ADVICE_ID).sort()).toEqual(["en", "zh-Hant"]);
+  });
+});
+
+describe("an abandoned run (#75)", () => {
+  const started = (at: string) =>
+    SlimEvent.parse({
+      seq: 1,
+      event_id: "00000000-0000-4000-8000-000000000001",
+      case_id: caseId,
+      actor: "demo-analyst",
+      at,
+      step_run_id: "run-1",
+      type: "step.started",
+      v: 1,
+      payload: { step: "rationale", model: "m", prompt_version: "rationale@1", input_run_id: "f" },
+    });
+  const t0 = Date.parse("2026-10-04T10:00:00.000Z");
+
+  it("is a run still running after the step timeout and a margin, never one that is merely slow", () => {
+    const log = [started("2026-10-04T10:00:00.000Z")];
+    const run = fold(log).stepRuns[0]!;
+    expect(isAbandoned(log, run, t0 + 60_000)).toBe(false);
+    expect(isAbandoned(log, run, t0 + STEP_TIMEOUT_MS)).toBe(false);
+    expect(isAbandoned(log, run, t0 + STEP_TIMEOUT_MS + ABANDONED_MARGIN_MS + 1)).toBe(true);
+  });
+
+  it("is never a run that settled", () => {
+    const log = [started("2026-10-04T10:00:00.000Z")];
+    const run = { ...fold(log).stepRuns[0]!, status: "completed" as const };
+    expect(isAbandoned(log, run, t0 + 10 * STEP_TIMEOUT_MS)).toBe(false);
   });
 });
 

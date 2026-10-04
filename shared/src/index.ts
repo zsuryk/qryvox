@@ -110,7 +110,8 @@ export {
   StepName,
   StepStarted,
 } from "./events.js";
-export { explanationFor } from "./explanation.js";
+export { explanationFor, explanationLanguages } from "./explanation.js";
+export { ABANDONED_MARGIN_MS, isAbandoned, STEP_TIMEOUT_MS } from "./stale.js";
 export { Rationale, RATIONALE_MAX_LENGTH, rationaleFor, RationaleOutput } from "./rationale.js";
 export { latestStatements, type Neighbour, nearestStatements } from "./similar.js";
 export { ChipStep, IntentChip, ParseInput, ParseOutput, type ResolvedIntent, resolveIntent } from "./intent.js";
