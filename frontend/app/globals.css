@@ -1861,3 +1861,29 @@ details[open] > summary::before {
     height: max(22rem, calc(100dvh - var(--canvas-top, 18rem) - 0.75rem));
   }
 }
+/* Expanded text (#81): the clamp lets go and the block shows its lines, up to the bounded excerpt. */
+.canvas-card__title--expanded {
+  -webkit-line-clamp: unset;
+  display: block;
+}
+.canvas-card__line--expanded {
+  -webkit-line-clamp: unset;
+  display: block;
+  white-space: normal;
+}
+.canvas-card__quote--expanded {
+  -webkit-line-clamp: 12;
+}
+.canvas-card__expand {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: var(--tint);
+  cursor: pointer;
+  font-size: 0.75rem;
+  margin: -0.25rem 0;
+  padding: 0.125rem 0;
+}
+.canvas-card__expand:hover {
+  text-decoration: underline;
+}

@@ -16,7 +16,7 @@ import {
 } from "@qryvox/shared";
 import Link from "next/link";
 import { categoryLabel } from "../lib/board";
-import { type CardCitation, type CardModel, cardModel, dockableCategories, DOCUMENT_KIND_LABELS, naturalSlot } from "../lib/canvas-cards";
+import { type CardCitation, type CardModel, cardModel, dockableCategories, DOCUMENT_KIND_LABELS, type ExpandedMap, naturalSlot } from "../lib/canvas-cards";
 import { type DropTarget, resolveDrop } from "../lib/canvas-drop";
 import { canvasLayout } from "../lib/canvas-layout";
 import { CARD_W } from "../lib/tiling";
@@ -335,7 +335,8 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
   const rationales = useRationales(log, mode, store, say);
   // Both layouts, wide and narrow (#61): the frame's width picks one, and the first fit has to know the
   // bounds of whichever it picks before anything is drawn.
-  const layouts = useMemo(() => ({ wide: canvasLayout(view), narrow: canvasLayout(view, { narrow: true }) }), [view]);
+  const [expandedMap, setExpandedMap] = useState<ExpandedMap>(new Map());
+  const layouts = useMemo(() => ({ wide: canvasLayout(view, { expanded: expandedMap }), narrow: canvasLayout(view, { narrow: true, expanded: expandedMap }) }), [view, expandedMap]);
   const bounds = useMemo(() => ({ wide: layouts.wide.bounds, narrow: layouts.narrow.bounds }), [layouts]);
   const frame = useRef<HTMLDivElement | null>(null);
   const bin = useRef<HTMLButtonElement | null>(null);
@@ -415,6 +416,11 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
       further: (id) => void further(id),
       decide: (id, disposition) => void decide(id, disposition),
       openCitation: (citation, label) => setSheet({ citation, label }),
+      toggleBlock: (id, block) =>
+        setExpandedMap((m) => {
+          const cur = m.get(id) ?? {};
+          return new Map(m).set(id, { ...cur, [block]: !cur[block] });
+        }),
       reveal(id) {
         const rect = rectOf(id);
         if (rect) reveal(rect);
@@ -697,6 +703,7 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
                         searching={searching.has(card.cardId)}
                         asked={asked(view, card.cardId)}
                         lit={lit.has(card.cardId)}
+                        expanded={expandedMap.get(card.cardId)}
                         similarOff={similarOff.get(card.cardId) ?? null}
                         deciding={deciding.has(card.cardId)}
                         actions={actions}

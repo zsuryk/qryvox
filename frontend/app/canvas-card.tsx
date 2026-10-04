@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import type { CardId, Disposition, Severity } from "@qryvox/shared";
-import type { CardCitation, CardModel } from "../lib/canvas-cards";
+import { blockLines, type CardCitation, type CardModel, type ExpandedBlocks, type TextBlock } from "../lib/canvas-cards";
 
 // The canvas's one card (#54). Two kinds, one anatomy and one height, so the flow can be arithmetic:
 //   finding — severity, category and authority badges, the finding in a sentence, the one line on why it
@@ -31,6 +31,8 @@ export type CardActions = {
   decide: (cardId: CardId, disposition: Disposition) => void;
   openCitation: (citation: CardCitation, label: string) => void;
   reveal: (cardId: CardId) => void;
+  // Show or collapse a clamped text block, in place (#81): the card, and the tiles around it, grow with it.
+  toggleBlock: (cardId: CardId, block: TextBlock) => void;
 };
 
 // Flat flags rather than one object, so a card whose state has not changed is never re-rendered.
@@ -51,10 +53,12 @@ export type CardProps = {
   similarOff: string | null;
   // A decision on this card's finding is on its way to the log.
   deciding: boolean;
+  // Which of the card's text blocks are expanded (#81).
+  expanded: ExpandedBlocks | undefined;
   actions: CardActions;
 };
 
-export const Card = memo(function Card({ model, docked, pinned, discarded, undockable, searching, asked, lit, similarOff, deciding, actions }: CardProps) {
+export const Card = memo(function Card({ model, docked, pinned, discarded, undockable, searching, asked, lit, similarOff, deciding, expanded, actions }: CardProps) {
   const state = { docked, pinned, discarded };
   const what =
     model.kind === "finding"
@@ -70,7 +74,7 @@ export const Card = memo(function Card({ model, docked, pinned, discarded, undoc
       tabIndex={model.kind === "finding" ? 0 : undefined}
       data-finding-card={model.kind === "finding" ? model.cardId : undefined}
     >
-      {model.kind === "finding" ? <FindingBody model={model} deciding={deciding} actions={actions} /> : <ExcerptBody model={model} actions={actions} />}
+      {model.kind === "finding" ? <FindingBody model={model} deciding={deciding} expanded={expanded} actions={actions} /> : <ExcerptBody model={model} expanded={expanded} actions={actions} />}
       <ActionRow cardId={model.cardId} state={state} undockable={undockable} searching={searching} asked={asked} similarOff={similarOff} actions={actions} />
     </article>
   );
@@ -86,7 +90,7 @@ const DECIDE: Record<Disposition, { label: string; tone: string; title: string }
   },
 };
 
-function FindingBody({ model, deciding, actions }: { model: Extract<CardModel, { kind: "finding" }>; deciding: boolean; actions: CardActions }) {
+function FindingBody({ model, deciding, expanded, actions }: { model: Extract<CardModel, { kind: "finding" }>; deciding: boolean; expanded: ExpandedBlocks | undefined; actions: CardActions }) {
   const chip = `${model.citation.documentName} · page ${model.citation.citation.page}`;
   return (
     <>
@@ -98,17 +102,19 @@ function FindingBody({ model, deciding, actions }: { model: Extract<CardModel, {
         <span className="badge">{model.category}</span>
         {model.authority && <span className="badge">{model.authority}</span>}
       </div>
-      <h3 className="t-callout strong canvas-card__title">{model.title}</h3>
+      <h3 className={`t-callout strong canvas-card__title${expanded?.title ? " canvas-card__title--expanded" : ""}`}>{model.title}</h3>
+      <BlockToggle model={model} block="title" expanded={expanded} actions={actions} />
       {model.written ? (
         // The model's sentence (#62), marked as such, quietly: the derived line needs no label.
-        <p className="t-caption muted canvas-card__line canvas-card__line--written" title={`Why it matters, written by the model: ${model.rationale}`}>
+        <p className={`t-caption muted canvas-card__line canvas-card__line--written${expanded?.rationale ? " canvas-card__line--expanded" : ""}`} title={`Why it matters, written by the model: ${model.rationale}`}>
           <span className="canvas-card__why">Why it matters</span> {model.rationale}
         </p>
       ) : (
-        <p className="t-caption muted canvas-card__line" title={model.rationale}>
+        <p className={`t-caption muted canvas-card__line${expanded?.rationale ? " canvas-card__line--expanded" : ""}`} title={model.rationale}>
           {model.rationale}
         </p>
       )}
+      <BlockToggle model={model} block="rationale" expanded={expanded} actions={actions} />
       <div className="canvas-card__chips">
         <button type="button" className="chip chip--link canvas-card__chip" title="Open the page this is cited on" onClick={() => actions.openCitation(model.citation, chip)}>
           {chip}
@@ -139,7 +145,7 @@ function FindingBody({ model, deciding, actions }: { model: Extract<CardModel, {
   );
 }
 
-function ExcerptBody({ model, actions }: { model: Extract<CardModel, { kind: "excerpt" }>; actions: CardActions }) {
+function ExcerptBody({ model, expanded, actions }: { model: Extract<CardModel, { kind: "excerpt" }>; expanded: ExpandedBlocks | undefined; actions: CardActions }) {
   const page = `${model.documentName} · page ${model.page}`;
   return (
     <>
@@ -154,7 +160,8 @@ function ExcerptBody({ model, actions }: { model: Extract<CardModel, { kind: "ex
           {page}
         </button>
       </div>
-      <blockquote className="t-callout canvas-card__quote">{model.quote}</blockquote>
+      <blockquote className={`t-callout canvas-card__quote${expanded?.quote ? " canvas-card__quote--expanded" : ""}`}>{model.quote}</blockquote>
+      <BlockToggle model={model} block="quote" expanded={expanded} actions={actions} />
       <div className="canvas-card__chips" role="group" aria-label="Findings citing this passage">
         {model.linked.length === 0 ? (
           <span className="t-caption faint canvas-card__line" title={model.similarTo ?? undefined}>
@@ -169,6 +176,18 @@ function ExcerptBody({ model, actions }: { model: Extract<CardModel, { kind: "ex
         )}
       </div>
     </>
+  );
+}
+
+// The quiet control on a clamped block (#81): only when the text does not fit. Expanded, it offers
+// Collapse; per block, per card, reachable like any button.
+function BlockToggle({ model, block, expanded, actions }: { model: CardModel; block: TextBlock; expanded: ExpandedBlocks | undefined; actions: CardActions }) {
+  const open = expanded?.[block] === true;
+  if (!open && !blockLines(model, block).hidden) return null;
+  return (
+    <button type="button" className="canvas-card__expand" aria-expanded={open} onClick={() => actions.toggleBlock(model.cardId, block)}>
+      {open ? "Collapse" : "Expand"}
+    </button>
   );
 }
 
