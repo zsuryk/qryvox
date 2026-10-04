@@ -11,6 +11,7 @@ import {
   playIntent,
   RECORDED_INTENTS,
   recordedIntent,
+  restoredOff,
   standingParseRun,
 } from "../lib/intent-parse";
 
@@ -129,5 +130,18 @@ describe("sending the same words again", () => {
     const events = failed(base, "garbled", "22222222-2222-4222-8222-222222222222");
     expect(parseRunFor(events, "garbled")).toBe("22222222-2222-4222-8222-222222222222");
     expect(parsedAlready(events, "garbled")).toBe(false);
+  });
+});
+
+describe("a canvas opening on a log that already has a parse run", () => {
+  it("has that run's chips switched off, so the whole canvas shows", () => {
+    expect([...restoredOff(played("fee contradictions in the PPM"))]).toEqual(["fees|ppm|contradictions"]);
+    expect([...restoredOff(played("PPM 裡的費用"))]).toEqual(["fees|ppm|null"]);
+  });
+
+  it("has nothing switched off where there is no completed run, or the words mapped onto nothing", () => {
+    expect(restoredOff(base).size).toBe(0);
+    expect(restoredOff(failed(base, "garbled", "22222222-2222-4222-8222-222222222222")).size).toBe(0);
+    expect(restoredOff(played("what a lovely afternoon")).size).toBe(0);
   });
 });

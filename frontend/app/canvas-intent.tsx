@@ -9,7 +9,7 @@ import type { CanvasMode } from "../lib/canvas-source";
 import type { CanvasLog } from "../lib/canvas-store";
 import { runStep } from "../lib/api";
 import { CARD_STEPS, CHIP_STEP_LABELS, chipKey, chipLabel, type IntentCards } from "../lib/intent-chips";
-import { chipsOf, intentRefusal, parseRequest, parseRunFor, parsedAlready, playIntent, RECORDED_INTENTS, standingParseRun } from "../lib/intent-parse";
+import { chipsOf, intentRefusal, parseRequest, parseRunFor, parsedAlready, playIntent, RECORDED_INTENTS, restoredOff, standingParseRun } from "../lib/intent-parse";
 import styles from "./canvas-intent.module.css";
 
 // The intent field (#69, #70): one quiet line to say what to look at, and the chips it comes to. Enter
@@ -29,8 +29,8 @@ export type Intent = ReturnType<typeof useIntent>;
 export function useIntent(log: readonly SlimEvent[], mode: CanvasMode, store: IntentStore, say: (words: string) => void) {
   const [text, setText] = useState("");
   const [manual, setManual] = useState<readonly IntentChip[]>([]);
-  // Chips switched off by hand, by key: a chip stays in the row, dimmed, so it can be switched back on.
-  const [off, setOff] = useState<ReadonlySet<string>>(new Set());
+  // Chips switched off, by key, those of an earlier visit's parse among them (restoredOff): a chip stays in the row, dimmed, so it can be switched back on.
+  const [off, setOff] = useState<ReadonlySet<string>>(() => restoredOff(log));
   // The run whose chips stand where the analyst has just sent words: by default the log's latest completed.
   const [chosen, setChosen] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);

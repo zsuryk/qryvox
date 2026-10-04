@@ -41,6 +41,15 @@ export function chipsOf(events: readonly SlimEvent[], runId: string): IntentChip
   return parsed?.success ? parsed.data.chips : null;
 }
 
+// The chips a canvas opens with switched off: those of the parse run standing in the log when the page
+// loads. They are still in the chip row, dimmed, to be switched back on with one press, but a reload never
+// opens a filtered canvas. Chips parsed during the visit start on.
+export function restoredOff(events: readonly SlimEvent[]): Set<string> {
+  const run = standingParseRun(events);
+  const chips = run === null ? null : chipsOf(events, run);
+  return new Set((chips ?? []).map((c) => `${c.category}|${c.authority}|${c.step_kind}`));
+}
+
 // Whether a run of these words already completed on the log.
 export function parsedAlready(events: readonly SlimEvent[], text: string): boolean {
   const id = parseRunFor(events, text);
