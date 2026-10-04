@@ -14,7 +14,7 @@ import {
   SlimEvent,
   StepName,
 } from "./events.js";
-import { AdviceDecision, DecisionConfirmation, RejectionReason } from "./advice.js";
+import { AdviceDecision, DecisionConfirmation, RejectionReason, Verdict } from "./advice.js";
 import { ClientLanguage, ClientProfile, KnowledgeLevel } from "./client.js";
 import { Citation, Disposition } from "./finding.js";
 import { ParseInput } from "./intent.js";
@@ -91,6 +91,25 @@ export type ClientListResponse = z.infer<typeof ClientListResponse>;
 // GET /clients/:clientId — the cases that hold this client's answers: where the list's products are read from.
 export const ClientCasesResponse = z.object({ client_id: z.string().min(1), case_ids: z.array(z.string().min(1)) });
 export type ClientCasesResponse = z.infer<typeof ClientCasesResponse>;
+
+// GET /clients — the adviser's queue (#71): every client with advice in play, the cases holding it, and where
+// each decision stands (null: awaiting the adviser). Oldest answers first.
+export const ClientQueueCase = z.object({
+  case_id: z.string().min(1),
+  advice_id: z.uuid(),
+  verdict: Verdict,
+  decision: z.enum(["approved", "rejected"]).nullable(),
+});
+export type ClientQueueCase = z.infer<typeof ClientQueueCase>;
+export const ClientQueueEntry = z.object({
+  client_id: z.string().min(1),
+  vulnerable: z.boolean(),
+  answered_at: z.string(),
+  cases: z.array(ClientQueueCase),
+});
+export type ClientQueueEntry = z.infer<typeof ClientQueueEntry>;
+export const ClientQueueResponse = z.object({ clients: z.array(ClientQueueEntry) });
+export type ClientQueueResponse = z.infer<typeof ClientQueueResponse>;
 
 // POST /clients/:clientId/decision — the adviser decides the client's whole list in one decision: every
 // advice of theirs in play is approved (or rejected, with the one reason). pick_case_id marks one suitable
