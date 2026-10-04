@@ -1,4 +1,4 @@
-import { activeFindings, fold, type RunStepRequest, type SlimEvent, type StepName, type StepResult, type StepRun } from "@qryvox/shared";
+import { activeFindings, fold, isAbandoned, type RunStepRequest, type SlimEvent, type StepName, type StepResult, type StepRun } from "@qryvox/shared";
 import { errorMessage } from "./errors";
 
 // The run, as the browser drives it: five stateless steps, each one awaited call, in this order
@@ -226,15 +226,17 @@ export function writeRationales(steps: StepTransport, newRunId: RunIdSource, fin
 }
 
 // The findings run whose findings are on the board, when no rationale run has completed or is running over
-// it: a case analysed before the step existed, or one whose run failed. Null when there is nothing to word.
-export function unwordedFindingsRun(events: readonly SlimEvent[]): string | null {
+// it: a case analysed before the step existed, or one whose run failed or was abandoned (#75: a run still
+// "running" long after its call could have lasted, because the browser that started it closed). Null when
+// there is nothing to word. `now` is the reader's clock.
+export function unwordedFindingsRun(events: readonly SlimEvent[], now: number = Date.now()): string | null {
   const state = fold(events);
   const onBoard = activeFindings(state);
   if (onBoard.length === 0) return null;
   const created = new Set(onBoard.map((f) => f.stepRunId));
   const run = state.stepRuns.filter((r) => r.step === "findings" && r.status === "completed" && created.has(r.stepRunId)).at(-1);
   if (!run) return null;
-  const worded = state.stepRuns.some((r) => r.step === "rationale" && r.inputRunId === run.stepRunId && r.status !== "failed");
+  const worded = state.stepRuns.some((r) => r.step === "rationale" && r.inputRunId === run.stepRunId && r.status !== "failed" && !isAbandoned(events, r, now));
   return worded ? null : run.stepRunId;
 }
 

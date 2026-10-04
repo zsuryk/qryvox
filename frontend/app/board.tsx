@@ -231,7 +231,10 @@ function Finding({
       </div>
 
       <p className="t-headline">{card.claim}</p>
-      <p className="t-footnote muted">{card.rationale}</p>
+      <p className="t-footnote muted">
+        {card.rationaleWritten && <span className="strong">Why it matters </span>}
+        {card.rationale}
+      </p>
 
       {/* The quote, in the card, whatever the pane goes on to do. It is the finding's own evidence:
           readable whether or not a text layer was ever marked. */}

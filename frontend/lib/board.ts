@@ -2,6 +2,7 @@ import {
   ruleById,
   activeFindings,
   fold,
+  rationaleFor,
   type CaseDocument,
   type CaseFinding,
   type CaseState,
@@ -61,6 +62,8 @@ export type BoardCard = {
   claim: string;
   // One line saying why that counts as a finding.
   rationale: string;
+  // Whether that line is the rationale step's own (#75), not the one derived from the finding's kind.
+  rationaleWritten: boolean;
   // For a policy gap, the institutional rule it breaks, as rules@1 words it; null on every other kind.
   rule: { id: string; title: string; text: string } | null;
   citation: BoardCitation | null;
@@ -108,7 +111,7 @@ export function boardView(events: readonly SlimEvent[], selected: readonly Findi
   for (const finding of active) counts[finding.category] += 1;
 
   return {
-    cards: shown.map((finding) => card(finding, state.documents)),
+    cards: shown.map((finding) => card(finding, state.documents, rationaleFor(events, finding.finding_id))),
     counts,
     visible: shown.length,
     active: active.length,
@@ -118,7 +121,7 @@ export function boardView(events: readonly SlimEvent[], selected: readonly Findi
   };
 }
 
-function card(finding: CaseFinding, documents: readonly CaseDocument[]): BoardCard {
+function card(finding: CaseFinding, documents: readonly CaseDocument[], written: string | null): BoardCard {
   return {
     findingId: finding.finding_id,
     category: finding.category,
@@ -128,7 +131,9 @@ function card(finding: CaseFinding, documents: readonly CaseDocument[]): BoardCa
     severity: finding.severity,
     severityLabel: SEVERITY_LABELS[finding.severity],
     claim: finding.claim,
-    rationale: rationale(finding),
+    // The model's line when the rationale step wrote one that held (#62, #75), else the one the board derives.
+    rationale: written ?? rationale(finding),
+    rationaleWritten: written !== null,
     rule: finding.rule ? { id: finding.rule, title: ruleById(finding.rule).title, text: ruleById(finding.rule).text } : null,
     citation: citation(finding.citation, documents),
     counterpart: citation(finding.counterpart, documents),

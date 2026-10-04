@@ -29,6 +29,7 @@ describe("the board", () => {
       severityLabel: "High",
       claim: "The factsheet states a 0.85% management fee per annum; the fee table states 1.25% of net asset value.",
       rationale: "Two documents state the same fact differently: factsheet and fee-table.",
+      rationaleWritten: false,
       rule: null,
       citation: {
         documentId: "factsheet",
@@ -193,5 +194,24 @@ describe("a policy gap on the board", () => {
     expect(card.rationale).toBe(
       "factsheet falls short of the institution's rule: The factsheet and the marketing deck each name every type of risk listed in the PPM's risk factors.",
     );
+  });
+
+  it("shows the rationale the model wrote when one held, the derived line otherwise, and a superseded run's line never (#75)", () => {
+    const findings = boardView(events, all).cards;
+    const target = findings.find((c) => c.kind === "contradiction")!;
+    const last = events.at(-1)!;
+    const run = { step: "rationale", model: "fake-model", prompt_version: "rationale@1", input_run_id: target.runId };
+    const at = (n: number, type: string, payload: object) =>
+      SlimEvent.parse({ ...last, seq: last.seq + n, event_id: `00000000-0000-4000-8000-${String(900 + n).padStart(12, "0")}`, step_run_id: "rationale-run", type, payload });
+    const written = "An investor could pay a charge the deck does not mention.";
+    const log = [...events, at(1, "step.started", run), at(2, "step.completed", { ...run, output: { rationales: [{ finding_id: target.findingId, text: written }] } })];
+
+    const cards = boardView(log, all).cards;
+    const now = cards.find((c) => c.findingId === target.findingId)!;
+    expect(now).toMatchObject({ rationale: written, rationaleWritten: true });
+    // Every other card keeps the line derived from its own kind and documents.
+    const other = cards.find((c) => c.findingId !== target.findingId)!;
+    expect(other.rationaleWritten).toBe(false);
+    expect(other.rationale).toBe(boardView(events, all).cards.find((c) => c.findingId === other.findingId)!.rationale);
   });
 });

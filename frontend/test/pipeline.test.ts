@@ -510,4 +510,18 @@ describe("card rationales (#62)", () => {
     const done = [...recordedLog, event(1, "step.started", run), event(2, "step.completed", { ...run, output: { rationales: [] } })];
     expect(unwordedFindingsRun(done)).toBeNull();
   });
+
+  it("offers them again over a run abandoned mid-way, and not over one that is merely slow (#75)", () => {
+    const findingsRun = fold(recordedLog).stepRuns.filter((r) => r.step === "findings" && r.status === "completed").at(-1)!.stepRunId;
+    const last = recordedLog.at(-1)!;
+    const run = { step: "rationale", model: "fake-model", prompt_version: PROMPT_VERSIONS.rationale, input_run_id: findingsRun };
+    const startedAt = "2026-10-04T10:00:00.000Z";
+    const running = [
+      ...recordedLog,
+      SlimEvent.parse({ ...last, seq: last.seq + 1, event_id: eventId(last.seq + 1), at: startedAt, step_run_id: "rationale-run", type: "step.started", payload: run }),
+    ];
+    const t0 = Date.parse(startedAt);
+    expect(unwordedFindingsRun(running, t0 + 30_000)).toBeNull();
+    expect(unwordedFindingsRun(running, t0 + 10 * 60_000)).toBe(findingsRun);
+  });
 });
