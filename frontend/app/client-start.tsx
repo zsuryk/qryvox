@@ -23,6 +23,9 @@ export default function ClientStart({ caseId, product, ready }: { caseId: string
   const router = useRouter();
   const [lang, setLang] = useState<Lang>("en");
   const [stages, setStages] = useState<Stage[] | null>(null);
+  // Why the last send failed. Held here, not in the form: showing the stages swaps the form out, and a
+  // form that comes back has forgotten what went wrong.
+  const [failed, setFailed] = useState<string | null>(null);
   const w = WORDS[lang].start;
   // The id is made up when the answers are sent, in the browser: made during render, the server and the
   // browser would each make up a different one.
@@ -96,6 +99,11 @@ export default function ClientStart({ caseId, product, ready }: { caseId: string
         </div>
       ) : (
         <div className="card">
+          {failed !== null && (
+            <p className="notice notice--caution" role="alert" style={{ marginBottom: "1rem" }}>
+              {failed}
+            </p>
+          )}
           <ProfileForm
             initial={start}
             voice="client"
@@ -104,11 +112,12 @@ export default function ClientStart({ caseId, product, ready }: { caseId: string
             busyLabel={w.busy}
             onSubmit={async (profile) => {
               setStages([]);
+              setFailed(null);
               try {
                 await submit(profile);
               } catch (cause) {
                 setStages(null);
-                throw cause;
+                setFailed(cause instanceof Error ? cause.message : String(cause));
               }
             }}
           />
