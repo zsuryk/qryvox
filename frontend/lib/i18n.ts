@@ -67,6 +67,7 @@ type Words = {
     title: string;
     lead: (n: number) => string;
     waiting: string;
+    checking: (n: number) => string;
     filter: string;
     count: (shown: number, total: number) => string;
     nothingSuits: string;
@@ -194,6 +195,7 @@ export const WORDS: Record<Lang, Words> = {
       title: "What suits you",
       lead: (n) => `You answered once. The institution's rules checked ${n} ${n === 1 ? "product" : "products"} against your answers, every reason tied to the product's own documents.`,
       waiting: "Your adviser is checking your list. It appears here as soon as they confirm it.",
+      checking: (n) => `Your adviser is still checking ${n} more ${n === 1 ? "product" : "products"}.`,
       filter: "Only the ones that suit me",
       count: (shown, total) => `Showing ${shown} of ${total}`,
       nothingSuits: "None of these suits you. Your adviser will talk you through what to do next.",
@@ -329,6 +331,7 @@ export const WORDS: Record<Lang, Words> = {
       title: "哪些適合你",
       lead: (n) => `你只回答了一次。機構的規則已按你的答案檢查 ${n} 個產品，每個理由都對應產品文件的原文。`,
       waiting: "你的顧問正在確認你的清單，確認後會立即在這裡顯示。",
+      checking: (n) => `你的顧問仍在檢查另外 ${n} 個產品。`,
       filter: "只看適合我的",
       count: (shown, total) => `顯示 ${total} 個中的 ${shown} 個`,
       nothingSuits: "這些產品都不適合你。你的顧問會與你商量下一步。",

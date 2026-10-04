@@ -40,10 +40,26 @@ function caseLog(caseId: string, effect: "meets" | "blocks" | "conditional", dec
 const approved = { decision: "approved" as const };
 
 describe("a client's list (#71)", () => {
-  it("shows nothing as advice until every product is decided, and says where things stand", () => {
+  it("shows nothing as advice until a product is approved, and says where things stand", () => {
     expect(clientList([], "persona-x")).toMatchObject({ status: "none", products: [] });
-    const waiting = clientList([caseLog("a", "meets", approved), caseLog("b", "blocks")], "persona-x");
+    const waiting = clientList([caseLog("a", "meets"), caseLog("b", "blocks")], "persona-x");
     expect(waiting).toMatchObject({ status: "reviewing", total: 2, products: [] });
+  });
+
+  it("shows the approved products as soon as one is, and counts the ones still undecided", () => {
+    const list = clientList([caseLog("a", "meets", approved), caseLog("b", "blocks")], "persona-x");
+    if (list.status !== "approved") throw new Error("approved");
+    expect(list.products.map((p) => p.caseId)).toEqual(["a"]);
+    expect(list.pending).toBe(1);
+    const done = clientList([caseLog("a", "meets", approved), caseLog("b", "blocks", approved)], "persona-x");
+    expect(done).toMatchObject({ status: "approved", pending: 0 });
+  });
+
+  it("leaves a rejected product out of the list", () => {
+    const list = clientList([caseLog("a", "meets", approved), caseLog("b", "blocks", { decision: "rejected", reason: "needs_discussion_first" })], "persona-x");
+    if (list.status !== "approved") throw new Error("approved");
+    expect(list.products.map((p) => p.caseId)).toEqual(["a"]);
+    expect(list.pending).toBe(0);
   });
 
   it("is rejected when the adviser rejected the list", () => {

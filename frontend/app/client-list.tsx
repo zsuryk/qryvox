@@ -14,7 +14,7 @@ import ReasonRows, { type Cited } from "./reason-rows";
 // them, suitable first, each with the one or two reasons that decided it and where they come from. The list
 // is the institution's rules applied alike to every product; "recommended" appears only on the product the
 // adviser picked, because a recommendation is the adviser's act (ADR-0008). Opening a product reads its full
-// explanation, written then. Nothing is shown as advice until the adviser has approved the list.
+// explanation, written then. Nothing is shown as advice until the adviser has approved it, product by product or the whole list.
 
 export default function ClientList({ clientId, list }: { clientId: string; list: List }) {
   const [lang, setLang] = useState<Lang>(list.profile?.language ?? "en");
@@ -55,6 +55,12 @@ export default function ClientList({ clientId, list }: { clientId: string; list:
       <p className="t-body muted measure" style={{ marginTop: "0.75rem" }}>
         {w.list.lead(list.products.length)}
       </p>
+
+      {list.pending > 0 && (
+        <div style={{ marginTop: "0.75rem" }}>
+          <Waiting text={w.list.checking(list.pending)} />
+        </div>
+      )}
 
       <div className="row spread" style={{ margin: "1.5rem 0 1rem" }}>
         <label className="switch">

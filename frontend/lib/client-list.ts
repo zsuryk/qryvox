@@ -2,8 +2,9 @@ import { type CaseAdvice, type ClientProfile, fold, type SlimEvent, VERDICT_ORDE
 import { productName } from "./case";
 
 // A client's list (#71, ADR-0008), folded from the logs of the cases that hold their answers: one advice per
-// verified product, shown only once the adviser has approved the whole list. Everything short of that is
-// said as where things stand, never shown, as on the single-product page (#34).
+// verified product, each shown once the adviser has approved it, whether by deciding the whole list or one
+// card on its case. What is still undecided is counted, not shown; with nothing approved yet, the page says
+// where things stand, as on the single-product page (#34).
 
 export type ListProduct = {
   caseId: string;
@@ -16,7 +17,8 @@ export type ListProduct = {
 };
 
 export type ClientList =
-  | { status: "approved"; profile: ClientProfile; products: ListProduct[] }
+  // pending: how many products the adviser has yet to decide, so the page keeps checking for them.
+  | { status: "approved"; profile: ClientProfile; products: ListProduct[]; pending: number }
   | { status: "reviewing" | "rejected" | "none"; profile: ClientProfile | null; products: []; total: number };
 
 export type CaseLog = { caseId: string; events: readonly SlimEvent[] };
@@ -36,12 +38,15 @@ export function listEntries(cases: readonly CaseLog[], clientId: string) {
 export function clientList(cases: readonly CaseLog[], clientId: string): ClientList {
   const { found, profile } = listEntries(cases, clientId);
   if (found.length === 0) return { status: "none", profile, products: [], total: 0 };
-  if (found.some((f) => f.advice.decision === null)) return { status: "reviewing", profile, products: [], total: found.length };
-  if (found.some((f) => f.advice.decision?.decision === "rejected")) return { status: "rejected", profile, products: [], total: found.length };
+  const decided = found.filter((f) => f.advice.decision?.decision === "approved");
+  const pending = found.filter((f) => f.advice.decision === null).length;
+  if (decided.length === 0 && pending > 0) return { status: "reviewing", profile, products: [], total: found.length };
+  if (decided.length === 0) return { status: "rejected", profile, products: [], total: found.length };
   return {
     status: "approved",
     profile: profile!,
-    products: found
+    pending,
+    products: decided
       .map((f): ListProduct => ({ caseId: f.caseId, product: f.product, advice: f.advice, pick: f.advice.decision?.adviserPick === true, events: f.events }))
       .sort((a, b) => VERDICT_ORDER[a.advice.verdict] - VERDICT_ORDER[b.advice.verdict] || Number(b.pick) - Number(a.pick) || a.product.localeCompare(b.product)),
   };
