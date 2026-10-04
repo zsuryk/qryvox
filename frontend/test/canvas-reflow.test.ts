@@ -5,7 +5,7 @@ import { canvasLayout } from "../lib/canvas-layout";
 import { canvasView, fixtureEvents } from "../lib/canvas-source";
 import { appendOp } from "../lib/canvas-store";
 import { planLayout } from "../lib/plan-region";
-import { tile } from "../lib/tiling";
+import { GAP, overlaps, tile } from "../lib/tiling";
 
 // The canvas toolbar's Reflow (#82): whatever the analyst did with their hands, pressing it puts every
 // unpinned card back into the tiling, in arrival order, and leaves every pin where it was. What it
@@ -45,15 +45,18 @@ describe("reflow (#82)", () => {
       const expected = tile(onFlow.map((c) => c.cardId), pins, { obstacles: [planLayout(groups).bounds], sizes });
       for (const placed of layout.flow) {
         expect(placed.rect).toEqual(expected.get(placed.card.cardId));
-        if (placed.pinned) {
-          const pin = pins.get(placed.card.cardId)!;
-          expect(placed.rect).toMatchObject({ x: pin.x, y: pin.y });
-        }
       }
+      // Every pin on the canvas is where the analyst put it, and every other card is one the tiler placed.
+      for (const pin of view.state.board.pinned.filter((p) => expected.has(p.cardId))) {
+        const placed = layout.flow.find((p) => p.card.cardId === pin.cardId);
+        expect(placed?.pinned).toBe(true);
+        expect(placed?.rect).toMatchObject({ x: pin.worldPos.x, y: pin.worldPos.y });
+      }
+      // Every card is a gap clear of the next, and of the plan region the flow must go around.
+      const plan = planLayout(groups).bounds;
       for (const [i, a] of layout.flow.entries()) {
-        for (const b of layout.flow.slice(i + 1)) {
-          expect(a.rect.x < b.rect.x + b.rect.w && b.rect.x < a.rect.x + a.rect.w && a.rect.y < b.rect.y + b.rect.h && b.rect.y < a.rect.y + a.rect.h).toBe(false);
-        }
+        for (const b of layout.flow.slice(i + 1)) expect(overlaps(a.rect, b.rect, GAP)).toBe(false);
+        if (!a.pinned) expect(overlaps(a.rect, plan, GAP)).toBe(false);
       }
     }
   });
