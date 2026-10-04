@@ -120,6 +120,19 @@ describe("one questionnaire, every product (#71)", () => {
 
   it("refuses when no product is verified", async () => {
     const t = await setup({ llm: shelfLlm() });
+    const why = await error(await answer(t, chan), 409);
+    expect(why).toContain("no product has been verified yet");
+    expect(why).toContain("reading the product's facts");
+    // Nothing was recorded for the client: the queue is still empty.
+    expect(ClientQueueResponse.parse(await (await t.request("GET", "/clients")).json()).clients).toEqual([]);
+  });
+
+  it("refuses when a product has findings but its facts were never read", async () => {
+    const t = await setup({ llm: shelfLlm() });
+    const caseId = await t.openCase();
+    for (const document of larkspurPack) await t.request("POST", `/cases/${caseId}/documents`, { event_id: randomUUID(), document });
+    let input: string | null = null;
+    for (const step of ["extract", "decompose", "contradictions", "findings"]) input = await run(t, caseId, step, input);
     await error(await answer(t, chan), 409);
   });
 

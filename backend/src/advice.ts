@@ -211,7 +211,7 @@ function derivedId(eventId: string, caseId: string, label: string): string {
 // the rules and no model. A retry with the same event_id finishes what a failure left and appends nothing twice.
 export async function recordClientList(db: Db, eventId: string, profile: ClientProfile): Promise<ClientListResponse> {
   const products = await verifiedProducts(db, null, undefined);
-  if (products.length === 0) throw new AdviceConflict("no product is verified yet: there is nothing to compare for this client");
+  if (products.length === 0) throw new AdviceConflict("no product has been verified yet: an analyst must finish a review, including reading the product's facts, before clients can be checked");
   const listed: ClientListResponse["products"] = [];
   for (const product of products) {
     await recordProfile(db, product.caseId, derivedId(eventId, product.caseId, "profile"), profile, true);

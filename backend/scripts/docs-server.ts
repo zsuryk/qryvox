@@ -148,6 +148,8 @@ const TEXT = {
       "an id derived from it and the case, so a retry after a partial failure finishes the rest and appends nothing twice. " +
       "Answers with the client's list: one product per case, with its advice id.",
     clientListRecorded: "Recorded and drafted; the client's list",
+    clientListNoProduct:
+      "No product has been verified yet: an analyst must finish a review, including reading the product's facts, before clients can be checked",
     clientCases: "The cases that hold a client's answers",
     clientQueue: "The adviser's queue of clients",
     clientQueueDesc: "Read-only. Every client with advice in play, oldest answers first: whether they are vulnerable, and each case holding their advice with its verdict and decision (null while it awaits the adviser).",
@@ -255,6 +257,7 @@ const TEXT = {
       "（rules@1；不會呼叫模型）。event_id 由瀏覽器產生：這次呼叫追加的每一筆事件，其 ID 都由它與案件推導而來，" +
       "因此部分失敗後重試只會補完其餘，不會重複追加。回傳客戶的清單：每個案件一項產品，附建議 ID。",
     clientListRecorded: "已記錄並起草；客戶的清單",
+    clientListNoProduct: "目前還沒有已核實的產品：分析員須先完成審核（包括讀取產品資料），才能檢查客戶",
     clientCases: "保存客戶答案的案件",
     clientQueue: "顧問的客戶待辦清單",
     clientQueueDesc: "唯讀。列出所有有效建議的客戶，最早回答者在前：是否屬易受傷害客戶，以及各案件的結論與決定（等待顧問時為 null）。",
@@ -458,7 +461,7 @@ function openapi(lang: Lang) {
           summary: t.clientList,
           description: t.clientListDesc,
           requestBody: body("RecordClientListRequest"),
-          responses: { 201: json("ClientListResponse", t.clientListRecorded), 400: error(t.invalidBody) },
+          responses: { 201: json("ClientListResponse", t.clientListRecorded), 400: error(t.invalidBody), 409: error(t.clientListNoProduct) },
         },
       },
       "/clients/{clientId}": {
