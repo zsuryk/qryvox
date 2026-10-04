@@ -20,7 +20,7 @@ buttons. Every card is something our program parsed and checked against its sour
 | **Docks** a card into the plan region, the reportable set grouped by category and source authority (PPM > fee table > factsheet > deck) | Each drop is an event in the hash-chained log, so the reportable set can be replayed. A wrong-category drop is refused (#55, #65) |
 | **Discards, pins, restores** | Discarding is housekeeping, separate from the analyst's Dismiss, which is a recorded judgement. The underlying finding is never deleted (#56, #59) |
 | **Finds similar** passages from any card | First the nearest already-grounded passages, instantly and at no token cost (BM25). Then "look further" runs a grounded model step. Results arrive as candidate cards and never alter reviewed findings (#57, #60, #64) |
-| **Types a sentence, if they want** | It becomes intent chips from a closed vocabulary. Kimi K3: 「PPM 裡的費用」 → fees + PPM; a sentence about nothing gives no chips (#63) |
+| **Types a sentence, if they want** | It becomes intent chips from a closed vocabulary, and the chips choose which cards show. Kimi K3: "fee contradictions in the PPM" → one chip, 51 cards → 2 in about 3 s. A sentence about nothing gives no chips, and changing a chip asks no model (#63, #69, #70) |
 | **Reads why each card matters** | One batched, grounded model call per product writes all the lines (about 1.7k tokens, 12 s) (#62) |
 | **Watches the activity panel** | It is the case's own step log, so every run, retry and failure is visible, with its reason (#58) |
 
@@ -46,7 +46,7 @@ buttons. Every card is something our program parsed and checked against its sour
 | **Explained at the client's depth.** Each client gets three depths, starting at their own knowledge level, and switches with one tap without another model call. | `frontend/app/client-advice.tsx` |
 | **In the client's language.** The whole journey is available in English or Traditional Chinese. Evidence stays quoted in the original, so it is still checkable. | ADR-0006, `frontend/lib/i18n.ts` |
 | **Self-service with no account.** A product link leads to a short questionnaire with no text boxes. The client's page updates by itself once the adviser confirms. Measured at 46–57 s to the waiting page. | `frontend/app/client-start.tsx`, [scalability.md](scalability.md) |
-| **Alternatives, not just "no".** A product that doesn't suit leads to the products on the shelf that do, by the same rules. | `alternativesFor` in `backend/src/advice.ts` |
+| **Answer once, see every product.** One questionnaire is checked against every verified product, at no model cost. Each product says whether it suits the client, with the rule and passage that decided it. "Recommended" appears only on the adviser's pick. | ADR-0008, `/start` → `/list/<client>`, #68, #71 |
 | **Learns how the client reads, with consent.** The client can let the adviser see which depth they choose. It only ever produces a suggestion to the adviser. | #38 |
 | **Apple-style interface design.** It supports dark mode, reduced motion and transparency, increased contrast, and phone widths. | `frontend/app/globals.css` |
 
@@ -67,6 +67,7 @@ buttons. Every card is something our program parsed and checked against its sour
 | **Accuracy is measured, not claimed.** Planted answer keys and live precision, recall and advice-accuracy tiles. | `/eval`, `frontend/app/eval-tiles.tsx` |
 | **Real-model results.** Kimi K3, Larkspur: recall 9/10, precision 10/10. Wrenfield: recall 2/2. Product facts all correct. All three personas got the expected verdict. | README "Status", [scalability.md](scalability.md) |
 | **Catches what marketing hides.** Mismatched fees, an exit charge left out of key facts, and income paid from capital each become a disclosure the client must see. | Larkspur pack, S3/S6 |
+| **Every product compared, not just one.** Each advice carries the whole shelf: Mr Lee sees why Wrenfield doesn't suit him, and Mrs Chan sees why Larkspur doesn't suit her and that Wrenfield does. | `shelfComparison` in `backend/src/advice.ts`, #68 |
 | **Advice stays current.** A new document version or a changed profile supersedes the advice it touches and puts it back in the adviser's queue. | #37, `supersede` in `backend/src/advice.ts` |
 
 ## 5. Scalability

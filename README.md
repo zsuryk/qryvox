@@ -119,7 +119,9 @@ Stage 2 is tracked in #20.
 | Judging criteria pass | ✅ S7 goal fit (`rules@2`), rejection reasons, vulnerable-client confirmation (ADR-0005); the client journey in 繁體中文 (ADR-0006) | #41 #42 #43 |
 | Compliance map | ✅ [docs/compliance.md](docs/compliance.md): SFC, HKMA, PDPO and CFA obligations against our controls | #44 |
 | Cost and scale, measured | ✅ [docs/scalability.md](docs/scalability.md): ≈16k tokens per product, ≈2.8k per client | #45 |
-| **Canvas** | ✅ Infinite canvas as the case's first section: pan/zoom/touch, auto-tiled cards, plan region, discard and pin, find similar (instant BM25 + grounded re-run), intent chips (`parse@1`), model-written rationales (`rationale@1`), activity panel | #48–#67 |
+| **Canvas** | ✅ Infinite canvas as the case's first section: pan/zoom/touch, auto-tiled cards, plan region, discard and pin, find similar (instant BM25 + grounded re-run), typed intent that becomes chips and filters the cards (`parse@1`), model-written rationales (`rationale@1`), activity panel | #48–#70 |
+| **Client list** | ✅ Answer once at `/start` and see every verified product: suits or doesn't, with deciding reasons and sources; the adviser approves the list and may mark a pick; explanations written on open, in either language | #68 #71 #75 |
+| Demo readiness | ✅ `pnpm demo:seed` builds the demo state on any deployment · `docs/demo.md` live script · 🚧 production run and rehearsals | #72–#74 |
 | Pitch | ✅ [docs/pitch.md](docs/pitch.md): strengths by judging criterion, with evidence; the strategic presentation is built from it | #46 |
 | Spend protection | ✅ Origin allow-list, rate limit, judge-link token end to end, `JUDGE_TOKEN` set in production | #16 #19 |
 | Production deploy | ✅ Deployed (owner, CLI) · 🚧 switch the production model back to Kimi K3 with `LLM_REASONING_EFFORT=low` | #17 |
