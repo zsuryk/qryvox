@@ -1,7 +1,7 @@
 # Live demo script
 
-Four and a half minutes, two people: **the driver** clicks, **the speaker** talks. The deck (13 slides)
-carries the argument; this is the part judges remember. Every number said aloud is in
+Four and a half minutes, two people: **the driver** clicks, **the speaker** talks. There are no slides
+(they aren't allowed): the product carries the argument, so say each claim while the screen proves it. Every number said aloud is in
 `docs/scalability.md` or the eval tiles.
 
 ## Before you start (10 minutes before)
