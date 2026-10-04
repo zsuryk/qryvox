@@ -156,15 +156,9 @@ describe("variable card sizes (#79)", () => {
     expectNoOverlap([...rects.values()]);
     for (const [id, rect] of rects) expect(rect.h).toBe(sizes.get(id)!.h);
     // Between any two cards there is either a full gap or they are in different rows.
-    for (const [id, a] of rects) {
-      for (const [other, b] of rects) {
-        if (id === other) continue;
-        const nearX = a.x < b.x + b.w + GAP && b.x < a.x + a.w + GAP;
-        const nearY = a.y < b.y + b.h + GAP && b.y < a.y + a.h + GAP;
-        expect(overlaps(a, b, GAP)).toBe(false);
-        void nearX;
-        void nearY;
-      }
+    const list = [...rects.values()];
+    for (const [i, a] of list.entries()) {
+      for (const b of list.slice(i + 1)) expect(overlaps(a, b, GAP), `${JSON.stringify(a)} too close to ${JSON.stringify(b)}`).toBe(false);
     }
   });
 
@@ -201,11 +195,20 @@ describe("variable card sizes (#79)", () => {
     const before = tile(order, new Map(), { sizes });
     const after = tile([...order, findingCardId("new")], new Map(), { sizes: new Map([...sizes, [findingCardId("new"), { w: CARD_W, h: 280 }]]) });
     for (const [id, rect] of before) expect(after.get(id)).toEqual(rect);
-    const last = [...before.values()].reduce((a, b) => (a.y + a.h > b.y + b.h ? a : b));
-    const added = after.get(findingCardId("new"))!;
-    expect(added.y).toBeGreaterThanOrEqual(0);
-    expect([...after.values()].filter((r) => r !== added)).toHaveLength(5);
-    void last;
+    // In reading order (row, then along it) the new card is after every card already laid out.
+    const byReadingOrder = [...after.entries()].sort(([, a], [, b]) => a.y - b.y || a.x - b.x);
+    expect(byReadingOrder.at(-1)?.[0]).toBe(findingCardId("new"));
+  });
+
+  it("removing one moves only later unpinned cards", () => {
+    const order = ids(8);
+    const sizes = sizesOf([220, 300, 180, 260, 240, 200, 320, 190]);
+    const before = tile(order, new Map(), { sizes });
+    const removed = order[3]!;
+    const after = tile(order.filter((id) => id !== removed), new Map(), { sizes });
+    for (const id of order.slice(0, 3)) expect(after.get(id)).toEqual(before.get(id));
+    expect(after.has(removed)).toBe(false);
+    expectNoOverlap([...after.values()]);
   });
 
   it("reflows with the same result as the fixed grid when every card has CARD_H", () => {

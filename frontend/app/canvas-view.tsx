@@ -336,10 +336,7 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
   // Both layouts, wide and narrow (#61): the frame's width picks one, and the first fit has to know the
   // bounds of whichever it picks before anything is drawn.
   const [expandedMap, setExpandedMap] = useState<ExpandedMap>(new Map());
-  // Bumping this re-derives the layout through the auto-tiler: the Reflow button's whole effect, since
-  // the fold never kept a copy of positions anywhere but the pins (#82).
-  const [flowNonce, setFlowNonce] = useState(0);
-  const layouts = useMemo(() => ({ wide: canvasLayout(view, { expanded: expandedMap }), narrow: canvasLayout(view, { narrow: true, expanded: expandedMap }) }), [view, expandedMap, flowNonce]);
+  const layouts = useMemo(() => ({ wide: canvasLayout(view, { expanded: expandedMap }), narrow: canvasLayout(view, { narrow: true, expanded: expandedMap }) }), [view, expandedMap]);
   const bounds = useMemo(() => ({ wide: layouts.wide.bounds, narrow: layouts.narrow.bounds }), [layouts]);
   const frame = useRef<HTMLDivElement | null>(null);
   const bin = useRef<HTMLButtonElement | null>(null);
@@ -800,7 +797,7 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
           <CanvasStatus events={log} />
         )}
 
-        <div className="canvas__toolbar" role="toolbar" aria-label="Zoom" onPointerDown={(event) => event.stopPropagation()}>
+        <div className="canvas__toolbar" role="toolbar" aria-label="Canvas controls" onPointerDown={(event) => event.stopPropagation()}>
           <button type="button" className="btn btn--small" aria-label="Zoom out" onClick={() => zoom(1 / 1.25)}>
             −
           </button>
@@ -813,14 +810,17 @@ function Canvas({ view: fullView, log, mode, store, said, say }: CanvasProps) {
           <button type="button" className="btn btn--small" onClick={fit}>
             Fit
           </button>
-          {/* Every unpinned card back into the tiling, pinned cards kept: the same pure layout, asked
-              for again, and announced (#82). */}
+          {/* Every unpinned card back into the tiling, pinned cards kept (#82). The canvas keeps no
+              positions of its own — the fold has the pins and nothing else — so reflowing is asking the
+              auto-tiler to lay the cards out again: a fresh expanded map, same blocks, laid out afresh. */}
           <button
             type="button"
             className="btn btn--small"
             onClick={() => {
-              setFlowNonce((n) => n + 1);
-              say(`Reflowed: ${layout.flow.filter((p) => !p.pinned).length} unpinned card${layout.flow.filter((p) => !p.pinned).length === 1 ? "" : "s"} back into the flow, ${layout.flow.filter((p) => p.pinned).length} pinned card${layout.flow.filter((p) => p.pinned).length === 1 ? "" : "s"} kept where it is.`);
+              setExpandedMap((m) => new Map(m));
+              const unpinned = layout.flow.filter((p) => !p.pinned).length;
+              const pinned = layout.flow.filter((p) => p.pinned).length;
+              say(`Reflowed: ${unpinned} unpinned card${unpinned === 1 ? "" : "s"} back into the flow, ${pinned} pinned card${pinned === 1 ? "" : "s"} kept where it is.`);
             }}
             title="Put every unpinned card back into the flow, in arrival order; pinned cards stay where they are"
           >

@@ -1861,14 +1861,15 @@ details[open] > summary::before {
     height: max(22rem, calc(100dvh - var(--canvas-top, 18rem) - 0.75rem));
   }
 }
-/* Expanded text (#81): the clamp lets go and the block shows its lines, up to the bounded excerpt. */
+/* Expanded text (#81): the clamp opens to the bounded excerpt the sizing reserved (#80), ten lines at
+   most for the title and the rationale, twelve for a quote, so the card that grew still fits its rect. */
 .canvas-card__title--expanded {
-  -webkit-line-clamp: unset;
-  display: block;
+  -webkit-line-clamp: 10;
 }
 .canvas-card__line--expanded {
-  -webkit-line-clamp: unset;
-  display: block;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 10;
+  display: -webkit-box;
   white-space: normal;
 }
 .canvas-card__quote--expanded {

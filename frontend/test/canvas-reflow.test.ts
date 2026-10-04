@@ -1,4 +1,4 @@
-import { findingCardId, isDiscarded, planGroups } from "@qryvox/shared";
+import { isDiscarded, planGroups } from "@qryvox/shared";
 import { describe, expect, it } from "vitest";
 import { cardModel, cardSize } from "../lib/canvas-cards";
 import { canvasLayout } from "../lib/canvas-layout";
@@ -55,7 +55,6 @@ describe("reflow (#82)", () => {
           expect(a.rect.x < b.rect.x + b.rect.w && b.rect.x < a.rect.x + a.rect.w && a.rect.y < b.rect.y + b.rect.h && b.rect.y < a.rect.y + a.rect.h).toBe(false);
         }
       }
-      void findingCardId;
     }
   });
 });

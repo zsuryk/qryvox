@@ -1,6 +1,6 @@
 import { type CardId, isDiscarded, type PlanGroup, planGroups, type WorldPos } from "@qryvox/shared";
 import type { CanvasCard, CanvasView } from "./canvas-source";
-import { cardModel, cardSize, type ExpandedBlocks, type ExpandedMap } from "./canvas-cards";
+import { cardModel, cardSize, type ExpandedMap } from "./canvas-cards";
 import { type PlanLayout, planLayout } from "./plan-region";
 import { tile, type CardSize } from "./tiling";
 import { boundsOf, type Rect } from "./viewport";
@@ -41,7 +41,7 @@ export function canvasLayout(view: CanvasView, { narrow = false, expanded }: Lay
   const pins = new Map<CardId, WorldPos>(state.board.pinned.map((p) => [p.cardId, p.worldPos]));
   // Each card's height is its content's (#80), and the flow packs the cards at those heights (#79).
   const sizes = new Map<CardId, CardSize>(
-    view.cards.map((card) => [card.cardId, cardSize(cardModel(card, state, view.rationales), expanded?.get(card.cardId) as ExpandedBlocks | undefined)]),
+    view.cards.map((card) => [card.cardId, cardSize(cardModel(card, state, view.rationales),expanded?.get(card.cardId))]),
   );
   const rects = tile(
     onFlow.map((c) => c.cardId),

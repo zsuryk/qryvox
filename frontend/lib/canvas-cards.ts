@@ -131,7 +131,8 @@ const QUOTE_CHARS = 40;
 const TITLE_LINE_PX = 23;
 const RATIONALE_LINE_PX = 18;
 const QUOTE_LINE_PX = 23;
-// Padding, the badge row, the chips row and the action row around the text.
+// Padding, the badge row, the chips row and the action row around the text. Pairs with the sizes and
+// paddings in app/globals.css (.canvas-card): changing one side's metrics wants the other's.
 const CHROME_PX = 146;
 
 export type TextBlock = "title" | "rationale" | "quote";
@@ -147,34 +148,45 @@ function clampedLines(count: number, cap: number): number {
   return Math.min(count, cap);
 }
 
+function blockText(model: CardModel, block: TextBlock): string {
+  if (model.kind === "finding") return block === "title" ? model.title : model.rationale;
+  return model.quote;
+}
+
+function blockChars(block: TextBlock): number {
+  return block === "title" ? TITLE_CHARS : block === "rationale" ? RATIONALE_CHARS : QUOTE_CHARS;
+}
+
+function blockLinePx(block: TextBlock): number {
+  return block === "title" ? TITLE_LINE_PX : block === "rationale" ? RATIONALE_LINE_PX : QUOTE_LINE_PX;
+}
+
+function collapsedCap(model: CardModel, block: TextBlock): number {
+  if (model.kind === "finding") {
+    if (block === "title") return TITLE_LINES;
+    return model.written ? RATIONALE_WRITTEN_LINES : RATIONALE_LINES;
+  }
+  return QUOTE_LINES;
+}
+
+function expandedCap(block: TextBlock): number {
+  return block === "title" ? EXPANDED_TITLE_LINES : block === "rationale" ? EXPANDED_RATIONALE_LINES : EXPANDED_QUOTE_LINES;
+}
+
 // How many lines the block shows at its collapsed clamp, and so whether anything is hidden: a block
 // that fits shows no Expand control (#81).
 export function blockLines(model: CardModel, block: TextBlock): { shown: number; hidden: boolean } {
-  if (model.kind === "finding") {
-    if (block === "title") {
-      const n = lineCount(model.title, TITLE_CHARS);
-      return { shown: clampedLines(n, TITLE_LINES), hidden: n > TITLE_LINES };
-    }
-    const cap = model.written ? RATIONALE_WRITTEN_LINES : RATIONALE_LINES;
-    const n = lineCount(model.rationale, RATIONALE_CHARS);
-    return { shown: clampedLines(n, cap), hidden: n > cap };
-  }
-  const n = lineCount(model.quote, QUOTE_CHARS);
-  return { shown: clampedLines(n, QUOTE_LINES), hidden: n > QUOTE_LINES };
+  const n = lineCount(blockText(model, block), blockChars(block));
+  const cap = collapsedCap(model, block);
+  return { shown: clampedLines(n, cap), hidden: n > cap };
 }
 
 export function cardSize(model: CardModel, expanded: ExpandedBlocks = {}): CardSize {
-  let text = 0;
-  if (model.kind === "finding") {
-    const title = lineCount(model.title, TITLE_CHARS);
-    text += clampedLines(title, expanded.title ? EXPANDED_TITLE_LINES : TITLE_LINES) * TITLE_LINE_PX;
-    const cap = model.written ? RATIONALE_WRITTEN_LINES : RATIONALE_LINES;
-    const rationale = lineCount(model.rationale, RATIONALE_CHARS);
-    text += clampedLines(rationale, expanded.rationale ? EXPANDED_RATIONALE_LINES : cap) * RATIONALE_LINE_PX;
-  } else {
-    const quote = lineCount(model.quote, QUOTE_CHARS);
-    text += clampedLines(quote, expanded.quote ? EXPANDED_QUOTE_LINES : QUOTE_LINES) * QUOTE_LINE_PX;
-  }
+  const blocks: TextBlock[] = model.kind === "finding" ? ["title", "rationale"] : ["quote"];
+  const text = blocks.reduce(
+    (sum, block) => sum + clampedLines(lineCount(blockText(model, block), blockChars(block)), expanded[block] ? expandedCap(block) : collapsedCap(model, block)) * blockLinePx(block),
+    0,
+  );
   return { w: CARD_W, h: Math.min(CARD_MAX_H, Math.max(CARD_MIN_H, CHROME_PX + text)) };
 }
 

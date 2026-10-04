@@ -166,10 +166,15 @@ nothing has brought onto the canvas yet: no finding cites it, and no Similar pre
 returned it. It is not drawn; it may be pinned or discarded, and docks only once a press gives it a
 category. *Not* hidden: it simply has not been asked for.
 
-**Auto-tiling** — how cards find their place on the canvas without anyone placing them: one size of card,
-left to right in rows of four from world (0, 0), each new card after the last, skipping any slot a pinned
-card is in (`frontend/lib/tiling.ts`). Docked and discarded cards are not in the flow. *Not* a pin: tiling
-moves cards whenever the flow changes; a pin never moves.
+**Auto-tiling** — how cards find their place on the canvas without anyone placing them: left to right in
+rows of four from world (0, 0), each card at the size its content needs (one shared width, a height
+bounded above and below), every row as tall as its tallest card, each new card after the last, skipping
+any slot a pinned card is in (`frontend/lib/tiling.ts`). Docked and discarded cards are not in the flow.
+*Not* a pin: tiling moves cards whenever the flow changes; a pin never moves.
+
+**Reflow** — the explicit ask to run the auto-tiler again over the canvas: every unpinned card returns to
+the flow in arrival order, and every pinned card stays where it was put. The canvas derives its layout
+from the log, so a reflow never changes any card's state, only ever the positions the flow assigns.
 
 **Plan region** — the area of the canvas where docked cards form the reportable set, grouped by category ×
 authority (PPM, fee table, factsheet, deck — the order of `AUTHORITY_ORDER`). Each docked card names its

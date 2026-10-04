@@ -143,7 +143,6 @@ describe("the live store", () => {
 });
 
 describe("card sizing (#80)", () => {
-  const finding = view.cards.find((c) => c.kind === "finding")!;
   const excerpt = view.cards.find((c) => c.kind === "excerpt")!;
 
   it("bounds every card between CARD_MIN_H and CARD_MAX_H", () => {
@@ -171,7 +170,6 @@ describe("card sizing (#80)", () => {
     expect(expanded.h).toBeGreaterThanOrEqual(collapsed.h);
     const modelL = cardModel({ ...excerpt, citation: { ...excerpt.citation, quote: "word ".repeat(400) } } as typeof excerpt, view.state);
     expect(cardSize(modelL, { quote: true }).h).toBeGreaterThan(cardSize(modelL).h);
-    void finding;
   });
 
   it("feeds the layout through the canvas store's fold: expanded cards re-tile larger, without overlap", () => {
