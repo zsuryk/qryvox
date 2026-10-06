@@ -12,7 +12,7 @@ export const env = {
     // Comma-separated; the frontend origin(s).
     allowedOrigins: (process.env.ALLOWED_ORIGIN ?? "http://localhost:3000").split(",").map((o) => o.trim()),
     ipHashSecret: ipHashSecret(),
-    apiToken: apiToken(),
+    apiToken: apiTokenFromEnv(),
     limits: {
       windowSeconds: Number(process.env.RATE_LIMIT_WINDOW_SECONDS ?? 3600),
       stepsPerIp: Number(process.env.RATE_LIMIT_STEPS_PER_IP ?? 60),
@@ -25,7 +25,7 @@ export const env = {
 // been migrated keeps its guard: an unset API_TOKEN alone would silently leave analysis steps open on
 // the public URL, which is the one failure the guard exists to stop. Remove it with the header fallback
 // in guards.ts (#96).
-function apiToken(): string | null {
+function apiTokenFromEnv(): string | null {
   const current = process.env.API_TOKEN;
   const retired = process.env.JUDGE_TOKEN;
   if (!current && retired) {

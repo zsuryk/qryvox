@@ -8,7 +8,7 @@ Demo mode, fixtures and current limitations are in [Demo mode & limitations](#de
 
 Three principles shape the interface: no free-text prompt anywhere in the analyst's flow (typing is
 compiled to intent chips), every claim is checkable against a cited page, and the model is swappable
-because no prompt knowledge leaks to the user. Concretely:
+because no prompt knowledge leaks to the analyst. Concretely:
 
 - **Canvas of cards over the case log** — findings and cited passages arrive as cards on an open canvas that pans and zooms; pin, discard or dock them into a reportable plan grouped by category × document authority. Layout is derived from the log, so a replay rebuilds it.
 - **Citation-grounded findings** — every finding cites a document, a 1-based page and a verbatim quote, and every quote a step produces is checked against that page before it is kept (the grounding check). Ungrounded output is dropped.

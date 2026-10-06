@@ -31,9 +31,11 @@ export type Guards = {
 // x-judge-token, the name this header carried until #86, is still accepted: a deploy runs api before
 // web, so for the length of one deploy the live frontend is still the old one and sends the old name.
 // Drop the fallback once the web deploy carrying the new name is live (issue #96).
-export function apiToken(token: string | null): MiddlewareHandler {
+const RETIRED_API_TOKEN_HEADER = "x-judge-token";
+
+export function requireApiToken(token: string | null): MiddlewareHandler {
   return async (c, next) => {
-    const given = c.req.header(API_TOKEN_HEADER) ?? c.req.header("x-judge-token") ?? "";
+    const given = c.req.header(API_TOKEN_HEADER) ?? c.req.header(RETIRED_API_TOKEN_HEADER) ?? "";
     if (token !== null && !sameToken(given, token)) {
       return c.json({ error: "this demo link is missing its access token, or the token is wrong" }, 401);
     }

@@ -5,12 +5,12 @@
 //
 //   pnpm smoke                                   # against the default deployment
 //   SMOKE_BASE_URL=https://... pnpm smoke        # against any deployment
-//   API_TOKEN=... pnpm smoke                   # when the API token is switched on (#19)
+//   API_TOKEN=... pnpm smoke                    # when the API token is switched on (#19)
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { DOCUMENTS } from "@qryvox/shared/pack-source";
-import { PackManifest, PDFJS_VERSION, type IngestedDocument, type StepName } from "@qryvox/shared";
+import { API_TOKEN_HEADER, PackManifest, PDFJS_VERSION, type IngestedDocument, type StepName } from "@qryvox/shared";
 
 const BASE = (process.env.SMOKE_BASE_URL ?? "https://qryvox-api.vercel.app").replace(/\/$/, "");
 const API_TOKEN = process.env.API_TOKEN ?? "";
@@ -55,7 +55,7 @@ function check(label: string, condition: boolean, detail = ""): void {
 async function call(method: string, path: string, body?: unknown): Promise<{ status: number; json: unknown }> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["content-type"] = "application/json";
-  if (API_TOKEN) headers["x-api-token"] = API_TOKEN;
+  if (API_TOKEN) headers[API_TOKEN_HEADER] = API_TOKEN;
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers,

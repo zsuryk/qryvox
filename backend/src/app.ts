@@ -29,7 +29,7 @@ import { AdviceConflict, AdviceNotFound, clientCases, clientQueue, decideAdvice,
 import { CardConflict, recordCardOperation } from "./cards.js";
 import { assertAppendOnly } from "./db/append-only.js";
 import type { Database } from "./db/client.js";
-import { clientIp, type Guards, hashIp, apiToken, originAllowList, RateLimited } from "./guards.js";
+import { clientIp, type Guards, hashIp, originAllowList, RateLimited, requireApiToken } from "./guards.js";
 import type { Llm } from "./llm.js";
 import {
   appendOnce,
@@ -130,7 +130,7 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
     return c.json({ seq: row.seq } satisfies AppendResponse, 201);
   });
 
-  app.post("/cases/:caseId/steps", apiToken(guards.apiToken), async (c) => {
+  app.post("/cases/:caseId/steps", requireApiToken(guards.apiToken), async (c) => {
     const caseId = c.req.param("caseId");
     const body = RunStepRequest.safeParse(await readJson(c));
     if (!body.success) return badRequest(c, body.error);

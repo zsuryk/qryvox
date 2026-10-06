@@ -7,6 +7,12 @@ accepted — 2026-10-01 — deciders: <names>
 Amended by ADR-0003: the backend calls any OpenAI-compatible endpoint, not the Anthropic API. Where this
 record says Anthropic, read "the model provider".
 
+Amended in #86: the token header and env var were renamed (`x-judge-token` → `x-api-token`, `JUDGE_TOKEN`
+→ `API_TOKEN`) while the live frontend still sent the old name, which the "additive only" rule above
+forbids. The exception was the rule's own escape in practice — one shared secret behind the only
+spending endpoint — handled by accepting both names on the wire and both variables in the environment
+until #96, rather than by a deploy that leaves the public URL's steps 401ing in between.
+
 ## Context
 
 We build the product end-to-end in TypeScript — Next.js UI in `/frontend`, Hono API in `/backend`, zod contracts in `/shared`, pnpm workspaces — and deploy to Vercel (Hobby) as two projects in one monorepo, with the Hobby account owner deploying from their machine via the Vercel CLI. Vercel has no persistent filesystem, so the database is a SQLite dialect accessed through Drizzle + libSQL: a local `file:` database in dev, Turso over HTTP in production. That constraint also shapes the code: the analysis pipeline is a set of stateless steps the browser orchestrates, not a long-running server job, and PDF parsing happens client-side.

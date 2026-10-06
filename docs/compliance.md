@@ -19,10 +19,11 @@ and under which rules.
 
 One obligation of that list is *not* met, and no row below should be read as saying it is. The log records
 what was decided and when, but not who typed it: every event's `actor` is the fixed identity
-`demo-analyst` (ADR-0004). A deployment is single-tenant and client pages are open to anyone holding the
-link, so there is no per-client access control and no decision can be attributed to a named, licensed
-person. Real identities, roles, tenancy and a licensed operator are future work (README, "Demo mode &
-limitations"; `docs/deploying.md`).
+`demo-analyst` (ADR-0004). There is no login, no session and no per-user authorisation anywhere, and a
+deployment is single-tenant, so one person's dispositions are recorded as the analyst's own. Client pages
+are reachable by link and possession of the link is the only check, so nothing keeps one client's page
+from another's. Real identities, roles, tenancy and a licensed operator are future work (README, "Demo
+mode & limitations"; `docs/deploying.md`).
 
 ## Hong Kong: SFC Code of Conduct and the suitability obligation
 
@@ -90,9 +91,5 @@ vulnerable customers, such as those aged 65 or over.
 - Encryption of profile data and the erasure design in `docs/data-ecosystem.md` are not built.
 - There is one fixed adviser identity (ADR-0004). Real deployments need authentication, roles and
   four-eyes review on rule changes.
-- No identity behind any of it: no login, no sessions, no per-user authorisation, and a deployment is
-  single-tenant, so one person's dispositions are recorded as the analyst's own.
-- Client pages are reachable by link and possession of the link is the only check, so nothing keeps one
-  client's page from another's.
 - Nothing here is licensed, registered or supervised. There is no licensed operator behind the fixed
   adviser identity, so a real client could not be advised through this as it stands.

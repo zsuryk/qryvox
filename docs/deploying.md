@@ -44,6 +44,7 @@ whole model. Know what it does and does not cover before sharing that URL:
   URL is shared. Unset, analysis steps are open — right locally, wrong on a public URL.
   It was called `JUDGE_TOKEN` until #86: rename the variable on the backend Vercel project (the backend
   still reads the old name and warns, but `.env.deploy` must carry `API_TOKEN` for `deploy.sh` to sync it).
+  #96 drops the old names on both sides — do the Vercel rename before that deploy.
 - **What it protects: the calls that spend model tokens, and only those.** The guard covers
   `POST /cases/:caseId/steps` — `extract`, `decompose`, `contradictions`, `compliance`, `findings`,
   `attributes`, `explain`, `parse`, `rationale` (`backend/src/guards.ts`). A missing or wrong token is a
@@ -61,9 +62,14 @@ whole model. Know what it does and does not cover before sharing that URL:
   doing the same job: the origin allow-list, the rate limit, and a hard spend limit at the provider.
 
 **Never commit `.env`, `.env.deploy` or `.deploy/`.** They hold the Turso token, `IP_HASH_SECRET`,
-`LLM_API_KEY` and `API_TOKEN`; production values live only in the two Vercel projects, and `.env.example`
-is the committed contract — the only env file that belongs in git. `.gitignore` already covers all three,
+`LLM_API_KEY` and `API_TOKEN`; `.env.deploy` is how the deploy script reads them (`load_secrets`), the two
+Vercel projects are where they live once deployed, and `.env.example` is the committed contract
+— the only env file that belongs in git. `.gitignore` already covers all three,
 but a secret that lands in a commit is published: rotate it in Vercel rather than deleting the file.
+
+Git history was audited for this before the repo was published (#87): every commit was searched for
+provider keys, Turso tokens, the API token's value and any tracked `.env`, and the only env file ever
+committed was `.env.example`, with placeholders. No secret has to be rotated.
 
 **The post-deploy check is `pnpm smoke`**, after every `pnpm deploy:all`. Pass `API_TOKEN` when the backend
 has one set — without it the pipeline's steps answer 401 and the run fails — and "Verifying by hand" below
@@ -104,8 +110,8 @@ workspace resolved inside the deployed function — which is the failure mode AD
 For the full check, run the smoke script:
 
 ```sh
-API_TOKEN=... pnpm smoke             # production: every analysis step needs the token
-pnpm smoke                           # https://qryvox-api.vercel.app, when API_TOKEN is unset
+API_TOKEN=... pnpm smoke                # production: every analysis step needs the token
+pnpm smoke                              # https://qryvox-api.vercel.app, when API_TOKEN is unset
 SMOKE_BASE_URL=https://... pnpm smoke   # any other deployment
 ```
 

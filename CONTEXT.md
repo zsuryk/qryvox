@@ -388,7 +388,7 @@ its category and its quote match a planted finding.
 
 | Avoid | Say instead | Why |
 |---|---|---|
-| flag, alert (as a noun) | finding | The README says "flags"; the product, code and tickets say finding. |
+| flag, alert (as a noun) | finding | The product, code and tickets say finding; only old notes and conversations say flag. |
 | issue (for what the board shows) | finding | Issue is the `contradictions` step's internal output. |
 | review, session, project | case | One word for one review. |
 | bundle, document set, dossier | pack | One word for the product's documents. |
