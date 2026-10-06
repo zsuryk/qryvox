@@ -283,7 +283,11 @@ stage_gitless() {
   info "staged $STAGED_AT without .git -> $STAGE"
 }
 
-cleanup_stage() { [ -n "${STAGE:-}" ] && rm -rf "$(dirname "$STAGE")"; }
+# The if matters: `[ ... ] && rm` as the last command leaves status 1 when STAGE is unset
+# (e.g. setup), and an EXIT trap's status becomes the script's exit code.
+cleanup_stage() {
+  if [ -n "${STAGE:-}" ]; then rm -rf "$(dirname "$STAGE")"; fi
+}
 
 # The URL of the most recent deployment, for the preview health check.
 latest_deployment_url() {
