@@ -23,14 +23,49 @@ cp .env.example .env.deploy   # fill in DATABASE_URL, DATABASE_AUTH_TOKEN, IP_HA
 pnpm deploy:setup
 ```
 
-`.env.deploy` and `.deploy/` are gitignored. Production secrets exist only in the Vercel
-projects and in your `.env.deploy` — never in the repo.
+`.env.deploy` and `.deploy/` are gitignored — never commit either, see "Demo mode / auth model" below.
 
 Then, once per project, in the Vercel dashboard (**Settings → Build and Deployment**):
 
 - **Root Directory** = `backend` / `frontend` — only needed for `backend` today
 - **Include source files outside of the Root Directory** = ON (this is how `/shared` is uploaded)
 - Leave the Git integration disconnected
+
+## Demo mode / auth model
+
+There is no account system. No login, no user table, no sessions, no per-user authorisation. A deployment
+is single-tenant — SQLite (`file:./dev.db`) locally, Turso in production — so everyone who finds the URL is
+looking at the same cases, the same log and the same clients. One link is the capability, and that is the
+whole model. Know what it does and does not cover before sharing that URL:
+
+- **The demo link carries the token.** `?k=<token>` is taken out of the address bar into `sessionStorage`
+  when the page loads (`frontend/lib/api.ts`) and sent as the **`x-api-token`** header on every request.
+  The env var is **`API_TOKEN`** (`.env.example`), and it is set on the backend Vercel project before the
+  URL is shared. Unset, analysis steps are open — right locally, wrong on a public URL.
+- **What it protects: the calls that spend model tokens, and only those.** The guard covers
+  `POST /cases/:caseId/steps` — `extract`, `decompose`, `contradictions`, `compliance`, `findings`,
+  `attributes`, `explain`, `parse`, `rationale` (`backend/src/guards.ts`). A missing or wrong token is a
+  401 before the model is called, and unlike the origin allow-list it also stops requests that send no
+  `Origin` at all, such as `curl`. Everything else is open: opening a case, ingesting documents,
+  dispositions, card operations, the client queue and its decisions, the board, the replay, the event log.
+  Those take the token when the browser sends it and never check it.
+- **What it does not protect: identity, tenancy, authorisation.** The `actor` on every event is always
+  `demo-analyst` (ADR-0004), so a disposition or a client decision typed by anyone at all is recorded as
+  the analyst's own. There is no second analyst to keep apart, nothing per-user to authorise, and no
+  per-user revocation: rotating the token invalidates the link for everyone holding it. The log records
+  *what* the system did and cannot record *who* did it.
+- **Client pages are open by link** the same way (`/start/<case>`, `/list/<clientId>`), which is why the
+  token is a spend guard and not access control. `docs/ops/model-spend.md` has the other three layers
+  doing the same job: the origin allow-list, the rate limit, and a hard spend limit at the provider.
+
+**Never commit `.env`, `.env.deploy` or `.deploy/`.** They hold the Turso token, `IP_HASH_SECRET`,
+`LLM_API_KEY` and `API_TOKEN`; production values live only in the two Vercel projects, and `.env.example`
+is the committed contract — the only env file that belongs in git. `.gitignore` already covers all three,
+but a secret that lands in a commit is published: rotate it in Vercel rather than deleting the file.
+
+**The post-deploy check is `pnpm smoke`**, after every `pnpm deploy:all`. Pass `API_TOKEN` when the backend
+has one set — without it the pipeline's steps answer 401 and the run fails — and "Verifying by hand" below
+says what it asserts and how to point it at another deployment.
 
 ## Why the deploy is not `vercel deploy`
 
@@ -55,6 +90,8 @@ staging copy has no `.git` before uploading.
 
 ## Verifying by hand
 
+`curl` is the quick look. `pnpm smoke` is the post-deploy check.
+
 ```sh
 curl -fsS https://qryvox-api.vercel.app/health
 ```
@@ -65,9 +102,9 @@ workspace resolved inside the deployed function — which is the failure mode AD
 For the full check, run the smoke script:
 
 ```sh
-pnpm smoke                              # https://qryvox-api.vercel.app
+API_TOKEN=... pnpm smoke             # production: every analysis step needs the token
+pnpm smoke                           # https://qryvox-api.vercel.app, when API_TOKEN is unset
 SMOKE_BASE_URL=https://... pnpm smoke   # any other deployment
-API_TOKEN=... pnpm smoke              # when the API token is switched on (#19)
 ```
 
 It opens a case, ingests the fabricated pack, runs the pipeline in the browser's order
