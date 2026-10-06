@@ -67,7 +67,7 @@ For the full check, run the smoke script:
 ```sh
 pnpm smoke                              # https://qryvox-api.vercel.app
 SMOKE_BASE_URL=https://... pnpm smoke   # any other deployment
-JUDGE_TOKEN=... pnpm smoke              # when the judge-link token is switched on (#19)
+API_TOKEN=... pnpm smoke              # when the API token is switched on (#19)
 ```
 
 It opens a case, ingests the fabricated pack, runs the pipeline in the browser's order
@@ -80,11 +80,11 @@ A fresh database holds nothing a judge can look at. `pnpm demo:seed` builds the 
 API, the way the browser would, so it runs against any deployment, local or production:
 
 ```sh
-pnpm demo:seed -- --base https://qryvox-api.vercel.app --token $JUDGE_TOKEN --web https://qryvox.vercel.app
+pnpm demo:seed -- --base https://qryvox-api.vercel.app --token $API_TOKEN --web https://qryvox.vercel.app
 pnpm demo:seed -- --base http://localhost:8787      # a local backend, no token
 ```
 
-`--token` (or `JUDGE_TOKEN`) is the judge-link token, needed when the backend has `JUDGE_TOKEN` set.
+`--token` (or `API_TOKEN`) is the API token, needed when the backend has `API_TOKEN` set.
 `--web` only makes the printed case and client links absolute. It spends model tokens: about 6-10 minutes
 on Kimi K3. Run it once, after the model switch (#17), and watch the spend limit.
 

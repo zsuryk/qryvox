@@ -159,7 +159,7 @@ describe("recording a card operation", () => {
   });
 });
 
-describe("the judge-link token", () => {
+describe("the API token", () => {
   function browser(search: string, stored: Record<string, string> = {}) {
     const storage = new Map(Object.entries(stored));
     const replaced: string[] = [];
@@ -173,18 +173,18 @@ describe("the judge-link token", () => {
   const step = { step_run_id: crypto.randomUUID(), step: "extract" as const, input_run_id: null };
 
   it("is taken off the demo link into the tab's storage, and out of the address bar", async () => {
-    const { storage, replaced } = browser("?k=judge-secret&x=1");
-    const { captureJudgeToken } = await import("../lib/api");
-    captureJudgeToken();
-    expect([...storage.values()]).toEqual(["judge-secret"]);
+    const { storage, replaced } = browser("?k=test-secret&x=1");
+    const { captureApiToken } = await import("../lib/api");
+    captureApiToken();
+    expect([...storage.values()]).toEqual(["test-secret"]);
     expect(replaced).toEqual(["https://qryvox.vercel.app/?x=1"]);
   });
 
   it("travels with every call once captured", async () => {
-    browser("", { "qryvox.judge-token": "judge-secret" });
+    browser("", { "qryvox.api-token": "test-secret" });
     const fetch = stubFetch(StepResult.parse({ step_run_id: step.step_run_id, step: "extract", seq: 3, prompt_version: "extract@1", model: "m", output: {} }), 200);
     await runStep("case-1", step);
-    expect(fetch.mock.calls[0]![1]!.headers).toMatchObject({ "x-judge-token": "judge-secret" });
+    expect(fetch.mock.calls[0]![1]!.headers).toMatchObject({ "x-api-token": "test-secret" });
   });
 
   it("is not asked for without one: no header is sent", async () => {

@@ -1,11 +1,11 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { JUDGE_TOKEN_HEADER } from "@qryvox/shared";
+import { API_TOKEN_HEADER } from "@qryvox/shared";
 import { and, count, eq, gte, min } from "drizzle-orm";
 import type { Context, MiddlewareHandler } from "hono";
 import type { Db } from "./db/client.js";
 import { events } from "./db/schema.js";
 
-// Spend protection for a public judge URL (ADR-0001): a judge-link token, an origin allow-list, a hashed
+// Spend protection for a public judge URL (ADR-0001): an API token, an origin allow-list, a hashed
 // client IP, and a rate limit counted from the events table. The model provider's hard spend limit is the real backstop
 // (docs/ops/model-spend.md).
 
@@ -20,16 +20,16 @@ export type Guards = {
   allowedOrigins: readonly string[];
   ipHashSecret: string;
   limits: RateLimits;
-  // null leaves analysis steps open, for local development; production sets JUDGE_TOKEN.
-  judgeToken: string | null;
+  // null leaves analysis steps open, for local development; production sets API_TOKEN.
+  apiToken: string | null;
 };
 
-// The judge-link token, checked on analysis steps only: they are what spends money, while the board and
+// The API token, checked on analysis steps only: they are what spends money, while the board and
 // replay read the log and cost nothing. Unlike the origin allow-list, a request without an Origin (curl)
 // does not get past it.
-export function judgeLink(token: string | null): MiddlewareHandler {
+export function apiToken(token: string | null): MiddlewareHandler {
   return async (c, next) => {
-    if (token !== null && !sameToken(c.req.header(JUDGE_TOKEN_HEADER) ?? "", token)) {
+    if (token !== null && !sameToken(c.req.header(API_TOKEN_HEADER) ?? "", token)) {
       return c.json({ error: "this demo link is missing its access token, or the token is wrong" }, 401);
     }
     await next();

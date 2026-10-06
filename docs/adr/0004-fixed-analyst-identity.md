@@ -43,5 +43,5 @@ boxes: a login form would be the first one.
 - Whoever replaces this must decide where the identity comes from (a login, an SSO header, a picker) and
   whether the server or the client vouches for it. Today the server alone sets it, and that property is
   worth keeping: an actor the client can choose is not evidence.
-- The judge-link token (ADR-0001) is not an identity. It says the caller holds the demo link, not who they
+- The API token (ADR-0001) is not an identity. It says the caller holds the demo link, not who they
   are, and it is not recorded on events.

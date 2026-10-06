@@ -60,7 +60,7 @@ vulnerable customers, such as those aged 65 or over.
 | DPP1, collection limited to purpose | The profile asks only what a rule reads. It does not collect name, income, net worth or date of birth. | `shared/src/client.ts`, ADR-0005 |
 | DPP2, accuracy and retention | The client sees their answers back with a "something wrong?" route, and new answers supersede the advice. Retention and erasure-by-key-deletion are designed but not built. | `frontend/app/client-advice.tsx`, `docs/data-ecosystem.md` |
 | DPP3, use | How a client reads their advice is shared with the adviser only if the client turns it on. It only ever produces a suggestion. | `frontend/app/client-advice.tsx`, #38 |
-| DPP4, security | Clients get pseudonymous ids. IPs are stored only as a keyed HMAC. A judge-link token and an origin allow-list protect the paid endpoints. | `backend/src/guards.ts`, `shared/src/client.ts` |
+| DPP4, security | Clients get pseudonymous ids. IPs are stored only as a keyed HMAC. A API token and an origin allow-list protect the paid endpoints. | `backend/src/guards.ts`, `shared/src/client.ts` |
 | DPP5, openness | The client start page says what is collected and that no name or account is needed. | `frontend/app/client-start.tsx` |
 | DPP6, access and correction | The client's own page shows everything they told us. | `frontend/app/client-advice.tsx` (`YourAnswers`) |
 

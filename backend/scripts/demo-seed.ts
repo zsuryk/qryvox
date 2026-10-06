@@ -1,11 +1,11 @@
-// pnpm demo:seed -- --base <url> [--token <judge token>] [--web <frontend url>]
+// pnpm demo:seed -- --base <url> [--token <API token>] [--web <frontend url>]
 //
 // Builds the demo state on any deployment, through the HTTP API only: two verified products (Larkspur,
 // revised, and Wrenfield) with the five steps run, facts read, rationales written and every finding on the
 // board dispositioned, then for each product's three personas a profile, a drafted advice, an explanation and
 // the adviser's approval. A judge opening the deployment then finds what the local demo shows.
 //
-//   pnpm demo:seed -- --base https://qryvox-api.vercel.app --token $JUDGE_TOKEN --web https://qryvox.vercel.app
+//   pnpm demo:seed -- --base https://qryvox-api.vercel.app --token $API_TOKEN --web https://qryvox.vercel.app
 //
 // Idempotent by product. A product's case id is derived from its pack, so a second run lands on the same case,
 // reads its log, and does only what the log says is missing: a product already verified, dispositioned and
@@ -31,7 +31,7 @@ import {
   GroundTruth,
   type GroundTruthEntry,
   type IngestedDocument,
-  JUDGE_TOKEN_HEADER,
+  API_TOKEN_HEADER,
   PackManifest,
   PersonaSet,
   type SlimEvent,
@@ -47,10 +47,10 @@ const { values: args } = parseArgs({
   allowPositionals: true,
 });
 const BASE = (args.base ?? process.env.SEED_BASE_URL ?? "").replace(/\/$/, "");
-const TOKEN = args.token ?? process.env.JUDGE_TOKEN ?? "";
+const TOKEN = args.token ?? process.env.API_TOKEN ?? "";
 const WEB = (args.web ?? "").replace(/\/$/, "");
 if (!BASE) {
-  console.error("usage: pnpm demo:seed -- --base <api url> [--token <judge token>] [--web <frontend url>]");
+  console.error("usage: pnpm demo:seed -- --base <api url> [--token <API token>] [--web <frontend url>]");
   process.exit(2);
 }
 
@@ -116,7 +116,7 @@ function isPlanted(finding: { category: string; citation: { quote: string }; cou
 async function call(method: string, path: string, body?: unknown): Promise<{ status: number; json: unknown; headers: Headers }> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["content-type"] = "application/json";
-  if (TOKEN) headers[JUDGE_TOKEN_HEADER] = TOKEN;
+  if (TOKEN) headers[API_TOKEN_HEADER] = TOKEN;
   for (let attempt = 0; ; attempt += 1) {
     // Every call here is safe to repeat (ids are the seed's, ADR-0002), so a dropped connection, as when a
     // local server restarts under a long step, is retried rather than fatal.
@@ -292,7 +292,7 @@ async function advisePersonas(pack: Pack, caseId: string): Promise<void> {
 
 // --- Run -----------------------------------------------------------------------------------------------
 
-console.log(`demo seed against ${BASE}${TOKEN ? " (judge token set)" : ""}`);
+console.log(`demo seed against ${BASE}${TOKEN ? " (API token set)" : ""}`);
 const health = await call("GET", "/health");
 if (health.status !== 200) throw new Error(`GET /health -> ${health.status}: is ${BASE} an API?`);
 

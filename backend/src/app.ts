@@ -29,7 +29,7 @@ import { AdviceConflict, AdviceNotFound, clientCases, clientQueue, decideAdvice,
 import { CardConflict, recordCardOperation } from "./cards.js";
 import { assertAppendOnly } from "./db/append-only.js";
 import type { Database } from "./db/client.js";
-import { clientIp, type Guards, hashIp, judgeLink, originAllowList, RateLimited } from "./guards.js";
+import { clientIp, type Guards, hashIp, apiToken, originAllowList, RateLimited } from "./guards.js";
 import type { Llm } from "./llm.js";
 import {
   appendOnce,
@@ -130,7 +130,7 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
     return c.json({ seq: row.seq } satisfies AppendResponse, 201);
   });
 
-  app.post("/cases/:caseId/steps", judgeLink(guards.judgeToken), async (c) => {
+  app.post("/cases/:caseId/steps", apiToken(guards.apiToken), async (c) => {
     const caseId = c.req.param("caseId");
     const body = RunStepRequest.safeParse(await readJson(c));
     if (!body.success) return badRequest(c, body.error);
@@ -170,7 +170,7 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
   });
 
   // One card operation on the canvas (#65): dock, undock, pin, unpin, discard, restore or find similar, as
-  // the analyst made it. No model is called, so no judge-link token; find similar's own run goes through
+  // the analyst made it. No model is called, so no API token; find similar's own run goes through
   // /steps like any step. 409 for a card the case does not have, or a dock into another category.
   app.post("/cases/:caseId/cards", async (c) => {
     const caseId = c.req.param("caseId");
@@ -182,7 +182,7 @@ export function createApp({ client, db, llm, guards }: AppOptions) {
     return c.json(CardOperationResponse.parse(toWire(row)), 201);
   });
 
-  // The client layer (#31). No model is called and nothing spends tokens, so no judge-link token either.
+  // The client layer (#31). No model is called and nothing spends tokens, so no API token either.
   // A new profile version supersedes the client's advice in play, in the same transaction.
   app.post("/cases/:caseId/clients", async (c) => {
     const caseId = c.req.param("caseId");

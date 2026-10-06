@@ -6,10 +6,10 @@ operations step that has to be done by hand.
 
 **Owner: @zsuryk** (the release owner, who holds the Vercel Hobby account and the production model key).
 
-## 1. Judge-link token (code)
+## 1. API token (code)
 
 The demo URL carries `?k=<token>`; the frontend keeps it in `sessionStorage` and sends it as the
-`x-judge-token` header. With `JUDGE_TOKEN` set on the backend Vercel project, an analysis step without the
+`x-api-token` header. With `API_TOKEN` set on the backend Vercel project, an analysis step without the
 matching header answers 401 before the model is called. Only steps need it: the board and replay stay open.
 Unlike the origin allow-list, it also stops requests that send no Origin, such as `curl`.
 

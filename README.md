@@ -123,7 +123,7 @@ Stage 2 is tracked in #20.
 | **Client list** | ✅ Answer once at `/start` and see every verified product: suits or doesn't, with deciding reasons and sources; the adviser approves the list and may mark a pick; explanations written on open, in either language | #68 #71 #75 |
 | Demo readiness | ✅ `pnpm demo:seed` builds the demo state on any deployment · `docs/demo.md` live script · 🚧 production run and rehearsals | #72–#74 |
 | Pitch | ✅ [docs/pitch.md](docs/pitch.md): strengths by judging criterion, with evidence; the pitch is the live demo, [docs/demo.md](docs/demo.md), since slide decks are not allowed | #46 |
-| Spend protection | ✅ Origin allow-list, rate limit, judge-link token end to end, `JUDGE_TOKEN` set in production | #16 #19 |
+| Spend protection | ✅ Origin allow-list, rate limit, API token end to end, `API_TOKEN` set in production | #16 #19 |
 | Production deploy | ✅ Deployed (owner, CLI) · 🚧 switch the production model back to Kimi K3 with `LLM_REASONING_EFFORT=low` | #17 |
 
 **Measured on Kimi K3** (`LLM_REASONING_EFFORT=low`; real pdf.js text): Larkspur recall 9/10, precision 10/10, all five steps in about 2½ minutes; Wrenfield recall 2/2, precision 2/4; every product attribute read correctly on both; all three personas got their expected verdict, and Mrs Chan's advice points her to Wrenfield. Without `low`, a reasoning model can think for over 300 s on one step — past Vercel's limit.

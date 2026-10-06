@@ -1,11 +1,11 @@
-// pnpm e2e -- --web <frontend url> --api <api url> [--token <judge token>] [--out <dir>] [--case <larkspur case id>]
+// pnpm e2e -- --web <frontend url> --api <api url> [--token <API token>] [--out <dir>] [--case <larkspur case id>]
 //
 // The pre-pitch end-to-end run (#73): the whole product as a judge would use it, in a real Chrome, through the
 // browser only. Run it against a stack that `pnpm demo:seed` has built (it reads Larkspur's case by the id the
 // seed derives from the pack, or take it with --case). Not part of CI: it calls the live model for the typed
 // intent and for the client's explanation, so it takes a few minutes and costs a few thousand tokens.
 //
-//   pnpm e2e -- --web https://qryvox.vercel.app --api https://qryvox-api.vercel.app --token $JUDGE_TOKEN --out ./e2e-out
+//   pnpm e2e -- --web https://qryvox.vercel.app --api https://qryvox-api.vercel.app --token $API_TOKEN --out ./e2e-out
 //
 // Steps, in order (each is timed and screenshotted; a failed step does not stop the ones that do not need it):
 //   1 home                 the intake page, and the way into a reviewed case
@@ -44,9 +44,9 @@ const { values: args } = parseArgs({
 });
 const WEB = (args.web ?? "").replace(/\/$/, "");
 const API = (args.api ?? "").replace(/\/$/, "");
-const TOKEN = args.token ?? process.env.JUDGE_TOKEN ?? "";
+const TOKEN = args.token ?? process.env.API_TOKEN ?? "";
 if (!WEB || !API) {
-  console.error("usage: pnpm e2e -- --web <frontend url> --api <api url> [--token <judge token>] [--out <dir>] [--case <case id>]");
+  console.error("usage: pnpm e2e -- --web <frontend url> --api <api url> [--token <API token>] [--out <dir>] [--case <case id>]");
   process.exit(2);
 }
 const OUT = resolve(args.out ?? `e2e-out-${new Date().toISOString().replace(/[:.]/g, "-")}`);
@@ -86,7 +86,7 @@ async function newPage(browser: Browser, who: string, options: Parameters<Browse
   return { page, context };
 }
 
-// The judge-link token rides on the first load of each tab, as the demo link carries it (?k=).
+// The API token rides on the first load of each tab, as the demo link carries it (?k=).
 async function open(page: Page, path: string): Promise<void> {
   const url = new URL(WEB + path);
   if (TOKEN) url.searchParams.set("k", TOKEN);

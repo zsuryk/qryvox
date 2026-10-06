@@ -167,7 +167,7 @@ type Store = ReturnType<typeof useCanvasStore>;
 // the card's nearest neighbours among the statements already extracted come back through the fold at once,
 // shown before the server has even answered; those already on the canvas are lit up rather than drawn
 // twice. Once pressed, the card offers Look further (#57), the model's seeded run: on a live case one awaited
-// call to the steps endpoint, judge-link token and all, with the log read again every couple of seconds
+// call to the steps endpoint, API token and all, with the log read again every couple of seconds
 // while it runs so the status panel shows it running; on the fixture a recorded run is played back. Either
 // way the candidates arrive through the fold like everything else. A failure leaves the canvas as the log
 // has it, with the reason said; a failed run is on the log as a failed run.
