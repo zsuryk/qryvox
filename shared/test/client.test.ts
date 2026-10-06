@@ -130,7 +130,7 @@ describe("advice", () => {
 });
 
 describe("fold: clients and advice", () => {
-  it("a stage-1 log folds with no clients and no advice", () => {
+  it("a log folds with no clients and no advice", () => {
     expect(fold(events)).toMatchObject({ clients: [], advice: [] });
   });
 

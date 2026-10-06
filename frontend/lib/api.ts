@@ -170,7 +170,7 @@ export async function recordCardOperation(caseId: string, req: CardOperationRequ
   throw new Error(ErrorResponse.safeParse(body).data?.error ?? `the server answered ${res.status}`);
 }
 
-// --- The client layer (stage 2). Each is an append the browser names by event_id, so a retry after a lost
+// --- The client layer. Each is an append the browser names by event_id, so a retry after a lost
 // response returns the event already written rather than writing a second (ADR-0002).
 
 // A new version of a client's answers. The server supersedes advice drafted on the old version.

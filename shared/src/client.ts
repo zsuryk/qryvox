@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { Citation } from "./finding.js";
 
-// The client layer (stage 2): who advice is for and what a product is, as far as suitability needs.
+// The client layer: who advice is for and what a product is, as far as suitability needs.
 // Nothing here is computed. A profile is a client's own answers; attributes are read from the documents.
 
 // ---------------------------------------------------------------------------------------------------------

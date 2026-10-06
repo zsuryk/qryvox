@@ -12,7 +12,7 @@
     "db:check": "tsx --conditions=source --env-file-if-exists=../.env scripts/db.ts check",
     "record:fixture": "tsx --conditions=source scripts/record-fold-fixture.ts",
     "smoke": "tsx --conditions=source scripts/smoke.ts",
-    "demo:seed": "tsx --conditions=source scripts/demo-seed.ts",
+    "seed:demo": "tsx --conditions=source scripts/demo-seed.ts",
     "e2e": "tsx --conditions=source scripts/e2e.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

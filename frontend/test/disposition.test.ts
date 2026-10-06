@@ -88,7 +88,7 @@ describe("the disposition console", () => {
 
     expect(view.rows[0]).toMatchObject({
       decision: "approved",
-      // Stage 1 has one analyst identity and no picker (spec decision 9), and the log says so itself.
+      // One analyst identity and no picker (spec decision 9), and the log says so itself.
       decidedBy: ANALYST_ACTOR,
       decidedAt: "2026-10-02T12:00:00.000Z",
       decidedAtSeq: lastSeq + 1,

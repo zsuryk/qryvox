@@ -7,7 +7,7 @@ times run from `step.started` to `step.completed`. Anyone can re-read them from 
 
 ## Once per product: verifying it for the shelf
 
-Five analysis steps read the pack and find what is wrong with it. A sixth reads the facts the suitability
+The pack is fabricated demo fixture data. Five analysis steps read it and find what is wrong with it. A sixth reads the facts the suitability
 rules need.
 
 | Step | Larkspur v1 (in / out tokens, seconds) | Larkspur v2 | Wrenfield |

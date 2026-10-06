@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { assertPdfjsVersion, extractPageTexts } from "../lib/pdf";
 import { groundTruth, manifest, nodeAssets, packDir, pdfjsDir, readBytes, readJson } from "./helpers";
 
-// The highest-value test in stage 1: if a planted quote is not in the text pdf.js reads off its cited
+// The highest-value test: if a planted quote is not in the text pdf.js reads off its cited
 // page, citation highlighting cannot work and every downstream surface is at risk. A failure names the
 // document and the page, so the fix is one line in shared/pack/source.ts and a `pack:generate`.
 

@@ -56,7 +56,7 @@ describe("policy_gap findings", () => {
     expect(gap).toMatchObject({ kind: "policy_gap", rule: "P1", supersededAtSeq: null });
   });
 
-  it("leave stage-1 findings, which name no rule, parsing as before", () => {
+  it("leave findings that name no rule, parsing as before", () => {
     expect(activeFindings(fold(events)).every((f) => f.rule === undefined)).toBe(true);
   });
 

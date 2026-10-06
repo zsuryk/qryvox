@@ -11,7 +11,7 @@ One command per action. Deploys go through `scripts/deploy.sh`; `smoke` is a pla
 | `pnpm deploy:web` | Deploys the frontend. |
 | `pnpm deploy:all` | `api` then `web`, from the same commit — the same two can never be deployed out of order, so production never runs a new frontend against an old backend. |
 | `pnpm smoke` | End-to-end check of the deployed backend: health, open a case, ingest the pack, run the full pipeline, verify the chain. |
-| `pnpm demo:seed -- --base <url>` | Builds the demo state on a deployment through its API: two verified products, three approved personas each. See "Seeding the demo" below. |
+| `pnpm seed:demo -- --base <url>` | Builds the demo state on a deployment through its API: two verified products, three approved personas each. See "Seeding the demo" below. |
 | `pnpm deploy:setup` | One-time: creates and links both Vercel projects, pushes production env vars. |
 
 ## First run on a new machine
@@ -76,12 +76,12 @@ intact. A fresh case and fresh ids every run, so it is safe to re-run after any 
 
 ## Seeding the demo
 
-A fresh database holds nothing a judge can look at. `pnpm demo:seed` builds the demo state over the HTTP
+A fresh database holds nothing anyone can look at. `pnpm seed:demo` builds the demo state over the HTTP
 API, the way the browser would, so it runs against any deployment, local or production:
 
 ```sh
-pnpm demo:seed -- --base https://qryvox-api.vercel.app --token $API_TOKEN --web https://qryvox.vercel.app
-pnpm demo:seed -- --base http://localhost:8787      # a local backend, no token
+pnpm seed:demo -- --base https://qryvox-api.vercel.app --token $API_TOKEN --web https://qryvox.vercel.app
+pnpm seed:demo -- --base http://localhost:8787      # a local backend, no token
 ```
 
 `--token` (or `API_TOKEN`) is the API token, needed when the backend has `API_TOKEN` set.
@@ -113,7 +113,7 @@ step's time and tokens.
   connect it and do not add a `VERCEL_TOKEN` workflow.
 - **Hobby has no collaboration.** Only one person can deploy. Plan a deploy cadence, and freeze
   before a demo.
-- **Set a hard spend limit in the model provider's console.** A public judge URL can otherwise
+- **Set a hard spend limit in the model provider's console.** A public demo URL can otherwise
   burn credits. This is the real backstop behind the three app-level guards.
 - **`LLM_MODEL` may be a steerable or stealth model.** Those get deprecated with little notice;
   keep a fallback model in mind or the analysis steps will 503 mid-demo.

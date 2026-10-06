@@ -13,7 +13,7 @@ vetting a product. What they need is to *collect* evidence: the passages that di
 the PPM doesn't back, the fees stated two ways. They then need to put it in order as the reportable set,
 and leave a record a reviewer can trust.
 
-Stage 1 had cards, but in a fixed list. The question was what an interface built around collecting
+The product had cards, but in a fixed list. The question was what an interface built around collecting
 evidence looks like, without bringing a text box back in.
 
 ## Decision

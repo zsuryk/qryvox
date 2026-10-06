@@ -112,7 +112,7 @@ export type CaseState = {
   // The latest disposition per finding that has one, in the order it was first decided. A finding with no
   // entry here has not been decided yet — which is not the same as dismissed, and never happens by itself.
   dispositions: FindingDisposition[];
-  // Stage 2: each client's latest profile, in the order first profiled, and every advice ever drafted.
+  // Each client's latest profile, in the order first profiled, and every advice ever drafted.
   clients: CaseClient[];
   advice: CaseAdvice[];
   // Depths clients chose to read at, where they shared it (#38), in order.

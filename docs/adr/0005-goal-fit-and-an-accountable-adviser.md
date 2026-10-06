@@ -7,7 +7,7 @@ ADR-0004's adviser sign-off.
 
 ## Context
 
-The track is judged on five criteria; two of them, *personalisation* and *investment outcome quality*, ask
+Two criteria, *personalisation* and *investment outcome quality*, ask
 whether the advice serves what the client is trying to achieve, and *fiduciary & regulatory compliance*
 asks whether the human decision behind it would satisfy a regulator. Measured against them, three gaps:
 

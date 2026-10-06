@@ -5,7 +5,7 @@ to get right, what the prototype assumes in its place, and how it is protected. 
 key requirement; the short version is that **the hard data is about the client, not the product**, and
 the design keeps the two apart.
 
-Terms are as in [CONTEXT.md](../CONTEXT.md). Everything the prototype holds is fabricated: the Larkspur pack,
+Terms are as in [CONTEXT.md](../CONTEXT.md). Everything the prototype holds is fabricated demo fixture data: the Larkspur pack,
 its ground truth and the three personas.
 
 ## The data map
@@ -19,7 +19,7 @@ its ground truth and the three personas.
 | **Client goals, horizon, constraints** (relies on income, may need cash at short notice, exclusions) | The client, in a questionnaire | **Low.** Clients know these, and buttons make the answers unambiguous | Answered honestly; no free text anywhere | **Personal** | `client.profiled`, under a pseudonymous id |
 | **Risk tolerance** | Questionnaire | **High.** Self-assessment is unreliable and shifts with markets: tolerance stated in a rising market rarely survives a falling one | The questionnaire's level (1–5) is a starting point the adviser can revisit; every change is a new, logged profile version | **Personal, sensitive** | `client.profiled` |
 | **Knowledge and experience** | Questionnaire, then behaviour | **High.** People overstate it, and it decides how advice must be explained | Self-reported level; bonus #38 suggests a change to the adviser from how the client reads (never changes it alone) | **Personal** | `client.profiled`; interaction events in #38 |
-| **Full financial picture** (income, net worth, liabilities, assets held elsewhere) | The client, other institutions | **Very high.** Held-away assets are invisible without open-finance consent, and self-reports are partial | **Not used.** Suitability here judges one product against stated goals and limits, not a portfolio | **Personal, highly sensitive** | Nowhere |
+| **Full financial picture** (income, net worth, liabilities, assets held elsewhere) | The client, other institutions | **Very high.** Held-away assets are invisible without open-finance consent, and self-reports are partial | **Not used.** Suitability here assesses one product against stated goals and limits, not a portfolio | **Personal, highly sensitive** | Nowhere |
 | **Interaction signals** (which explanations a client opens, at what depth) | The client page | Low to capture; consent is the hard part | Bonus #38 only, shown to the client as a visible, consented feature | **Personal** | Events, pseudonymous |
 | **Market and performance data** (prices, returns, volatility) | Market data vendors | — | **Deliberately unused.** Nothing in Qryvox computes a return, a forecast or a volatility: claims and attributes are read, suitability compares levels and terms | — | Nowhere |
 

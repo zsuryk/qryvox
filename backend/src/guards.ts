@@ -5,7 +5,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import type { Db } from "./db/client.js";
 import { events } from "./db/schema.js";
 
-// Spend protection for a public judge URL (ADR-0001): an API token, an origin allow-list, a hashed
+// Spend protection for a public demo URL (ADR-0001): an API token, an origin allow-list, a hashed
 // client IP, and a rate limit counted from the events table. The model provider's hard spend limit is the real backstop
 // (docs/ops/model-spend.md).
 

@@ -14,7 +14,7 @@
 
 | Layer | Audience | Claim |
 |---|---|---|
-| **The hook** | Hackathon judges, live demo | "Not another ChatGPT wrapper — the prompting is compiled into the interface" |
+| **The hook** | Live demo | "Not another ChatGPT wrapper — the prompting is compiled into the interface" |
 | **The moat** | The actual buyer (regulated intermediary) | Citation-linked findings + replayable audit log + human-in-the-loop state machine + live precision/recall — *defensible diligence* |
 
 One thesis underneath both: **expertise lives in the product, not in the user's head.** The UI makes it usable; the audit layer makes it buyable.
@@ -35,7 +35,7 @@ For this target user it lands as more than convenience: prompt variance is audit
 - **Progressive disclosure.** Simple by default: drop a document, get flags. Power lives one layer down (filters, re-run scopes, thresholds), never in a text field.
 - **The model is swappable.** Because no prompt knowledge leaks to the user, the LLM behind the UI can change without changing the workflow.
 
-**Anticipated judge question — "how is this not a prompt wrapper?"** → "A wrapper gives you a text box and ships the prompt engineering as a string. We shipped it as an interface: the prompt engineering is invisible, versioned, and testable, and the user only ever touches controls that already know what to do."
+**Anticipated question — "how is this not a prompt wrapper?"** → "A wrapper gives you a text box and ships the prompt engineering as a string. We shipped it as an interface: the prompt engineering is invisible, versioned, and testable, and the user only ever touches controls that already know what to do."
 
 ## The moat: defensible diligence
 
@@ -56,9 +56,9 @@ The interaction wins the room; the audit layer wins the buyer. A regulated inter
 
 The comparison class isn't ChatGPT — it's Excel, manual review, and expensive GRC tools. This is what they're buying: product diligence they can stand behind at shelf-placement review.
 
-**Anticipated judge question — "where's the innovation beyond UX?"** → "The UI is how a non-expert drives it; the citation-replay-eval layer is why a regulated firm can trust what comes out. Competitors ship one or the other — a chat box, or a black box."
+**Anticipated question — "where's the innovation beyond UX?"** → "The UI is how a non-expert drives it; the citation-replay-eval layer is why a regulated firm can trust what comes out. Competitors ship one or the other — a chat box, or a black box."
 
-**Anticipated judge question — "isn't AI advice a regulatory risk?"** → "The AI never decides. Fixed rules decide suitability, every reason cites the product's own documents and the client's own answers, and nothing reaches the client until a licensed adviser approves it. And it can only advise on products it has verified — advice built on unvetted product claims is exactly what gives democratised wealth products a bad name."
+**Anticipated question — "isn't AI advice a regulatory risk?"** → "The AI never decides. Fixed rules decide suitability, every reason cites the product's own documents and the client's own answers, and nothing reaches the client until a licensed adviser approves it. And it can only advise on products it has verified — advice built on unvetted product claims is exactly what gives democratised wealth products a bad name."
 
 ## Why this fits *Finance & Wealth — Democratising Private Bank-Level Advice*
 
@@ -90,7 +90,7 @@ Every step below is a distinct UI surface. Watch the cursor: it never types a se
 | **Auditable** | Citation-linked findings + replayable audit log |
 | **Fast** | Document pack → scored findings in seconds vs. days of manual review |
 
-## Capco brief mapping (must achieve all three objectives)
+## Brief mapping (must achieve all three objectives)
 
 | Objective | Met by |
 |---|---|
@@ -100,7 +100,7 @@ Every step below is a distinct UI surface. Watch the cursor: it never types a se
 | **Data ecosystem** (key requirement) | [docs/data-ecosystem.md](docs/data-ecosystem.md): what is needed, what is hard to capture, assumptions, privacy limits (pseudonymous ids in the log, erasure by deleting a key) |
 | **Bonus** | Product updates trigger re-verification; knowledge level learned from how the client reads |
 
-Stage 2 is tracked in #20.
+The client layer is tracked in #20.
 
 ## Status (2026-10-04)
 
@@ -116,13 +116,12 @@ Stage 2 is tracked in #20.
 | Replay | ✅ A scrubber that rebuilds the case at any event | #14 |
 | Bonus | ✅ Product updates (Larkspur v2), a second product with alternatives (Wrenfield), learned reading depth | #37 #38 #39 |
 | Data ecosystem | ✅ [docs/data-ecosystem.md](docs/data-ecosystem.md) | #36 |
-| Judging criteria pass | ✅ S7 goal fit (`rules@2`), rejection reasons, vulnerable-client confirmation (ADR-0005); the client journey in 繁體中文 (ADR-0006) | #41 #42 #43 |
+| Client-layer pass | ✅ S7 goal fit (`rules@2`), rejection reasons, vulnerable-client confirmation (ADR-0005); the client journey in 繁體中文 (ADR-0006) | #41 #42 #43 |
 | Compliance map | ✅ [docs/compliance.md](docs/compliance.md): SFC, HKMA, PDPO and CFA obligations against our controls | #44 |
 | Cost and scale, measured | ✅ [docs/scalability.md](docs/scalability.md): ≈16k tokens per product, ≈2.8k per client | #45 |
 | **Canvas** | ✅ Infinite canvas as the case's first section: pan/zoom/touch, auto-tiled cards, plan region, discard and pin, find similar (instant BM25 + grounded re-run), typed intent that becomes chips and filters the cards (`parse@1`), model-written rationales (`rationale@1`), activity panel | #48–#70 |
 | **Client list** | ✅ Answer once at `/start` and see every verified product: suits or doesn't, with deciding reasons and sources; the adviser approves the list and may mark a pick; explanations written on open, in either language | #68 #71 #75 |
-| Demo readiness | ✅ `pnpm demo:seed` builds the demo state on any deployment · `docs/demo.md` live script · 🚧 production run and rehearsals | #72–#74 |
-| Pitch | ✅ [docs/pitch.md](docs/pitch.md): strengths by judging criterion, with evidence; the pitch is the live demo, [docs/demo.md](docs/demo.md), since slide decks are not allowed | #46 |
+| Demo readiness | ✅ `pnpm seed:demo` builds the demo state on any deployment · 🚧 production run and rehearsals | #72–#74 |
 | Spend protection | ✅ Origin allow-list, rate limit, API token end to end, `API_TOKEN` set in production | #16 #19 |
 | Production deploy | ✅ Deployed (owner, CLI) · 🚧 switch the production model back to Kimi K3 with `LLM_REASONING_EFFORT=low` | #17 |
 
@@ -158,5 +157,5 @@ pnpm --filter @qryvox/frontend dev    # app on http://localhost:3000 (builds sha
 
 - **MVP:** fabricated product pack (factsheet, PPM excerpt, marketing deck, fee table), 6 planted contradictions → drop-zone intake, claim board, citation split-pane, disposition console, eval dashboard, audit replay
 - **Stretch:** regulatory filing/news cross-check, tamper signals, retail-facing verified claims card, keyboard-first navigation, continuous re-verification (pack re-checks when the product publishes an update)
-- **Stage 2 (in progress, #20):** policy checks (`policy_gap`), client profiles, rule-based suitability, adviser sign-off, client advice page at three depths
+- **Client layer (in progress, #20):** policy checks (`policy_gap`), client profiles, rule-based suitability, adviser sign-off, client advice page at three depths
 - **Explicitly out of scope (say it in the pitch):** portfolio construction, any performance computation — no returns, no volatility, no backtesting — and advice on any product that has not been verified. Claims and attributes are extracted and cross-checked, never computed; suitability compares levels and terms. Zero math, no unverified advice, zero text boxes.

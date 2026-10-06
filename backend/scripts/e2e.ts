@@ -1,7 +1,7 @@
 // pnpm e2e -- --web <frontend url> --api <api url> [--token <API token>] [--out <dir>] [--case <larkspur case id>]
 //
-// The pre-pitch end-to-end run (#73): the whole product as a judge would use it, in a real Chrome, through the
-// browser only. Run it against a stack that `pnpm demo:seed` has built (it reads Larkspur's case by the id the
+// The end-to-end run (#73): the whole product as an analyst would use it, in a real Chrome, through the
+// browser only. Run it against a stack that `pnpm seed:demo` has built (it reads Larkspur's case by the id the
 // seed derives from the pack, or take it with --case). Not part of CI: it calls the live model for the typed
 // intent and for the client's explanation, so it takes a few minutes and costs a few thousand tokens.
 //

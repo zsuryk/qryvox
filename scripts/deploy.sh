@@ -22,7 +22,7 @@ STATE_DIR=".deploy"
 PROJECTS_FILE="$STATE_DIR/projects.env"
 SECRETS_FILE=".env.deploy"
 API_PROJECT="${VERCEL_API_PROJECT:-qryvox-api}"
-# The frontend takes the bare product name: qryvox.vercel.app is the judge-facing URL (ADR-0001),
+# The frontend takes the bare product name: qryvox.vercel.app is the public demo URL (ADR-0001),
 # so qryvox-web.vercel.app would put a build detail in front of the audience.
 WEB_PROJECT="${VERCEL_WEB_PROJECT:-qryvox}"
 SCOPE="${VERCEL_SCOPE:-}"

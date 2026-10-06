@@ -6,7 +6,7 @@ accepted — 2026-10-03 — deciders: <names>. Ticket #43 (under #40).
 
 ## Context
 
-The track is judged on *personalisation & client experience*. Hong Kong's retail investors mostly read
+*Personalisation and client experience* matter. Hong Kong's retail investors mostly read
 Traditional Chinese, and many of the clients regulators worry about most (the elderly, the new to investing)
 read it best. The client journey (the questionnaire, the waiting page, the advice) was English only.
 

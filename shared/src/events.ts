@@ -49,7 +49,7 @@ export const DocumentIngested = z.object({
   payload: IngestedDocument,
 });
 
-// The four analysis steps, driven by the browser in this order (ADR-0001), then the steps stage 2 adds:
+// The four analysis steps, driven by the browser in this order (ADR-0001), then the client-layer steps:
 // compliance checks the documents against the product rules between contradictions and findings (#24);
 // attributes reads the documents for the facts suitability needs (#29); explain words one advice's
 // verdict at three depths (#30); parse reads the analyst's free-text intent for the canvas into intent
@@ -157,7 +157,7 @@ export const FindingSuperseded = z.object({
 
 // The analyst's decision, by button or keyboard, and the only disposition there is (spec decision 34).
 // Who decided is the envelope's actor, so the audit trail identifies who decided what (spec decision 21);
-// stage 1 has one fixed identity and no picker (spec decision 9). Deliberately not a step event: no
+// one fixed identity and no picker (spec decision 9). Deliberately not a step event: no
 // step_run_id, because no run decided this and no model was called to produce it.
 export const DispositionChanged = z.object({
   ...envelope,
@@ -166,7 +166,7 @@ export const DispositionChanged = z.object({
   payload: z.object({ finding_id: z.string().min(1), disposition: Disposition }),
 });
 
-// --- The client layer (stage 2). None of these is a step event: no model produces them. ---
+// --- The client layer. None of these is a step event: no model produces them. ---
 
 // A client's answers, appended by the browser. Each one is a new version of that client's profile; the
 // server supersedes advice drafted on an older version in the same transaction.

@@ -1,6 +1,6 @@
 # Model spend protection
 
-The judge URL is public, so anyone who finds it can make the backend call the model. The real bill is
+The demo URL is public, so anyone who finds it can make the backend call the model. The real bill is
 model tokens, not hosting (ADR-0001). Four layers protect it. Three are in the code; the last is an
 operations step that has to be done by hand.
 
@@ -13,7 +13,7 @@ The demo URL carries `?k=<token>`; the frontend keeps it in `sessionStorage` and
 matching header answers 401 before the model is called. Only steps need it: the board and replay stay open.
 Unlike the origin allow-list, it also stops requests that send no Origin, such as `curl`.
 
-Unset, steps are open, which is right for local development and wrong for the judge URL. Set it
+Unset, steps are open, which is right for local development and wrong for the public demo URL. Set it
 (`openssl rand -hex 16`) only once the deployed frontend sends the header, or every step will be refused.
 Share the URL with the token on it; anyone holding that URL can run steps, so layers 3 and 4 still matter.
 
@@ -33,9 +33,9 @@ and 24 per case per hour (`RATE_LIMIT_*`). A full pipeline run is 4 steps.
 Client IPs are stored only as an HMAC keyed by `IP_HASH_SECRET`. Set it on the backend Vercel project to a
 long random value (`openssl rand -hex 32`) and never commit it. Rotating it resets the per-IP counts.
 
-## 4. Hard spend limit at the provider (operations, required before sharing the judge URL)
+## 4. Hard spend limit at the provider (operations, required before sharing the demo URL)
 
-Layers 1–3 stop or slow abuse; only the provider can stop the bill. Before the judge URL is shared:
+Layers 1–3 stop or slow abuse; only the provider can stop the bill. Before the demo URL is shared:
 
 1. In the console of the provider behind `LLM_BASE_URL`, create a **dedicated API key** for this project.
    Use it only as `LLM_API_KEY` on the backend Vercel project.

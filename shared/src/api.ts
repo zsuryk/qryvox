@@ -45,7 +45,7 @@ export const ChangeDispositionRequest = z.object({
 });
 export type ChangeDispositionRequest = z.infer<typeof ChangeDispositionRequest>;
 
-// --- The client layer (stage 2, #31). event_id is the browser's, so a retry appends nothing. ---
+// --- The client layer (#31). event_id is the browser's, so a retry appends nothing. ---
 
 // POST /cases/:caseId/clients — a new version of a client's profile. Advice drafted on the previous
 // version is superseded in the same transaction.

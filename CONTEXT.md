@@ -1,7 +1,7 @@
 # Qryvox domain glossary
 
-The words this project uses for its own concepts, as stage 1 settled them, plus the stage-2 terms agreed
-in #21 (marked *stage 2*: contracts for them land with #23 and #27). Issues, tests, code and docs
+The words this project uses for its own concepts, as the initial scope settled them, plus the client-layer terms agreed
+in #21 (marked *client layer*: contracts for them land with #23 and #27). Issues, tests, code and docs
 use these terms with these meanings. When a concept you need is missing here, that is a gap to settle,
 not licence to coin a synonym (see `docs/agents/domain.md`).
 
@@ -16,7 +16,7 @@ the `event_id` of its own `case.opened` event, so a retried open lands on the sa
 *Not* a pack (the material reviewed) and *not* a session or login.
 
 **Pack** — the set of documents one investment product ships with: a factsheet, a PPM excerpt, a
-marketing deck and a fee table. Stage 1 has exactly one, the fabricated Larkspur pack (`larkspur-v1`),
+marketing deck and a fee table. The initial scope has exactly one, the fabricated Larkspur pack (`larkspur-v1`; demo fixtures),
 served as static files under `/pack` with a manifest that pins each file by SHA-256.
 *Not* a case (one pack can be reviewed in many cases).
 
@@ -30,7 +30,7 @@ hash, kind, page count and pdf.js version).
 authority runs PPM, fee table, factsheet, deck. When two documents disagree, the finding is cited on the
 less authoritative one.
 
-**Fabricated** — invented for the demo. The product (Larkspur Global Income Fund) and the issuer
+**Fabricated** — invented as demo fixtures. The product (Larkspur Global Income Fund) and the issuer
 (Calderhaven Asset Management Ltd) do not exist, and every page says so.
 
 **Ground truth** — the answer key for a pack: every planted finding with its category, kind, cited
@@ -87,7 +87,7 @@ never computes a number and never advises.
 - `contradiction` — two documents state the same thing differently.
 - `unsupported_claim` — the deck or factsheet asserts something the PPM does not back.
 - `disclosure_gap` — the deck promises a benefit without the risk warning that should accompany it.
-- `policy_gap` *(stage 2)* — a document fails an institutional product rule, whatever the other documents say;
+- `policy_gap` *(client layer)* — a document fails an institutional product rule, whatever the other documents say;
   the finding names the rule. Differs from `disclosure_gap`, which compares documents with each other: a
   `disclosure_gap` is "the deck lacks a warning the PPM has", a `policy_gap` is "the factsheet lacks what our
   rules require". One passage can be both.
@@ -139,7 +139,7 @@ keeps both. A superseded finding cannot be decided (409). Made on Review's conso
 the canvas (#59): the same event, the same endpoint and the same keys (A, D).
 
 **Analyst / actor** — the analyst is the licensed human accountable for decisions. The actor is who an
-event records as having acted. In stage 1 every event's actor is one fixed identity, `demo-analyst`
+event records as having acted. For now every event's actor is one fixed identity, `demo-analyst`
 (`ANALYST_ACTOR`), with no login and no picker.
 
 ## The canvas (#48)
@@ -221,7 +221,7 @@ call, driven by the browser and recorded as a step run like any other, with the 
 (`intent`). Not part of the pipeline. A failed parse leaves the analyst's own chips standing and changes
 nothing else (`resolveIntent`). *Not* pdf.js parsing a document.
 
-## Policy and advice (stage 2)
+## Policy and advice
 
 **Rules** — the institution's own rules, versioned as one set (`rules@1`, now `rules@2`, which added S7) in two groups: **product rules**
 (P1, P2, …), which a document must meet to go on the shelf, and **suitability rules** (S1, S2, …), which
@@ -292,7 +292,7 @@ Drafted by the system (`advice.drafted`), decided by the adviser (`advice.decide
 profile or the product changes (`advice.superseded`). A client sees approved advice only.
 *Not* a recommendation the model makes: the rules decide and the adviser signs off.
 
-**Adviser** — the licensed human who approves or rejects advice. In stage 2, like the analyst, the fixed
+**Adviser** — the licensed human who approves or rejects advice. For now, like the analyst, the fixed
 `demo-analyst` actor (ADR-0004).
 
 **Vulnerable client** — a client who calls for extra care: 65 or over (a coarse, optional answer), or new
@@ -385,7 +385,7 @@ its category and its quote match a planted finding.
 | history, ledger, journal | event log | One log, one name. |
 | job, task | step run | There is no background work. |
 | tamper-proof, immutable chain | tamper-evident chain | The honest claim (ADR-0002). |
-| snapshot (for the event list) | event list, event page | "Snapshot" is reserved for the stage-2 JSON export. |
+| snapshot (for the event list) | event list, event page | "Snapshot" is reserved for the JSON export. |
 | offset, position (in a document) | page and quote | Citations never use character offsets. |
 | recommendation (for what the model does) | verdict, advice | The rules decide and the adviser signs off; no model recommends. |
 | suitability score, rating | verdict | A verdict is one of three values; nothing is scored or computed. |
@@ -409,7 +409,7 @@ settle each one before it spreads further.
    *extracts* statements from that text with a model.
 4. **"Contradictions" names a step that finds more than contradictions.** The step returns all three kinds
    of issue; only one kind is a contradiction.
-5. **The analyst is a constant, not a person.** Every decision, including an adviser's sign-off in stage 2,
+5. **The analyst is a constant, not a person.** Every decision, including an adviser's sign-off,
    is attributed to `demo-analyst` (ADR-0004). Real identities remain future work.
 6. ~~**How exactly a quote "matches" in eval.**~~ Settled by the eval tiles (#15): a finding matches a planted
    one when they share a category and either of the finding's quotes (citation or counterpart) contains the

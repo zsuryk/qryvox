@@ -17,7 +17,7 @@ import { errorMessage } from "../lib/errors";
 
 // The disposition console: the human decision, and the only one there is. Every finding on the case can be
 // approved or dismissed here, by button or by keyboard, and each decision is an event appended to the
-// log under the fixed stage-1 analyst identity (spec decision 34, spec decision 9).
+// log under the fixed single analyst identity (spec decision 34, spec decision 9).
 //
 // The console holds no disposition state of its own. It knows two things: which finding the analyst is
 // standing on, and which request is in flight. Everything it shows about a decision is folded from the

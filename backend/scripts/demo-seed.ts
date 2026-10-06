@@ -1,11 +1,13 @@
-// pnpm demo:seed -- --base <url> [--token <API token>] [--web <frontend url>]
+// pnpm seed:demo -- --base <url> [--token <API token>] [--web <frontend url>]
+//
+// The Larkspur and Wrenfield packs it seeds are fabricated fixtures, not real products.
 //
 // Builds the demo state on any deployment, through the HTTP API only: two verified products (Larkspur,
 // revised, and Wrenfield) with the five steps run, facts read, rationales written and every finding on the
 // board dispositioned, then for each product's three personas a profile, a drafted advice, an explanation and
-// the adviser's approval. A judge opening the deployment then finds what the local demo shows.
+// the adviser's approval. Someone opening the deployment then finds what the local demo shows.
 //
-//   pnpm demo:seed -- --base https://qryvox-api.vercel.app --token $API_TOKEN --web https://qryvox.vercel.app
+//   pnpm seed:demo -- --base https://qryvox-api.vercel.app --token $API_TOKEN --web https://qryvox.vercel.app
 //
 // Idempotent by product. A product's case id is derived from its pack, so a second run lands on the same case,
 // reads its log, and does only what the log says is missing: a product already verified, dispositioned and
@@ -39,7 +41,7 @@ import {
   type StepResult,
 } from "@qryvox/shared";
 
-// pnpm forwards the "--" in `pnpm demo:seed -- --base ...`, and parseArgs would read everything after it as positional.
+// pnpm forwards the "--" in `pnpm seed:demo -- --base ...`, and parseArgs would read everything after it as positional.
 const argv = process.argv.slice(2).filter((arg, i) => !(i === 0 && arg === "--"));
 const { values: args } = parseArgs({
   args: argv,
@@ -50,7 +52,7 @@ const BASE = (args.base ?? process.env.SEED_BASE_URL ?? "").replace(/\/$/, "");
 const TOKEN = args.token ?? process.env.API_TOKEN ?? "";
 const WEB = (args.web ?? "").replace(/\/$/, "");
 if (!BASE) {
-  console.error("usage: pnpm demo:seed -- --base <api url> [--token <API token>] [--web <frontend url>]");
+  console.error("usage: pnpm seed:demo -- --base <api url> [--token <API token>] [--web <frontend url>]");
   process.exit(2);
 }
 
@@ -311,6 +313,7 @@ for (const { pack, caseId } of packs) {
   console.log(`  ${pack.manifest.product}: chain ${verify.intact ? "intact" : "BROKEN"}, ${verify.event_count} events`);
 }
 
+console.log("DEMO DATA — fabricated");
 console.log("\nCases");
 for (const { pack, caseId } of packs) {
   console.log(`  ${pack.manifest.product} (${pack.manifest.pack_id})`);

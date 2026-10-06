@@ -8,7 +8,7 @@ names Anthropic: read "the model provider" there.
 ## Context
 
 ADR-0001 was written around the Anthropic API: analysis steps "need the Anthropic API", the real bill is
-"Anthropic API tokens", and the spend backstop is "a hard spend limit in the Anthropic console". Stage 1
+"Anthropic API tokens", and the spend backstop is "a hard spend limit in the Anthropic console". The implementation
 built something more general. The backend calls any chat-completions endpoint that speaks the OpenAI
 protocol, chosen entirely by environment (`LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_TEMPERATURE`,
 `LLM_TIMEOUT_MS`), and imports no provider SDK.

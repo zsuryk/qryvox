@@ -1,6 +1,6 @@
 import type { DocumentKind, GroundTruthEntry } from "../src";
 
-// The fabricated pack, authored as text. scripts/generate-pack.ts renders it to PDFs and writes the
+// The fabricated pack (demo fixtures), authored as text. scripts/generate-pack.ts renders it to PDFs and writes the
 // manifest and ground truth from this one source, so the answer key cannot drift from the documents.
 //
 // Line markup: "# " title, "## " heading, anything else body text. Every ground-truth quote must be a

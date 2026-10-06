@@ -18,7 +18,7 @@
     "deploy:web": "bash scripts/deploy.sh web",
     "deploy:all": "bash scripts/deploy.sh all",
     "smoke": "pnpm --filter @qryvox/backend smoke",
-    "demo:seed": "pnpm --filter @qryvox/backend demo:seed",
+    "seed:demo": "pnpm --filter @qryvox/backend seed:demo",
     "e2e": "pnpm --filter @qryvox/backend e2e"
   },
   "devDependencies": {

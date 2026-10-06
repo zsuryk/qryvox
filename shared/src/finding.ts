@@ -11,7 +11,7 @@ export const FindingKind = z.enum([
   "unsupported_claim",
   // A promise made without the risk disclosure that should accompany it.
   "disclosure_gap",
-  // A document falls short of an institutional product rule, whatever the other documents say (stage 2).
+  // A document falls short of an institutional product rule, whatever the other documents say .
   // The finding names the rule.
   "policy_gap",
 ]);
@@ -42,7 +42,7 @@ export const Finding = z.object({
   citation: Citation,
   counterpart: Citation.nullable(),
   // The product rule a policy_gap breaks (rules.ts). Absent on every other kind, and on events written
-  // before stage 2.
+  // today.
   rule: ProductRuleId.optional(),
 });
 export type Finding = z.infer<typeof Finding>;

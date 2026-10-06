@@ -328,7 +328,7 @@ function openapi(lang: Lang) {
 
   return {
     openapi: "3.1.0",
-    info: { title: t.title, version: "stage-1", description: t.description },
+    info: { title: t.title, version: "1.0.0", description: t.description },
     servers: [{ url: origin }],
     paths: {
       "/health": {
