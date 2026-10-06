@@ -11,11 +11,18 @@ adviser. Each row names the obligation, the control we built, and where it lives
 ## In one paragraph
 
 A model reads the documents and writes the words, and that is all it does. Product facts are grounded in
-verbatim quotes. Suitability is decided by fixed, versioned rules in a pure function. A named adviser
-approves every piece of advice before the client sees it, and a rejection must give a reason. Vulnerable
-clients need a second, recorded confirmation. Every one of these acts is an append-only, hash-chained event
-that can be replayed to any point. That covers what a regulator asks for: why the advice was given, by whom,
-on what evidence, and under which rules.
+verbatim quotes. Suitability is decided by fixed, versioned rules in a pure function. No piece of advice
+reaches a client without a human approval, and a rejection must give a reason. Vulnerable clients need a
+second, recorded confirmation. Every one of these acts is an append-only, hash-chained event that can be
+replayed to any point. That covers what a regulator asks for: why the advice was given, on what evidence,
+and under which rules.
+
+One obligation of that list is *not* met, and no row below should be read as saying it is. The log records
+what was decided and when, but not who typed it: every event's `actor` is the fixed identity
+`demo-analyst` (ADR-0004). A deployment is single-tenant and client pages are open to anyone holding the
+link, so there is no per-client access control and no decision can be attributed to a named, licensed
+person. Real identities, roles, tenancy and a licensed operator are future work (README, "Demo mode &
+limitations"; `docs/deploying.md`).
 
 ## Hong Kong: SFC Code of Conduct and the suitability obligation
 
@@ -28,7 +35,7 @@ on what evidence, and under which rules.
 | **Disclosure of material information** | S6 discloses every open fees or terms finding to the client, whatever the verdict. Each disclosure cites the more authoritative document. | `shared/src/suitability.ts` (`disclose`), `frontend/app/client-advice.tsx` |
 | **Explaining the recommendation in a way the client understands** | The explanation comes at three depths, starting at the client's own knowledge level, in English or Traditional Chinese (ADR-0006). Each statement is one tap from its source page. The explain step refuses quotes and numbers that are not in the advice or the documents. | `backend/src/steps/explain.ts`, `frontend/lib/i18n.ts` |
 | **Alternatives** | When a product does not suit, the same rules check every other verified product on the shelf. The suitable ones are offered, each with its own reasons and citations. | `backend/src/advice.ts` (`alternativesFor`) |
-| **Supervision and accountability** | A named adviser approves or rejects every draft, and nothing approves itself. A rejection must carry one of five reasons, which can be counted. | `backend/src/advice.ts` (`decideAdvice`), `backend/src/app.ts`, ADR-0004, ADR-0005 |
+| **Supervision and accountability** | An adviser approves or rejects every draft, and nothing approves itself. A rejection must carry one of five reasons, which can be counted. The approval is attributable to a decision and its reason, not to a person: every decision's actor is `demo-analyst`. | `backend/src/advice.ts` (`decideAdvice`), `backend/src/app.ts`, ADR-0004, ADR-0005 |
 | **Record keeping** (Securities and Futures (Keeping of Records) Rules) | All of the above is held in an append-only, hash-chained event log. `GET /cases/:id/verify` proves that nothing was altered. Each step records its prompt version, model and raw response, and each advice records its `rules@` version. | `backend/src/log.ts`, `backend/src/hash.ts`, ADR-0002 |
 
 ## Hong Kong: online advisory platforms
@@ -60,7 +67,7 @@ vulnerable customers, such as those aged 65 or over.
 | DPP1, collection limited to purpose | The profile asks only what a rule reads. It does not collect name, income, net worth or date of birth. | `shared/src/client.ts`, ADR-0005 |
 | DPP2, accuracy and retention | The client sees their answers back with a "something wrong?" route, and new answers supersede the advice. Retention and erasure-by-key-deletion are designed but not built. | `frontend/app/client-advice.tsx`, `docs/data-ecosystem.md` |
 | DPP3, use | How a client reads their advice is shared with the adviser only if the client turns it on. It only ever produces a suggestion. | `frontend/app/client-advice.tsx`, #38 |
-| DPP4, security | Clients get pseudonymous ids. IPs are stored only as a keyed HMAC. A API token and an origin allow-list protect the paid endpoints. | `backend/src/guards.ts`, `shared/src/client.ts` |
+| DPP4, security | Clients get pseudonymous ids. IPs are stored only as a keyed HMAC. One shared API token guards the calls that spend model tokens, and an origin allow-list refuses other sites' browser requests. Neither is access control: both are held by everyone who has the demo link. | `backend/src/guards.ts`, `shared/src/client.ts` |
 | DPP5, openness | The client start page says what is collected and that no name or account is needed. | `frontend/app/client-start.tsx` |
 | DPP6, access and correction | The client's own page shows everything they told us. | `frontend/app/client-advice.tsx` (`YourAnswers`) |
 
@@ -83,3 +90,9 @@ vulnerable customers, such as those aged 65 or over.
 - Encryption of profile data and the erasure design in `docs/data-ecosystem.md` are not built.
 - There is one fixed adviser identity (ADR-0004). Real deployments need authentication, roles and
   four-eyes review on rule changes.
+- No identity behind any of it: no login, no sessions, no per-user authorisation, and a deployment is
+  single-tenant, so one person's dispositions are recorded as the analyst's own.
+- Client pages are reachable by link and possession of the link is the only check, so nothing keeps one
+  client's page from another's.
+- Nothing here is licensed, registered or supervised. There is no licensed operator behind the fixed
+  adviser identity, so a real client could not be advised through this as it stands.

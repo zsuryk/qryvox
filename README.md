@@ -1,6 +1,6 @@
 # Qryvox
 
-A diligence copilot for investment products. It ingests a product pack — factsheet, PPM excerpt, marketing deck, fee table — extracts and cross-checks the claims those documents make against each other and against institutional product rules, and matches the product against client profiles. Every step is appended to a hash-chained event log, every finding carries a citation to a page, suitability verdicts come from fixed rules rather than the model, and a licensed adviser approves advice before a client sees it.
+A diligence copilot for investment products. It ingests a product pack — factsheet, PPM excerpt, marketing deck, fee table — extracts and cross-checks the claims those documents make against each other and against institutional product rules, and matches the product against client profiles. Every step is appended to a hash-chained event log, every finding carries a citation to a page, suitability verdicts come from fixed rules rather than the model, and an adviser approves advice before a client sees it.
 
 Demo mode, fixtures and current limitations are in [Demo mode & limitations](#demo-mode--limitations).
 
@@ -61,7 +61,7 @@ Deploys are owner-only Vercel CLI runs from a staged copy of the repo, never the
 
 ## Demo mode & limitations
 
-- **Fixed identity.** Every event, including an adviser's sign-off, is attributed to `demo-analyst`. There is no login and no identity picker.
+- **Fixed identity.** Every event, including an adviser's sign-off, is attributed to `demo-analyst`. There is no login and no identity picker, and no licensed person behind that name — it is a constant in the code, not a user.
 - **Shared token.** When `API_TOKEN` is set, an analysis step needs the header `x-api-token` with that value. It is one shared secret, not per-user auth.
 - **Link-as-capability.** Client pages are reachable by link; possession of the link is the only check.
 - **Single tenant.** One local SQLite file in development, one Turso database in production.

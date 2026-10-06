@@ -73,7 +73,8 @@ evidence looks like, without bringing a text box back in.
 - The interface has no free-text box in its main path. An analyst who has never written a prompt runs
   the whole review with cards, buttons and drags. The prompt engineering is compiled, versioned and
   tested behind them.
-- The canvas inherits everything the log gives: replay, the hash chain, and "who did what, when".
+- The canvas inherits everything the log gives: replay, the hash chain, and what was decided and when —
+  all under one fixed actor, `demo-analyst`, never a named person (ADR-0004).
 - The card vocabulary is closed. A new kind of card or operation is a contract change, made additively
   like any other event.
 - On a big case, the first view fits the content but never below 70% zoom, so it opens readable.

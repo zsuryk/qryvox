@@ -62,6 +62,13 @@ The cost is roughly linear in clients, with a small constant. To turn tokens int
 provider's current price list. The endpoint is OpenAI-compatible (ADR-0003), so a cheaper or local model
 is a configuration change, and the eval measures what it costs in quality.
 
+**That table is arithmetic about model tokens, not a claim of production readiness for many users.** A
+deployment today is single-tenant with no accounts: every event's actor is the fixed identity
+`demo-analyst` (ADR-0004), client pages are open to anyone with the link, and there is no tenancy,
+authorisation or session layer at all. So "1,000 clients" is a cost projection over the measured per-client
+cost, and serving a thousand real people would first need accounts, per-client access control and
+isolation — none of it built (README, "Demo mode & limitations"; `docs/deploying.md`).
+
 ## The adviser
 
 The adviser does not read documents per client. That was done once, when the product was verified.

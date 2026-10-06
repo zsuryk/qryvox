@@ -57,8 +57,10 @@ asks whether the human decision behind it would satisfy a regulator. Measured ag
 
 - The client's goal now shapes what they read: Mr Lee (growth) is told Larkspur is built mainly for income;
   Mrs Chan (income) is told Wrenfield is built first to keep capital safe, and is still offered it.
-- Every adviser decision in the log is explainable: who, when, which way, and — for a rejection — why, and
-  — for a vulnerable client — that it was explained to them directly.
+- Every adviser decision in the log is explainable: which way, when, under which rules version, and — for
+  a rejection — why, and — for a vulnerable client — that it was explained to them directly. The decision
+  carries an actor, but in demo mode that actor is always `demo-analyst`, so the log explains what was
+  decided and never which of several people decided it (ADR-0004).
 - Advice drafted under rules@1 keeps saying rules@1; replay shows each advice under the rules it was given.
 - Attributes runs recorded before rules@2 have no primary objective; S7 is silent on them until the facts
   are read again.

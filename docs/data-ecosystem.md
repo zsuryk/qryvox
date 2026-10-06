@@ -71,6 +71,10 @@ its ground truth and the three personas.
 - The rules are fabricated institutional policy, not regulation, and are far fewer than a real policy.
 - The prototype's personal data is invented and stored unencrypted; the encryption design above is not
   built.
+- Access is not modelled at all. A deployment is single-tenant, every event's actor is the fixed identity
+  `demo-analyst` (ADR-0004), and a client's page is open to anyone holding the link, so nothing in the
+  product keeps one client's data from another's at the access layer. Real identities, roles and tenancy
+  are future work.
 - Extraction quality depends on the model; the eval (precision, recall and advice accuracy against the
   answer keys) is how a change of model is judged, and grounding drops what a model invents but cannot
   make it find what it missed.
