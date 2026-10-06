@@ -8,7 +8,7 @@ language; supersedes nothing. The single-product link flow stays.
 ## Context
 
 A client started from one product's link and saw that product's verdict; the whole shelf (#68) sat at the
-bottom of the page. The journey we pitch runs the other way: answer the questionnaire once, then see every
+bottom of the page. The journey this product runs the other way: answer the questionnaire once, then see every
 verified product, each saying whether it suits you.
 
 The log is per case, and a case is one product (ADR-0002). A hash chain, the fold, replay and the audit all

@@ -42,6 +42,8 @@ whole model. Know what it does and does not cover before sharing that URL:
   when the page loads (`frontend/lib/api.ts`) and sent as the **`x-api-token`** header on every request.
   The env var is **`API_TOKEN`** (`.env.example`), and it is set on the backend Vercel project before the
   URL is shared. Unset, analysis steps are open — right locally, wrong on a public URL.
+  It was called `JUDGE_TOKEN` until #86: rename the variable on the backend Vercel project (the backend
+  still reads the old name and warns, but `.env.deploy` must carry `API_TOKEN` for `deploy.sh` to sync it).
 - **What it protects: the calls that spend model tokens, and only those.** The guard covers
   `POST /cases/:caseId/steps` — `extract`, `decompose`, `contradictions`, `compliance`, `findings`,
   `attributes`, `explain`, `parse`, `rationale` (`backend/src/guards.ts`). A missing or wrong token is a

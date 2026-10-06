@@ -3,11 +3,11 @@
 ## Status
 
 accepted — 2026-10-04 — deciders: <names>. Spec #48; tickets #49–#67. Extends ADR-0002 (the event log)
-and the "no free text" interaction principle in the README.
+and the "no free text" interaction principle (see the README's Features list).
 
 ## Context
 
-Most entries in this track are a chat box in front of a model: the user has to know what to ask and
+Most model-backed tools are a chat box in front of a model: the user has to know what to ask and
 how to phrase it, and the answer is prose that can't be checked, sorted or filed. Our users are analysts
 vetting a product. What they need is to *collect* evidence: the passages that disagree, the claims
 the PPM doesn't back, the fees stated two ways. They then need to put it in order as the reportable set,

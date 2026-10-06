@@ -174,7 +174,7 @@ describe("intake", () => {
     // A dropped File starts out naming nothing but itself, so the kind is only known after the parse.
     const { api } = recorder();
     const { settled, onTile } = tiles();
-    await intake([dropped("Larkspur-Fee-Table.pdf")], { assets: nodeAssets, api, ingested: [], onTile });
+    await intake([dropped("larkspur-fee-table.pdf")], { assets: nodeAssets, api, ingested: [], onTile });
 
     expect(settled()[0]).toMatchObject({ kind: "fee_table", status: "ingested" });
     expect(settled()[0]?.detail).toContain(packFile("fee-table").sha256.slice(0, 12));

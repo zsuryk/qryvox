@@ -96,11 +96,12 @@ describe("the API token", () => {
     expect((await step(t, caseId, { [API_TOKEN_HEADER]: "test-secret" })).status).toBe(200);
   });
 
-  it("rejects the retired x-judge-token header", async () => {
+  it("still accepts the retired x-judge-token header, while the old frontend is still deployed", async () => {
     const t = await setup({ llm: new FakeLlm(() => EXTRACT_REPLY), guards: guarded });
     const caseId = await caseWithDocument(t);
 
-    expect((await step(t, caseId, { "x-judge-token": "test-secret" })).status).toBe(401);
+    expect((await step(t, caseId, { "x-judge-token": "test-secret" })).status).toBe(200);
+    expect((await step(t, caseId, { "x-judge-token": "a-guess" })).status).toBe(401);
   });
 
   it("leaves everything that spends nothing open: opening a case, ingesting, reading the log", async () => {

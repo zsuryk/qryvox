@@ -142,6 +142,18 @@ the canvas (#59): the same event, the same endpoint and the same keys (A, D).
 event records as having acted. For now every event's actor is one fixed identity, `demo-analyst`
 (`ANALYST_ACTOR`), with no login and no picker.
 
+**Demo mode** — the shape the product ships in, deliberately (ADR-0004, amended in #90): one fixed analyst
+identity, no accounts, no tenancy, one shared API token, client pages reachable by link, and fabricated
+fixtures. Real accounts, roles and per-user authorisation are future work. *Not* a development setting and
+*not* a mock: the pipeline, grounding, rules, log and replay all run for real on real documents; only the
+materials and the identities are stand-ins.
+
+**API token** — the one shared secret that gates `POST /cases/:caseId/steps`, the only calls that spend
+model tokens: env `API_TOKEN`, header `x-api-token`, taken from a `?k=<token>` link into `sessionStorage`
+(ADR-0001). *Not* an identity, not a session and not access control: it says the caller holds the demo link
+and nothing about who they are. The name was `JUDGE_TOKEN` / `x-judge-token` until #86; both are still accepted while the old frontend is
+deployed and are dropped in #96.
+
 ## The canvas (#48)
 
 **Canvas** — the case's findings and the passages they cite, laid out as cards on an open, infinite view
@@ -376,7 +388,7 @@ its category and its quote match a planted finding.
 
 | Avoid | Say instead | Why |
 |---|---|---|
-| flag, alert (as a noun) | finding | The README's pitch says "flag"; the product, code and tickets say finding. |
+| flag, alert (as a noun) | finding | The README says "flags"; the product, code and tickets say finding. |
 | issue (for what the board shows) | finding | Issue is the `contradictions` step's internal output. |
 | review, session, project | case | One word for one review. |
 | bundle, document set, dossier | pack | One word for the product's documents. |
@@ -398,7 +410,7 @@ These words are genuinely ambiguous today. They are flagged rather than given a 
 settle each one before it spreads further.
 
 1. **"Claim" means three things.** In the README, a claim is what a product's documents assert
-   ("verifies an investment product's own claims"). In the pipeline, a claim is `decompose`'s atomic
+   ("cross-checks the claims those documents make"). In the pipeline, a claim is `decompose`'s atomic
    fact (`c6`). And `Finding.claim` is a finding's one-sentence description, which is not a claim in
    either sense. Renaming the field (e.g. to `statement` or `description`) is a breaking contract change,
    so it would need an additive new field first.

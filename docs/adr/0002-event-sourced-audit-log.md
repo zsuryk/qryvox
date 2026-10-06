@@ -12,7 +12,7 @@ Each analysis step's event stores the raw LLM response alongside the parsed resu
 
 Every event carries `case_id` (each demo run opens a new case — no database wiping), `actor` (the licensed human accountable for a disposition — settled in ADR-0004 as one fixed identity, `demo-analyst`, so today the field records a constant, not a person), and `at` (wall-clock time for the scrubber; `seq` stays the ordering key).
 
-"Replayable audit log — any past decision reconstructable exactly" is a pitch-critical claim of the moat, and event sourcing makes replay a fold over the log rather than a feature we build. It's also economical: the analysis steps, dispositions, and eval tiles already need the same stream of events, so the board, the replay scrubber, and the precision/recall dashboard all read from one source.
+"Replayable audit log — any past decision reconstructable exactly" is a claim the product has to keep, and event sourcing makes replay a fold over the log rather than a feature we build. It's also economical: the analysis steps, dispositions, and eval tiles already need the same stream of events, so the board, the replay scrubber, and the precision/recall dashboard all read from one source.
 
 ## Considered options
 

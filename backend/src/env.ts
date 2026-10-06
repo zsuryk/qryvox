@@ -12,7 +12,7 @@ export const env = {
     // Comma-separated; the frontend origin(s).
     allowedOrigins: (process.env.ALLOWED_ORIGIN ?? "http://localhost:3000").split(",").map((o) => o.trim()),
     ipHashSecret: ipHashSecret(),
-    apiToken: process.env.API_TOKEN || null,
+    apiToken: apiToken(),
     limits: {
       windowSeconds: Number(process.env.RATE_LIMIT_WINDOW_SECONDS ?? 3600),
       stepsPerIp: Number(process.env.RATE_LIMIT_STEPS_PER_IP ?? 60),
@@ -20,6 +20,19 @@ export const env = {
     },
   },
 };
+
+// JUDGE_TOKEN, the name this variable carried until #86. Still read so a Vercel project that has not
+// been migrated keeps its guard: an unset API_TOKEN alone would silently leave analysis steps open on
+// the public URL, which is the one failure the guard exists to stop. Remove it with the header fallback
+// in guards.ts (#96).
+function apiToken(): string | null {
+  const current = process.env.API_TOKEN;
+  const retired = process.env.JUDGE_TOKEN;
+  if (!current && retired) {
+    console.warn("JUDGE_TOKEN is set and API_TOKEN is not: rename the Vercel variable to API_TOKEN (#86).");
+  }
+  return current || retired || null;
+}
 
 // Required against a hosted database: every instance must hash with the same key, or the per-IP limit
 // splits across instances. A local file database gets a fixed development key.

@@ -294,7 +294,9 @@ async function advisePersonas(pack: Pack, caseId: string): Promise<void> {
 
 // --- Run -----------------------------------------------------------------------------------------------
 
-console.log(`demo seed against ${BASE}${TOKEN ? " (API token set)" : ""}`);
+// Printed before anything runs, so a run that dies half way still says what it was doing.
+console.log("DEMO DATA — fabricated");
+console.log(`seeding ${BASE}${TOKEN ? " (API token set)" : ""}`);
 const health = await call("GET", "/health");
 if (health.status !== 200) throw new Error(`GET /health -> ${health.status}: is ${BASE} an API?`);
 
@@ -313,7 +315,6 @@ for (const { pack, caseId } of packs) {
   console.log(`  ${pack.manifest.product}: chain ${verify.intact ? "intact" : "BROKEN"}, ${verify.event_count} events`);
 }
 
-console.log("DEMO DATA — fabricated");
 console.log("\nCases");
 for (const { pack, caseId } of packs) {
   console.log(`  ${pack.manifest.product} (${pack.manifest.pack_id})`);
