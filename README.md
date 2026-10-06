@@ -45,6 +45,9 @@ To build the demo state (two verified products, every finding dispositioned, thr
 pnpm seed:demo -- --base http://localhost:8787
 ```
 
+The seed drives the real analysis steps, so it needs a model: set `LLM_BASE_URL`, `LLM_MODEL` and
+`LLM_API_KEY` in `.env` first, or the first step comes back 503 and the seed stops.
+
 The Larkspur and Wrenfield packs, their ground truth and every persona are **fabricated fixtures** — no real issuer, no real performance data.
 
 ## Testing
